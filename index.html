@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拾逅花事 MOMENT FLOR | 雲端 POS 系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        body { font-family: 'Noto Serif TC', serif; background-color: #f8f6f2; color: #4a4a4a; }
+        .card { background: white; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.05); }
+        .btn-primary { background-color: #8e9775; color: white; transition: 0.3s; cursor: pointer; }
+        .btn-primary:hover { background-color: #6d7756; }
+        .btn-pay, .btn-store { border: 2px solid #e5e7eb; transition: 0.2s; cursor: pointer; }
+        .btn-pay.active, .btn-store.active { border-color: #8e9775; background-color: #f1f3eb; color: #6d7756; font-weight: bold; }
+        .status-dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+ 
+        /* 來客來源按鈕 */
+        .source-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-bottom: 12px; }
+        .source-btn {
+            padding: 7px 4px;
+            border: 2px solid #e5e7eb;
+            border-radius: 10px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Serif TC', serif;
+            font-size: 11px;
+            color: #6b7280;
+            text-align: center;
+        }
+        .source-btn:hover { border-color: #8e9775; background: #f1f3eb; color: #6d7756; }
+        /* 分類卡片 */
+        .cat-card {
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px 8px;
+            border: 2px solid #e5e7eb; border-radius: 12px;
+            background: white; cursor: pointer;
+            transition: all 0.2s;
+            font-family: 'Noto Serif TC', serif;
+        }
+        .cat-card:hover { border-color: #8e9775; background: #f1f3eb; transform: translateY(-1px); box-shadow: 0 4px 12px rgba(0,0,0,0.06); }
+        .cat-card-icon { font-size: 26px; margin-bottom: 6px; line-height: 1; }
+        .cat-card-name { font-size: 13px; font-weight: bold; color: #4a4a4a; }
+        .cat-card-count { font-size: 10px; color: #9ca3af; margin-top: 2px; }
+ 
+        /* 分類 Tab */
+        .cat-tab {
+            padding: 5px 14px; border-radius: 20px; font-size: 12px;
+            border: 2px solid #e5e7eb; background: white;
+            color: #6b7280; cursor: pointer; transition: all 0.2s;
+            font-family: 'Noto Serif TC', serif;
+        }
+        .cat-tab:hover { border-color: #8e9775; color: #6d7756; }
+        .cat-tab.active { border-color: #8e9775; background-color: #f1f3eb; color: #6d7756; font-weight: bold; }
+ 
+        /* 桌機隱藏手機專用元素 */
+        .mobile-header, .mobile-store-bar, .mobile-checkout-bar, .mobile-layout { display: none; }
+ 
+        @media (max-width: 768px) {
+            body { padding: 0 !important; padding-bottom: 80px !important; }
+            .desktop-header, .desktop-store-bar, .desktop-layout, .report-section { display: none !important; }
+ 
+            /* 精簡 header */
+            .mobile-header {
+                display: flex !important;
+                position: sticky; top: 0; z-index: 100;
+                background: white; padding: 10px 14px;
+                align-items: center; justify-content: space-between;
+                border-bottom: 2px solid #8e9775;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            }
+            .mobile-header-title { font-size: 17px; font-weight: bold; color: #8e9775; }
+ 
+            /* 門市切換 */
+            .mobile-store-bar {
+                display: flex !important;
+                padding: 8px 14px; gap: 8px;
+                background: #f8f6f2; border-bottom: 1px solid #e5e7eb;
+            }
+            .mobile-store-bar .store-btn { flex: 1; text-align: center; padding: 9px 4px; font-size: 13px; border-radius: 8px; }
+ 
+            /* 固定底部結帳列 */
+            .mobile-checkout-bar {
+                display: flex !important;
+                position: fixed; bottom: 0; left: 0; right: 0; z-index: 90;
+                background: #2e2926; padding: 12px 16px;
+                align-items: center; justify-content: space-between;
+                box-shadow: 0 -4px 16px rgba(0,0,0,0.2);
+            }
+            .mob-co-left { display: flex; flex-direction: column; }
+            .mob-co-count { font-size: 11px; color: #9ca3af; }
+            .mob-co-total { font-size: 20px; font-weight: bold; color: #DFC07A; line-height: 1.2; }
+            .mob-co-btn {
+                background: #8e9775; color: white; border: none;
+                border-radius: 25px; padding: 13px 28px;
+                font-size: 15px; font-weight: bold; cursor: pointer;
+                font-family: 'Noto Serif TC', serif;
+                transition: background 0.2s;
+            }
+            .mob-co-btn:active { background: #6d7756; }
+            .mob-co-btn:disabled { opacity: 0.5; }
+ 
+            /* 手機版主體 */
+            .mobile-layout { display: block !important; }
+ 
+            /* 區塊通用 */
+            .mob-section {
+                background: white; margin-bottom: 8px;
+                border-bottom: 1px solid #e5e7eb;
+            }
+            .mob-section-header {
+                display: flex; align-items: center; justify-content: space-between;
+                padding: 13px 16px; cursor: pointer;
+            }
+            .mob-section-title { font-size: 14px; font-weight: bold; color: #4a4a4a; }
+            .mob-section-badge {
+                background: #8e9775; color: white;
+                font-size: 11px; padding: 2px 8px; border-radius: 10px;
+            }
+            .mob-section-arrow { color: #9ca3af; font-size: 16px; transition: transform 0.2s; }
+            .mob-section-arrow.open { transform: rotate(180deg); }
+            .mob-section-body { padding: 0 16px 14px; }
+ 
+            /* 快速收銀 */
+            .mob-pos { background: white; margin-bottom: 8px; padding: 14px 14px 6px; }
+            .mob-pos-title { font-size: 14px; font-weight: bold; color: #4a4a4a; margin-bottom: 12px; }
+ 
+            /* 分類卡片手機版 */
+            #mob-categoryGrid { grid-template-columns: repeat(3, 1fr); gap: 8px; }
+            .cat-card { padding: 16px 6px; }
+            .cat-card-icon { font-size: 24px; }
+            .cat-card-name { font-size: 12px; }
+ 
+            /* 品項卡片手機版 */
+            #mob-productGrid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+ 
+            /* 購物車品項在手機上加大按鈕 */
+            .qty-btn-mob { width: 36px !important; height: 36px !important; font-size: 18px !important; }
+        }
+    </style>
+</head>
+<body>
+ 
+    <!-- ══ 手機版 Header ══ -->
+    <div class="mobile-header">
+        <span class="mobile-header-title">🌸 拾逅花事 POS</span>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <div id="connStatusMob" style="font-size:11px;color:#9ca3af;display:flex;align-items:center;gap:4px;"><span class="status-dot" style="background:#9ca3af;width:7px;height:7px;"></span>尚未連線</div>
+            <button onclick="openSettings()" style="font-size:12px;color:#8e9775;background:none;border:1px solid #8e9775;padding:4px 10px;border-radius:20px;cursor:pointer;">設定</button>
+        </div>
+    </div>
+ 
+    <!-- ══ 手機版門市切換 ══ -->
+    <div class="mobile-store-bar">
+        <button onclick="setStore('台南FOCUS')" class="store-btn btn-store text-sm" id="mob-store-台南FOCUS">台南FOCUS</button>
+        <button onclick="setStore('高雄FOCUS 13')" class="store-btn btn-store text-sm" id="mob-store-高雄FOCUS 13">高雄FOCUS 13</button>
+    </div>
+ 
+    <!-- ══ 手機版主體 ══ -->
+    <div class="mobile-layout">
+ 
+        <!-- 1. 購物車（摺疊） -->
+        <div class="mob-section">
+            <div class="mob-section-header" onclick="toggleMobSection('mob-cart-body', this)">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span class="mob-section-title">🛒 結帳清單</span>
+                    <span class="mob-section-badge" id="mob-cart-badge">0</span>
+                </div>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span id="mob-cart-total-preview" style="font-size:14px;font-weight:bold;color:#8e9775;">NT$ 0</span>
+                    <span class="mob-section-arrow">▼</span>
+                </div>
+            </div>
+            <div class="mob-section-body" id="mob-cart-body" style="display:none;">
+                <div id="mob-cartItems" style="max-height:260px;overflow-y:auto;margin-bottom:10px;">
+                    <p style="text-align:center;color:#d1d5db;padding:20px 0;font-size:13px;">尚無項目</p>
+                </div>
+                <div style="border-top:1px solid #f3f4f6;padding-top:10px;">
+                    <div style="display:flex;justify-content:space-between;font-size:12px;color:#9ca3af;margin-bottom:4px;"><span>小計</span><span id="mob-subtotal">NT$ 0</span></div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;font-size:12px;color:#9ca3af;margin-bottom:4px;">
+                        <span>折扣</span>
+                        <div style="display:flex;align-items:center;gap:6px;">
+                            <span id="mob-discountDisplay" style="color:#f87171;">—</span>
+                            <button onclick="openDiscountModal()" style="font-size:11px;border:1px solid #8e9775;color:#8e9775;padding:2px 8px;border-radius:20px;background:none;cursor:pointer;">折扣</button>
+                        </div>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;font-size:18px;font-weight:bold;color:#8e9775;padding-top:6px;border-top:1px solid #f3f4f6;">
+                        <span>合計</span><span id="mob-total">NT$ 0</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+        <!-- 2. 快速收銀 -->
+        <div class="mob-pos">
+            <div class="mob-pos-title">🌸 快速收銀</div>
+            <div id="mob-categoryView">
+                <div class="grid" id="mob-categoryGrid" style="grid-template-columns:repeat(3,1fr);gap:8px;">
+                    <p style="grid-column:1/-1;text-align:center;color:#d1d5db;padding:20px 0;font-size:13px;">連線後載入...</p>
+                </div>
+            </div>
+            <div id="mob-productView" style="display:none;">
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:12px;">
+                    <button onclick="backToCategoryMob()" style="font-size:13px;color:#8e9775;background:none;border:none;cursor:pointer;">← 返回</button>
+                    <span style="font-weight:bold;font-size:14px;" id="mob-currentCategoryLabel"></span>
+                </div>
+                <div class="grid" id="mob-productGrid" style="grid-template-columns:repeat(2,1fr);gap:8px;"></div>
+            </div>
+        </div>
+ 
+        <!-- 3. 會員查詢 -->
+        <div class="mob-section">
+            <div class="mob-section-header" onclick="toggleMobSection('mob-member-body', this)">
+                <span class="mob-section-title">👥 會員查詢</span>
+                <span class="mob-section-arrow">▼</span>
+            </div>
+            <div class="mob-section-body" id="mob-member-body" style="display:none;">
+                <div style="display:flex;gap:8px;margin-bottom:10px;">
+                    <input type="text" id="memberSearch" placeholder="輸入手機號碼..."
+                        style="flex:1;border:1px solid #e5e7eb;border-radius:8px;padding:10px 12px;font-size:14px;outline:none;font-family:'Noto Serif TC',serif;">
+                    <button onclick="searchMember()" class="btn-primary" style="padding:10px 16px;border-radius:8px;border:none;font-size:13px;white-space:nowrap;cursor:pointer;">查詢</button>
+                </div>
+                <div id="selectedMemberInfo" class="hidden bg-[#f1f3eb] p-4 rounded-lg border border-[#8e9775] mb-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span id="curMemberName" class="font-bold text-lg text-[#6d7756]"></span>
+                            <span id="curMemberLevel" class="text-[10px] bg-white text-[#8e9775] px-2 py-0.5 rounded-full border border-[#8e9775] ml-2"></span>
+                            <div class="text-sm text-gray-500 mt-1">📞 <span id="curMemberPhone"></span></div>
+                            <div class="text-sm text-gray-500">🎂 <span id="curMemberBirthday"></span></div>
+                            <div class="text-sm text-gray-500 mt-1">累積點數：<span id="curMemberPoints" class="font-semibold text-[#8e9775]">0</span> pt</div>
+                        </div>
+                        <button onclick="clearMember()" class="text-red-400 text-sm hover:underline">取消選取</button>
+                    </div>
+                </div>
+                <div id="newMemberForm" class="hidden bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <p class="text-sm font-bold text-yellow-700 mb-3">查無此會員，是否立即建立？</p>
+                    <div class="space-y-2">
+                        <input type="text" id="newMemberName" placeholder="姓名 *" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none">
+                        <input type="text" id="newMemberPhone" placeholder="手機號碼 *" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none" readonly>
+                        <input type="date" id="newMemberBirthday" class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none">
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <button onclick="registerMember()" class="flex-1 btn-primary py-2 rounded-lg text-sm font-bold">✅ 建立會員</button>
+                        <button onclick="dismissNewMemberForm()" class="flex-1 bg-gray-100 text-gray-500 py-2 rounded-lg text-sm">略過</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+        <!-- 4. 付款/來源/折扣（收折） -->
+        <div class="mob-section">
+            <div class="mob-section-header" onclick="toggleMobSection('mob-settings-body', this)">
+                <span class="mob-section-title">💳 付款方式 ＆ 來客來源</span>
+                <span class="mob-section-arrow">▼</span>
+            </div>
+            <div class="mob-section-body" id="mob-settings-body" style="display:none;">
+                <div style="margin-bottom:14px;">
+                    <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;font-weight:bold;">付款方式</div>
+                    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+                        <button onclick="setPayment('現金')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-現金">現金</button>
+                        <button onclick="setPayment('匯款')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-匯款">匯款</button>
+                        <button onclick="setPayment('LINEPAY')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-LINEPAY">LINEPAY</button>
+                        <button onclick="setPayment('刷卡')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-刷卡">刷卡</button>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size:12px;color:#9ca3af;margin-bottom:8px;font-weight:bold;">來客來源</div>
+                    <div class="source-grid">
+                        <button class="source-btn active" onclick="selectSource('walk', this)">路過</button>
+                        <button class="source-btn" onclick="selectSource('ig', this)">IG/FB</button>
+                        <button class="source-btn" onclick="selectSource('friend', this)">朋友介紹</button>
+                        <button class="source-btn" onclick="selectSource('market', this)">市集常客</button>
+                        <button class="source-btn" onclick="selectSource('staff', this)">員工</button>
+                        <button class="source-btn" onclick="selectSource('google', this)">Google</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+    </div>
+ 
+    <!-- ══ 手機版固定底部結帳列 ══ -->
+    <div class="mobile-checkout-bar">
+        <div class="mob-co-left">
+            <span class="mob-co-count" id="mob-co-count">0 件商品</span>
+            <span class="mob-co-total" id="mob-co-total">NT$ 0</span>
+        </div>
+        <button class="mob-co-btn" id="mob-checkoutBtn" onclick="processCheckout()">確認結帳</button>
+    </div>
+ 
+    <!-- ══ 桌機版 ══ -->
+    <div class="desktop-layout p-4 md:p-8">
+ 
+    <div class="max-w-6xl mx-auto flex justify-between items-center mb-6">
+        <div>
+            <h1 class="text-3xl font-bold text-[#8e9775]">拾逅花事 <span class="text-sm font-normal text-gray-400">MOMENT FLOR</span></h1>
+            <p class="text-xs text-gray-500 mt-1 italic">♡用花拾起時光的柔軟，讓每個時候更溫暖♡</p>
+        </div>
+        <div class="text-right">
+            <div id="connStatus" class="text-sm font-medium mb-1"><span class="status-dot bg-gray-400"></span> 尚未連線</div>
+            <button onclick="openSettings()" class="text-xs text-gray-400 hover:text-[#8e9775] underline italic">⚙️ 系統設定</button>
+        </div>
+    </div>
+ 
+    <div class="max-w-6xl mx-auto mb-6 flex items-center gap-4 bg-white p-4 rounded-xl shadow-sm border-l-4 border-[#8e9775]">
+        <span class="text-sm font-bold text-gray-600">📍 當前營運據點：</span>
+        <div class="flex gap-2">
+            <button onclick="setStore('台南FOCUS')" class="store-btn btn-store px-6 py-1.5 rounded-full text-sm" id="store-台南FOCUS">台南FOCUS</button>
+            <button onclick="setStore('高雄FOCUS 13')" class="store-btn btn-store px-6 py-1.5 rounded-full text-sm" id="store-高雄FOCUS 13">高雄FOCUS 13</button>
+        </div>
+    </div>
+ 
+    <div class="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div class="lg:col-span-2 space-y-6">
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2 flex items-center italic">🌸 快速收銀</h2>
+ 
+                <!-- 第一層：類別選擇 -->
+                <div id="categoryView">
+                    <div class="grid grid-cols-3 gap-3" id="categoryGrid">
+                        <p class="col-span-full text-center py-10 text-gray-400 text-sm">連線成功後將載入類別...</p>
+                    </div>
+                </div>
+ 
+                <!-- 第二層：品項列表（點進類別後顯示） -->
+                <div id="productView" class="hidden">
+                    <div class="flex items-center gap-3 mb-4">
+                        <button onclick="backToCategory()" class="text-sm text-[#8e9775] hover:underline flex items-center gap-1">← 返回</button>
+                        <span class="font-bold text-[#4a4a4a]" id="currentCategoryLabel"></span>
+                    </div>
+                    <div class="grid grid-cols-2 md:grid-cols-3 gap-4" id="productGrid">
+                    </div>
+                </div>
+            </div>
+ 
+            <div class="card p-6">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2 italic">👥 會員選取</h2>
+                <div class="flex gap-2 mb-4">
+                    <input type="text" id="memberSearch" placeholder="輸入手機號碼查詢..."
+                        class="flex-1 border rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8e9775] outline-none">
+                    <button onclick="searchMember()" class="btn-primary px-6 py-2 rounded-lg">查詢會員</button>
+                </div>
+                <div id="selectedMemberInfo" class="hidden bg-[#f1f3eb] p-4 rounded-lg border border-[#8e9775] mb-3">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <span id="curMemberName" class="font-bold text-lg text-[#6d7756]"></span>
+                            <span id="curMemberLevel" class="text-[10px] bg-white text-[#8e9775] px-2 py-0.5 rounded-full border border-[#8e9775] ml-2"></span>
+                            <div class="text-sm text-gray-500 mt-1">📞 <span id="curMemberPhone"></span></div>
+                            <div class="text-sm text-gray-500">🎂 <span id="curMemberBirthday"></span></div>
+                            <div class="text-sm text-gray-500 mt-1">累積點數：<span id="curMemberPoints" class="font-semibold text-[#8e9775]">0</span> pt</div>
+                        </div>
+                        <button onclick="clearMember()" class="text-red-400 text-sm hover:underline">取消選取</button>
+                    </div>
+                </div>
+                <div id="newMemberForm" class="hidden bg-yellow-50 p-4 rounded-lg border border-yellow-200">
+                    <p class="text-sm font-bold text-yellow-700 mb-3">查無此會員，是否立即建立？</p>
+                    <div class="space-y-2">
+                        <input type="text" id="newMemberName" placeholder="姓名 *"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none">
+                        <input type="text" id="newMemberPhone" placeholder="手機號碼 *"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none" readonly>
+                        <input type="date" id="newMemberBirthday"
+                            class="w-full border rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-[#8e9775] outline-none">
+                    </div>
+                    <div class="flex gap-2 mt-3">
+                        <button onclick="registerMember()"
+                            class="flex-1 btn-primary py-2 rounded-lg text-sm font-bold">✅ 建立會員</button>
+                        <button onclick="dismissNewMemberForm()"
+                            class="flex-1 bg-gray-100 text-gray-500 py-2 rounded-lg text-sm">略過</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+ 
+        <div class="lg:col-span-1">
+            <div class="card p-6 sticky top-8 border-t-4 border-[#8e9775]">
+                <h2 class="text-xl font-bold mb-4 border-b pb-2 italic">🛒 結帳清單</h2>
+                <div id="cartItems" class="space-y-3 min-h-[150px] max-h-[300px] overflow-y-auto mb-4 text-sm italic text-gray-300">
+                    <p class="text-center pt-10">尚無項目</p>
+                </div>
+ 
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-gray-500 mb-3 italic">💳 支付方式</label>
+                    <div class="grid grid-cols-2 gap-2">
+                        <button onclick="setPayment('現金')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-現金">現金</button>
+                        <button onclick="setPayment('匯款')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-匯款">匯款</button>
+                        <button onclick="setPayment('LINEPAY')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-LINEPAY">LINEPAY</button>
+                        <button onclick="setPayment('刷卡')" class="payment-btn btn-pay py-2 rounded-lg text-xs" id="pay-刷卡">刷卡</button>
+                    </div>
+                </div>
+ 
+                <!-- 來客來源 -->
+                <div class="mb-4">
+                    <label class="block text-sm font-bold text-gray-500 mb-3 italic">🌸 來客來源</label>
+                    <div class="source-grid">
+                        <button class="source-btn active" onclick="selectSource('walk', this)">路過</button>
+                        <button class="source-btn" onclick="selectSource('ig', this)">IG/FB</button>
+                        <button class="source-btn" onclick="selectSource('friend', this)">朋友介紹</button>
+                        <button class="source-btn" onclick="selectSource('market', this)">市集常客</button>
+                        <button class="source-btn" onclick="selectSource('staff', this)">員工</button>
+                        <button class="source-btn" onclick="selectSource('google', this)">Google</button>
+                    </div>
+                </div>
+ 
+                <div class="border-t pt-4 space-y-2">
+                    <div class="flex justify-between text-gray-500 text-sm"><span>小計</span><span id="subtotal">NT$ 0</span></div>
+                    <div class="flex justify-between text-gray-500 text-sm items-center">
+                        <span>折扣</span>
+                        <div class="flex items-center gap-2">
+                            <span id="discountDisplay" class="text-red-400 text-sm">—</span>
+                            <button onclick="openDiscountModal()" class="text-xs border border-[#8e9775] text-[#8e9775] px-2 py-0.5 rounded-full hover:bg-[#f1f3eb] transition">折扣</button>
+                        </div>
+                    </div>
+                    <div class="flex justify-between text-2xl font-bold text-[#8e9775] mt-2"><span>總計</span><span id="total">NT$ 0</span></div>
+                </div>
+ 
+                <button onclick="processCheckout()" id="checkoutBtn" class="w-full btn-primary mt-6 py-4 rounded-xl text-lg font-bold shadow-md">確認結帳</button>
+            </div>
+        </div>
+    </div>
+ 
+    <div class="max-w-6xl mx-auto mt-8 card p-6">
+        <h2 class="text-xl font-bold mb-4 border-b pb-2 italic">📊 每日報表</h2>
+        <div class="flex gap-3 mb-6 flex-wrap">
+            <input type="date" id="reportDate"
+                class="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8e9775] outline-none">
+            <select id="reportStore"
+                class="border rounded-lg px-4 py-2 focus:ring-2 focus:ring-[#8e9775] outline-none">
+                <option value="">全部門市</option>
+                <option value="台南FOCUS">台南FOCUS</option>
+                <option value="高雄FOCUS 13">高雄FOCUS 13</option>
+            </select>
+            <button onclick="showDailyReport()" class="btn-primary px-6 py-2 rounded-lg">查詢報表</button>
+        </div>
+        <div id="reportResult"></div>
+    </div>
+ 
+    </div><!-- end desktop-layout -->
+ 
+    <!-- 折扣 Modal -->
+    <div id="discountModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white p-6 rounded-2xl max-w-xs w-full shadow-2xl text-sm">
+            <h3 class="text-lg font-bold mb-1">整單折扣</h3>
+            <p class="text-gray-400 text-xs mb-4">輸入折數，例如 8 = 八折、85 = 八五折、9 = 九折</p>
+            <div class="flex items-center gap-2 mb-2">
+                <input type="number" id="discountRateInput" placeholder="例：85" min="1" max="99" step="1"
+                    class="flex-1 border-2 border-[#8e9775] rounded-lg px-4 py-3 text-xl text-center focus:outline-none font-bold">
+                <span class="text-gray-400 text-lg">折</span>
+            </div>
+            <p id="discountPreview" class="text-center text-[#8e9775] text-sm mb-4 h-5"></p>
+            <div class="flex gap-2">
+                <button onclick="applyDiscount()" class="flex-1 btn-primary py-3 rounded-lg font-bold">套用</button>
+                <button onclick="clearDiscount()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-lg text-xs">清除折扣</button>
+                <button onclick="closeDiscountModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-lg text-xs">取消</button>
+            </div>
+        </div>
+    </div>
+ 
+    <div id="settingsModal" class="hidden fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-white p-8 rounded-2xl max-w-md w-full shadow-2xl text-sm">
+            <h3 class="text-xl font-bold mb-2 italic">系統串接設定</h3>
+            <p class="text-gray-400 mb-6">請填入 Google Apps Script 部署網址</p>
+            <input type="text" id="apiUrlInput" placeholder="https://script.google.com/.../exec"
+                class="w-full border rounded-lg px-4 py-3 mb-6 focus:ring-2 focus:ring-[#8e9775] outline-none">
+            <div class="flex gap-3">
+                <button onclick="saveSettings()" class="flex-1 btn-primary py-3 rounded-lg font-bold">儲存連線</button>
+                <button onclick="closeSettings()" class="flex-1 bg-gray-100 text-gray-500 py-3 rounded-lg font-bold">取消</button>
+            </div>
+        </div>
+    </div>
+ 
+    <script>
+        let API_URL = localStorage.getItem('moment_flor_api') || '';
+        let cart = [];
+        let currentMember = null;
+        let products = [];
+        let selectedPayment = '現金';
+        let selectedSource  = 'walk';
+        let currentStore = localStorage.getItem('moment_flor_store') || '台南FOCUS';
+        let discountRate = 0;
+        let currentCategory = '全部';
+ 
+        window.onload = () => {
+            setStore(currentStore);
+            setPayment('現金');
+            if(!API_URL) openSettings();
+            else testConnection();
+        };
+ 
+        function setStore(store) {
+            currentStore = store;
+            localStorage.setItem('moment_flor_store', store);
+            document.querySelectorAll('.store-btn').forEach(btn => btn.classList.remove('active'));
+            const btn = document.getElementById('store-' + store);
+            if(btn) btn.classList.add('active');
+            renderProducts();
+        }
+ 
+        function setPayment(type) {
+            selectedPayment = type;
+            document.querySelectorAll('.payment-btn').forEach(btn => btn.classList.remove('active'));
+            document.getElementById('pay-' + type).classList.add('active');
+        }
+ 
+        function selectSource(val, btn) {
+            selectedSource = val;
+            document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+        }
+ 
+        function openSettings() {
+            if(API_URL) document.getElementById('apiUrlInput').value = API_URL;
+            document.getElementById('settingsModal').classList.remove('hidden');
+        }
+        function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
+ 
+        async function saveSettings() {
+            const url = document.getElementById('apiUrlInput').value.trim();
+            if(!url) return alert('請輸入 API 網址');
+            API_URL = url;
+            localStorage.setItem('moment_flor_api', url);
+            const success = await testConnection();
+            if(success) closeSettings();
+        }
+ 
+        async function testConnection() {
+            const statusDiv = document.getElementById('connStatus');
+            statusDiv.innerHTML = '<span class="status-dot bg-yellow-400 animate-pulse"></span> 連線中...';
+            try {
+                const res = await fetch(API_URL + '?action=getProducts');
+                if(!res.ok) throw new Error();
+                products = await res.json();
+                statusDiv.innerHTML = '<span class="status-dot bg-green-500"></span> 雲端資料庫已連線';
+                renderProducts();
+                return true;
+            } catch (e) {
+                statusDiv.innerHTML = '<span class="status-dot bg-red-500"></span> 連線失敗';
+                return false;
+            }
+        }
+ 
+        // 類別對應 icon
+        const CAT_ICON = {
+            '主花': '🌹', '配花': '🌸', '葉材': '🌿',
+            '花束': '💐', '花瓶': '🏺', '其他加購': '✨'
+        };
+ 
+        function setCategory(cat, btn) {
+            currentCategory = cat;
+            document.querySelectorAll('.cat-tab').forEach(b => b.classList.remove('active'));
+            if (btn) btn.classList.add('active');
+            renderProducts();
+        }
+ 
+        function openCategory(cat) {
+            currentCategory = cat;
+            document.getElementById('categoryView').classList.add('hidden');
+            document.getElementById('productView').classList.remove('hidden');
+            document.getElementById('currentCategoryLabel').textContent = cat;
+            renderProductList();
+        }
+ 
+        function backToCategory() {
+            currentCategory = '全部';
+            document.getElementById('productView').classList.add('hidden');
+            document.getElementById('categoryView').classList.remove('hidden');
+        }
+ 
+        function renderProducts() {
+            const catGrid = document.getElementById('categoryGrid');
+            if (!products || products.length === 0) {
+                catGrid.innerHTML = '<p class="col-span-full text-center py-10 text-gray-400 italic text-sm">載入中或無產品資料...</p>';
+                return;
+            }
+            // 確保回到類別頁
+            document.getElementById('categoryView').classList.remove('hidden');
+            document.getElementById('productView').classList.add('hidden');
+ 
+            const ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
+            const catMap = {};
+            products.forEach(p => {
+                const cat = p.category || '其他加購';
+                if (!catMap[cat]) catMap[cat] = 0;
+                catMap[cat]++;
+            });
+ 
+            const cats = Object.keys(catMap).sort((a, b) => {
+                const ai = ORDER.indexOf(a); const bi = ORDER.indexOf(b);
+                return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+            });
+ 
+            catGrid.innerHTML = cats.map(cat => {
+                const icon = CAT_ICON[cat] || '🌸';
+                const count = catMap[cat];
+                return `<div class="cat-card" onclick="openCategory('${cat}')">
+                    <div class="cat-card-icon">${icon}</div>
+                    <div class="cat-card-name">${cat}</div>
+                    <div class="cat-card-count">${count} 項</div>
+                </div>`;
+            }).join('');
+ 
+            // 同步手機版
+            renderMobileProducts();
+        }
+ 
+        function renderProductList() {
+            const grid = document.getElementById('productGrid');
+            const list = products.filter(p =>
+                currentCategory === '全部' || (p.category || '其他加購') === currentCategory
+            );
+            if (!list.length) {
+                grid.innerHTML = '<p class="col-span-full text-center py-6 text-gray-300 italic text-sm">此分類無花材</p>';
+                return;
+            }
+            grid.innerHTML = list.map(p => {
+                const price = currentStore === '台南FOCUS' ? (p.priceTN || 0) : (p.priceKH || 0);
+                const stock = currentStore === '台南FOCUS' ? (p.stockTN || 0) : (p.stockKH || 0);
+                return `
+                    <div class="p-4 border border-gray-100 rounded-xl hover:border-[#8e9775] transition group">
+                        <div class="font-bold group-hover:text-[#6d7756] text-sm mb-1">${p.name}</div>
+                        <div class="text-[#8e9775] font-medium mb-1">$${price}</div>
+                        <div class="text-[10px] text-gray-300 mb-3 italic">${currentStore}庫存: ${stock}</div>
+                        <div class="flex gap-2">
+                            <button onclick="addToCart('${p.id}')"
+                                class="flex-1 bg-[#8e9775] text-white py-1.5 rounded-lg text-xs hover:bg-[#6d7756] transition">
+                                + 加入
+                            </button>
+                            <button onclick="reportWaste('${p.id}')"
+                                class="flex-1 bg-red-50 text-red-400 border border-red-200 py-1.5 rounded-lg text-xs hover:bg-red-100 transition">
+                                報廢
+                            </button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+ 
+        function addToCart(id) {
+            const p = products.find(i => String(i.id) === String(id));
+            if(!p) return;
+            const existing = cart.find(i => String(i.id) === String(id));
+            if(existing) existing.qty++;
+            else cart.push({...p, qty: 1});
+            renderCart();
+        }
+ 
+        function renderCart() {
+            // 桌機版購物車（現有邏輯不變）
+            const container = document.getElementById('cartItems');
+            if(cart.length === 0) {
+                container.innerHTML = '<p class="text-center pt-10 text-gray-300">尚無項目</p>';
+                updateTotals();
+                return;
+            }
+            container.innerHTML = cart.map((item, idx) => {
+                const price = currentStore === '台南FOCUS' ? (item.priceTN || 0) : (item.priceKH || 0);
+                return `
+                    <div class="bg-[#fcfbf9] p-3 rounded-lg border border-gray-100 mb-2">
+                        <div class="flex justify-between items-start mb-2">
+                            <div class="font-bold text-sm">${item.name}</div>
+                            <button onclick="removeFromCart(${idx})" class="text-gray-300 hover:text-red-400 text-lg leading-none">✕</button>
+                        </div>
+                        <div class="flex justify-between items-center">
+                            <div class="flex items-center gap-2">
+                                <button onclick="updateCartQty(${idx}, -1)"
+                                    class="w-9 h-9 rounded-full bg-white border-2 border-gray-200 text-gray-500 hover:border-[#8e9775] hover:text-[#8e9775] text-xl font-bold flex items-center justify-center">−</button>
+                                <span id="qty-display-${idx}"
+                                    onclick="startEditQty(${idx})"
+                                    class="w-8 text-center font-bold text-base cursor-pointer hover:text-[#8e9775] hover:underline"
+                                    title="點擊修改數量">${item.qty}</span>
+                                <input id="qty-input-${idx}" type="number" value="${item.qty}" min="1"
+                                    onblur="commitQty(${idx}, this.value)"
+                                    onkeydown="if(event.key==='Enter') this.blur()"
+                                    class="hidden w-12 text-center border-2 border-[#8e9775] rounded-lg bg-white focus:outline-none font-bold text-base">
+                                <button onclick="updateCartQty(${idx}, 1)"
+                                    class="w-9 h-9 rounded-full bg-[#8e9775] text-white text-xl font-bold flex items-center justify-center hover:bg-[#6d7756]">+</button>
+                            </div>
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="text-gray-400">$</span>
+                                <span id="price-display-${idx}"
+                                    onclick="startEditPrice(${idx})"
+                                    class="font-bold text-[#8e9775] cursor-pointer hover:underline"
+                                    title="點擊修改價格">${price}</span>
+                                <input id="price-input-${idx}" type="number" value="${price}" min="0"
+                                    onblur="commitPrice(${idx}, this.value)"
+                                    onkeydown="if(event.key==='Enter') this.blur()"
+                                    class="hidden w-16 text-right border-2 border-[#8e9775] rounded-lg bg-white focus:outline-none font-bold text-[#8e9775]">
+                                <span class="text-gray-500">= $${(price * item.qty).toLocaleString()}</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            updateTotals();
+        }
+ 
+        function updateTotals() {
+            const sub = cart.reduce((sum, item) => {
+                const price = currentStore === '台南FOCUS' ? (item.priceTN || 0) : (item.priceKH || 0);
+                return sum + (price * item.qty);
+            }, 0);
+            const discountAmt = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+            const total = sub - discountAmt;
+            document.getElementById('subtotal').innerText = `NT$ ${sub.toLocaleString()}`;
+            document.getElementById('discountDisplay').innerText = discountRate > 0
+                ? `${discountRate}折 — NT$ ${discountAmt.toLocaleString()}`
+                : '—';
+            document.getElementById('total').innerText = `NT$ ${total.toLocaleString()}`;
+            // 同步手機版
+            updateMobileUI();
+        }
+ 
+        function openDiscountModal() {
+            if (cart.length === 0) return alert('請先加入花材');
+            document.getElementById('discountRateInput').value = discountRate || '';
+            document.getElementById('discountPreview').innerText = '';
+            document.getElementById('discountModal').classList.remove('hidden');
+            document.getElementById('discountRateInput').focus();
+            document.getElementById('discountRateInput').oninput = function() {
+                const rate = parseFloat(this.value);
+                if (rate > 0 && rate <= 100) {
+                    const sub = cart.reduce((s, item) => {
+                        const p = currentStore === '台南FOCUS' ? (item.priceTN||0) : (item.priceKH||0);
+                        return s + p * item.qty;
+                    }, 0);
+                    const after = Math.round(sub * rate / 100);
+                    document.getElementById('discountPreview').innerText =
+                        `折後金額：NT$ ${after.toLocaleString()}（省 NT$ ${(sub - after).toLocaleString()}）`;
+                } else {
+                    document.getElementById('discountPreview').innerText = '';
+                }
+            };
+        }
+ 
+        function applyDiscount() {
+            const rate = parseFloat(document.getElementById('discountRateInput').value);
+            if (!rate || rate <= 0 || rate >= 100) return alert('請輸入 1–99 之間的折數，例如 8、85、9');
+            discountRate = rate;
+            closeDiscountModal();
+            updateTotals();
+        }
+ 
+        function clearDiscount() {
+            discountRate = 0;
+            document.getElementById('discountRateInput').value = '';
+            closeDiscountModal();
+            updateTotals();
+        }
+ 
+        function closeDiscountModal() {
+            document.getElementById('discountModal').classList.add('hidden');
+        }
+ 
+        function updateCartQty(idx, delta) {
+            cart[idx].qty = Math.max(1, cart[idx].qty + delta);
+            renderCart();
+        }
+ 
+        function startEditQty(idx) {
+            document.getElementById('qty-display-' + idx).classList.add('hidden');
+            const input = document.getElementById('qty-input-' + idx);
+            input.classList.remove('hidden');
+            input.focus();
+            input.select();
+        }
+ 
+        function commitQty(idx, value) {
+            cart[idx].qty = Math.max(1, parseInt(value) || 1);
+            renderCart();
+        }
+ 
+        function startEditPrice(idx) {
+            document.getElementById('price-display-' + idx).classList.add('hidden');
+            const input = document.getElementById('price-input-' + idx);
+            input.classList.remove('hidden');
+            input.focus();
+            input.select();
+        }
+ 
+        function commitPrice(idx, value) {
+            const price = parseInt(value) || 0;
+            const store = currentStore === '台南FOCUS' ? 'priceTN' : 'priceKH';
+            cart[idx][store] = price;
+            renderCart();
+        }
+ 
+        function removeFromCart(idx) { cart.splice(idx, 1); renderCart(); }
+ 
+        async function searchMember() {
+            const phone = document.getElementById('memberSearch').value.trim();
+            if (!phone) return alert('請輸入手機號碼');
+            try {
+                const res = await fetch(API_URL + '?action=getMembers');
+                const members = await res.json();
+                const normalizePhone = (p) => String(p).replace(/\D/g, '').replace(/^0/, '');
+                const m = members.find(item => normalizePhone(item.phone) === normalizePhone(phone));
+                if (m) {
+                    currentMember = m;
+                    document.getElementById('newMemberForm').classList.add('hidden');
+                    document.getElementById('selectedMemberInfo').classList.remove('hidden');
+                    document.getElementById('curMemberName').innerText = m.name;
+                    document.getElementById('curMemberPhone').innerText = m.phone;
+                    document.getElementById('curMemberBirthday').innerText = m.birthday || '未填寫';
+                    document.getElementById('curMemberPoints').innerText = m.points || 0;
+                    document.getElementById('curMemberLevel').innerText =
+                        (m.totalSpent || 0) >= 30000 ? '👑 VIP' :
+                        (m.totalSpent || 0) >= 10000 ? '🥇 金卡' :
+                        (m.totalSpent || 0) >= 3000  ? '🥈 銀卡' : '🥉 銅卡';
+                } else {
+                    currentMember = null;
+                    document.getElementById('selectedMemberInfo').classList.add('hidden');
+                    document.getElementById('newMemberForm').classList.remove('hidden');
+                    document.getElementById('newMemberPhone').value = phone;
+                    document.getElementById('newMemberName').value = '';
+                    document.getElementById('newMemberBirthday').value = '';
+                }
+            } catch(e) { alert('查詢出錯'); }
+        }
+ 
+        async function registerMember() {
+            const name = document.getElementById('newMemberName').value.trim();
+            const phone = document.getElementById('newMemberPhone').value.trim();
+            const birthday = document.getElementById('newMemberBirthday').value;
+            if (!name) return alert('請輸入姓名');
+            if (!phone) return alert('請輸入手機號碼');
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({ action: 'addMember', data: { name, phone, birthday } })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    currentMember = { id: result.id, name, phone, birthday, points: 0, totalSpent: 0, visits: 0 };
+                    document.getElementById('newMemberForm').classList.add('hidden');
+                    document.getElementById('selectedMemberInfo').classList.remove('hidden');
+                    document.getElementById('curMemberName').innerText = name;
+                    document.getElementById('curMemberPhone').innerText = phone;
+                    document.getElementById('curMemberBirthday').innerText = birthday || '未填寫';
+                    document.getElementById('curMemberPoints').innerText = 0;
+                    document.getElementById('curMemberLevel').innerText = '🥉 銅卡';
+                    alert('✅ 會員建立成功！');
+                } else {
+                    alert('建立失敗：' + (result.error || '原因不明'));
+                }
+            } catch(e) { alert('系統連線異常'); }
+        }
+ 
+        function dismissNewMemberForm() {
+            document.getElementById('newMemberForm').classList.add('hidden');
+            document.getElementById('memberSearch').value = '';
+        }
+ 
+        function clearMember() {
+            currentMember = null;
+            document.getElementById('selectedMemberInfo').classList.add('hidden');
+            document.getElementById('newMemberForm').classList.add('hidden');
+            document.getElementById('memberSearch').value = '';
+        }
+ 
+        async function processCheckout() {
+            if(cart.length === 0) return alert('購物籃是空的');
+ 
+            // 檢查庫存
+            const stockField = currentStore === '台南FOCUS' ? 'stockTN' : 'stockKH';
+            const insufficientItems = cart.filter(item => {
+                const stock = Number(item[stockField]) || 0;
+                return item.qty > stock;
+            });
+            if (insufficientItems.length > 0) {
+                const itemList = insufficientItems.map(item =>
+                    `・${item.name}（庫存 ${Number(item[stockField]) || 0}，結帳 ${item.qty}）`
+                ).join('\n');
+                const proceed = confirm(`以下品項庫存不足：\n\n${itemList}\n\n是否仍要繼續結帳？（庫存將變為負數）`);
+                if (!proceed) return;
+            }
+ 
+            const sub = cart.reduce((sum, item) => {
+                const price = currentStore === '台南FOCUS' ? (item.priceTN || 0) : (item.priceKH || 0);
+                return sum + (price * item.qty);
+            }, 0);
+            const discountAmt = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+            const total = sub - discountAmt;
+ 
+            const btn = document.getElementById('checkoutBtn');
+            btn.disabled = true;
+            btn.innerText = '結帳同步中...';
+ 
+            const orderData = {
+                action: 'addTransaction',
+                data: {
+                    id: 'T' + Date.now().toString().slice(-8),
+                    date: new Date().toLocaleString(),
+                    store: currentStore,
+                    memberId:     currentMember ? currentMember.id   : '',
+                    memberName:   currentMember ? currentMember.name : '散客',
+                    subtotal:     sub,
+                    discount:     discountAmt,
+                    total:        total,
+                    pay:          selectedPayment,
+                    earnedPoints: Math.floor(total * 0.01),
+                    note:         'POS結帳',
+                    customerType: currentMember ? '舊客' : '新客',
+                    source:       selectedSource,
+                    items: cart.map(item => ({
+                        id:        item.id,
+                        name:      item.name,
+                        qty:       item.qty,
+                        unitPrice: currentStore === '台南FOCUS' ? (item.priceTN || 0) : (item.priceKH || 0),
+                        unitCost:  item.cost || 0
+                    }))
+                }
+            };
+ 
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(orderData) });
+                const result = await res.json();
+                if(result.success) {
+                    alert('結帳成功！已扣除 ' + currentStore + ' 庫存');
+                    cart = [];
+                    currentMember = null;
+                    selectedSource = 'walk';
+                    discountRate = 0;
+                    // 重置來源按鈕
+                    document.querySelectorAll('.source-btn').forEach(b => b.classList.remove('active'));
+                    document.querySelector('.source-btn').classList.add('active');
+                    document.getElementById('selectedMemberInfo').classList.add('hidden');
+                    document.getElementById('memberSearch').value = '';
+                    renderCart();
+                    const res2 = await fetch(API_URL + '?action=getProducts');
+                    products = await res2.json();
+                    renderProducts();
+                } else {
+                    alert('結帳失敗：' + (result.error || '原因不明'));
+                }
+            } catch(e) { alert('系統連線異常'); }
+            btn.disabled = false;
+            btn.innerText = '確認結帳';
+        }
+ 
+        async function reportWaste(productId) {
+            const p = products.find(i => String(i.id) === String(productId));
+            if (!p) return;
+            const stock = currentStore === '台南FOCUS' ? (p.stockTN || 0) : (p.stockKH || 0);
+            const qty = prompt(`報廢「${p.name}」幾枝？（目前庫存 ${stock} 枝）`);
+            if (!qty || isNaN(qty) || Number(qty) <= 0) return;
+            if (Number(qty) > stock) return alert('報廢數量超過庫存');
+            const note = prompt('報廢原因（可略過）') || '';
+            try {
+                const res = await fetch(API_URL, {
+                    method: 'POST',
+                    body: JSON.stringify({
+                        action: 'addWaste',
+                        data: {
+                            date: new Date().toISOString(),
+                            store: currentStore,
+                            productId: p.id,
+                            productName: p.name,
+                            qty: Number(qty),
+                            unitCost: p.cost || 0,
+                            note
+                        }
+                    })
+                });
+                const result = await res.json();
+                if (result.success) {
+                    alert(`✅ 已記錄報廢：${p.name} ${qty} 枝`);
+                    const res2 = await fetch(API_URL + '?action=getProducts');
+                    products = await res2.json();
+                    renderProducts();
+                } else {
+                    alert('報廢失敗：' + (result.error || '原因不明'));
+                }
+            } catch(e) { alert('系統連線異常'); }
+        }
+ 
+        async function showDailyReport() {
+            const date = document.getElementById('reportDate').value;
+            const store = document.getElementById('reportStore').value;
+            if (!date) return alert('請選擇日期');
+ 
+            try {
+                const url = `${API_URL}?action=getDailyReport&date=${date}&store=${encodeURIComponent(store)}`;
+                const res = await fetch(url);
+                const raw = await res.json();
+                const stores = store ? { [store]: raw } : raw;
+ 
+                let html = '';
+                Object.entries(stores).forEach(([storeName, d]) => {
+                    if (!d) return;
+ 
+                    const lw = d.lastWeek || {};
+                    const revDiff  = d.revenue   - (lw.revenue   || 0);
+                    const custDiff = d.customers - (lw.customers || 0);
+                    const arrow = (val) => val > 0
+                        ? `<span class="text-green-500">▲${Math.abs(val).toLocaleString()}</span>`
+                        : val < 0
+                        ? `<span class="text-red-400">▼${Math.abs(val).toLocaleString()}</span>`
+                        : `<span class="text-gray-400">－</span>`;
+ 
+                    const itemRows = Object.entries(d.itemSummary || {})
+                        .sort((a, b) => b[1].sales - a[1].sales)
+                        .map(([name, i]) => `
+                            <tr class="border-b text-xs hover:bg-gray-50">
+                                <td class="py-2 font-medium">${name}</td>
+                                <td class="text-center">${i.qty}</td>
+                                <td class="text-right">$${i.sales.toLocaleString()}</td>
+                                <td class="text-right">$${i.cost.toLocaleString()}</td>
+                                <td class="text-right text-green-600">$${(i.sales - i.cost).toLocaleString()}</td>
+                                <td class="text-center ${i.grossMargin >= 50 ? 'text-green-600 font-bold' : i.grossMargin >= 30 ? 'text-yellow-500' : 'text-red-400'}">${i.grossMargin}%</td>
+                                <td class="text-center">${i.wasteQty}</td>
+                                <td class="text-center ${i.wasteRate > 20 ? 'text-red-400 font-bold' : 'text-gray-400'}">${i.wasteRate}%</td>
+                                <td class="text-center">${i.remaining}</td>
+                            </tr>
+                        `).join('');
+ 
+                    // 來源統計（如果有資料）
+                    const srcLabels = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
+                    const srcData   = d.sourceBreakdown || {};
+                    const srcHtml   = Object.entries(srcLabels).map(([k, label]) => {
+                        const cnt = srcData[k] || 0;
+                        const pct = d.customers > 0 ? Math.round(cnt / d.customers * 100) : 0;
+                        return `<div class="text-center">
+                            <div class="text-xs text-gray-500">${label}</div>
+                            <div class="font-bold">${cnt}</div>
+                            <div class="text-xs text-gray-400">${pct}%</div>
+                        </div>`;
+                    }).join('');
+ 
+                    html += `
+                        <div class="mb-10">
+                            <h3 class="font-bold text-base mb-4 text-[#8e9775] border-b pb-2">📍 ${storeName}　<span class="text-xs text-gray-400 font-normal">${date}</span></h3>
+ 
+                            <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                                <div class="bg-[#f1f3eb] p-3 rounded-lg text-center">
+                                    <div class="text-xs text-gray-500 mb-1">來客數</div>
+                                    <div class="text-2xl font-bold">${d.customers}</div>
+                                    <div class="text-xs mt-1">${arrow(custDiff)} vs 上週</div>
+                                </div>
+                                <div class="bg-[#f1f3eb] p-3 rounded-lg text-center">
+                                    <div class="text-xs text-gray-500 mb-1">舊客 / 新客</div>
+                                    <div class="text-xl font-bold text-[#8e9775]">${d.memberCount || 0} / ${d.newCount || 0}</div>
+                                </div>
+                                <div class="bg-[#f1f3eb] p-3 rounded-lg text-center">
+                                    <div class="text-xs text-gray-500 mb-1">營業額</div>
+                                    <div class="text-xl font-bold text-[#8e9775]">$${d.revenue.toLocaleString()}</div>
+                                    <div class="text-xs mt-1">${arrow(revDiff)} vs 上週</div>
+                                </div>
+                                <div class="bg-[#f1f3eb] p-3 rounded-lg text-center">
+                                    <div class="text-xs text-gray-500 mb-1">淨利</div>
+                                    <div class="text-xl font-bold text-green-600">$${d.profit.toLocaleString()}</div>
+                                    <div class="text-xs text-gray-400">毛利率 ${d.profitRate}%</div>
+                                </div>
+                            </div>
+ 
+                            <!-- 來源分佈 -->
+                            <div class="bg-white border border-gray-100 rounded-lg p-3 mb-4">
+                                <div class="text-xs font-bold text-gray-500 mb-2">🌸 來客來源分佈</div>
+                                <div class="grid grid-cols-6 gap-2">${srcHtml}</div>
+                            </div>
+ 
+                            <div class="overflow-x-auto">
+                                <table class="w-full">
+                                    <thead>
+                                        <tr class="bg-gray-50 text-xs text-gray-500">
+                                            <th class="py-2 text-left px-2">品項</th>
+                                            <th class="text-center px-2">銷售量</th>
+                                            <th class="text-right px-2">銷售額</th>
+                                            <th class="text-right px-2">成本</th>
+                                            <th class="text-right px-2">淨利</th>
+                                            <th class="text-center px-2">毛利率</th>
+                                            <th class="text-center px-2">報廢量</th>
+                                            <th class="text-center px-2">報廢率</th>
+                                            <th class="text-center px-2">剩餘量</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${itemRows || '<tr><td colspan="9" class="text-center py-6 text-gray-300 text-sm">當日無銷售資料</td></tr>'}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    `;
+                });
+ 
+                document.getElementById('reportResult').innerHTML = html || '<p class="text-center text-gray-300 py-8">無資料</p>';
+            } catch(e) {
+                alert('報表載入失敗：' + e.message);
+            }
+        }
+        // ══ 手機版功能 ══
+ 
+        function toggleMobSection(bodyId, header) {
+            const body  = document.getElementById(bodyId);
+            const arrow = header.querySelector('.mob-section-arrow');
+            const isOpen = body.style.display !== 'none';
+            body.style.display  = isOpen ? 'none' : 'block';
+            if (arrow) arrow.classList.toggle('open', !isOpen);
+        }
+ 
+        function updateMobileUI() {
+            const total = cart.reduce((a, c) => a + (currentStore === '台南FOCUS' ? c.priceTN : c.priceKH) * c.qty, 0);
+            const discountAmt = discountRate > 0 ? Math.round(total * (1 - discountRate / 100)) : 0;
+            const grand = total - discountAmt;
+            const count = cart.reduce((a, c) => a + c.qty, 0);
+ 
+            // 底部結帳列
+            const coCount = document.getElementById('mob-co-count');
+            const coTotal = document.getElementById('mob-co-total');
+            if (coCount) coCount.textContent = count + ' 件商品';
+            if (coTotal) coTotal.textContent = 'NT$ ' + grand.toLocaleString();
+ 
+            // 購物車badge
+            const badge = document.getElementById('mob-cart-badge');
+            const preview = document.getElementById('mob-cart-total-preview');
+            if (badge) badge.textContent = count;
+            if (preview) preview.textContent = 'NT$ ' + grand.toLocaleString();
+ 
+            // 摘要列
+            const mobSub  = document.getElementById('mob-subtotal');
+            const mobDisc = document.getElementById('mob-discountDisplay');
+            const mobTot  = document.getElementById('mob-total');
+            if (mobSub)  mobSub.textContent  = 'NT$ ' + total.toLocaleString();
+            if (mobDisc) mobDisc.textContent  = discountRate > 0 ? discountRate + '折 — NT$ ' + discountAmt.toLocaleString() : '—';
+            if (mobTot)  mobTot.textContent   = 'NT$ ' + grand.toLocaleString();
+ 
+            // 手機版購物車內容
+            renderMobileCart();
+ 
+            // 手機版連線狀態同步
+            const mobConn = document.getElementById('connStatusMob');
+            const deskConn = document.getElementById('connStatus');
+            if (mobConn && deskConn) mobConn.innerHTML = deskConn.innerHTML;
+ 
+            // 手機版門市按鈕同步
+            document.querySelectorAll('[id^="mob-store-"]').forEach(b => b.classList.remove('active'));
+            const mobStoreBtn = document.getElementById('mob-store-' + currentStore);
+            if (mobStoreBtn) mobStoreBtn.classList.add('active');
+        }
+ 
+        function renderMobileCart() {
+            const container = document.getElementById('mob-cartItems');
+            if (!container) return;
+            if (!cart.length) {
+                container.innerHTML = '<p style="text-align:center;color:#d1d5db;padding:20px 0;font-size:13px;">尚無項目</p>';
+                return;
+            }
+            container.innerHTML = cart.map((item, idx) => {
+                const price = currentStore === '台南FOCUS' ? item.priceTN : item.priceKH;
+                return `<div style="background:#fafaf9;border:1px solid #f3f4f6;border-radius:8px;padding:10px 12px;margin-bottom:8px;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                        <span style="font-size:13px;font-weight:bold;">${item.name}</span>
+                        <button onclick="removeFromCart(${idx})" style="color:#d1d5db;background:none;border:none;font-size:18px;cursor:pointer;">×</button>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <div style="display:flex;align-items:center;gap:10px;">
+                            <button onclick="updateCartQty(${idx},-1)" style="width:32px;height:32px;border-radius:50%;border:1px solid #e5e7eb;background:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">−</button>
+                            <span style="font-size:16px;font-weight:bold;min-width:20px;text-align:center;">${item.qty}</span>
+                            <button onclick="updateCartQty(${idx},1)" style="width:32px;height:32px;border-radius:50%;background:#8e9775;border:none;color:white;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center;">+</button>
+                        </div>
+                        <span style="font-size:14px;font-weight:bold;color:#9b6b62;">NT$ ${(price * item.qty).toLocaleString()}</span>
+                    </div>
+                </div>`;
+            }).join('');
+        }
+ 
+        function renderMobileProducts() {
+            const catGrid  = document.getElementById('mob-categoryGrid');
+            if (!catGrid || !products || !products.length) return;
+ 
+            document.getElementById('mob-categoryView').style.display = 'block';
+            document.getElementById('mob-productView').style.display  = 'none';
+ 
+            const ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
+            const catMap = {};
+            products.forEach(p => {
+                const cat = p.category || '其他加購';
+                if (!catMap[cat]) catMap[cat] = 0;
+                catMap[cat]++;
+            });
+            const cats = Object.keys(catMap).sort((a,b) => {
+                const ai = ORDER.indexOf(a); const bi = ORDER.indexOf(b);
+                return (ai===-1?99:ai)-(bi===-1?99:bi);
+            });
+            catGrid.innerHTML = cats.map(cat => {
+                const icon = CAT_ICON[cat] || '🌸';
+                return `<div class="cat-card" onclick="openCategoryMob('${cat}')">
+                    <div class="cat-card-icon">${icon}</div>
+                    <div class="cat-card-name">${cat}</div>
+                    <div class="cat-card-count">${catMap[cat]} 項</div>
+                </div>`;
+            }).join('');
+        }
+ 
+        function openCategoryMob(cat) {
+            currentCategory = cat;
+            document.getElementById('mob-categoryView').style.display = 'none';
+            document.getElementById('mob-productView').style.display  = 'block';
+            document.getElementById('mob-currentCategoryLabel').textContent = cat;
+            const grid = document.getElementById('mob-productGrid');
+            const list = products.filter(p => (p.category||'其他加購') === cat);
+            grid.innerHTML = list.map(p => {
+                const price = currentStore === '台南FOCUS' ? p.priceTN : p.priceKH;
+                const stock = currentStore === '台南FOCUS' ? p.stockTN : p.stockKH;
+                return `<div style="background:white;border:1px solid #f3f4f6;border-radius:10px;padding:12px 10px;">
+                    <div style="font-size:13px;font-weight:bold;margin-bottom:3px;">${p.name}</div>
+                    <div style="font-size:11px;color:#d1d5db;margin-bottom:6px;">庫存 ${stock}</div>
+                    <div style="font-size:17px;font-weight:bold;color:#6d7756;margin-bottom:8px;">NT$${price}</div>
+                    <button onclick="addToCart('${p.id}')" style="width:100%;background:#8e9775;color:white;border:none;border-radius:7px;padding:9px;font-size:13px;cursor:pointer;font-family:'Noto Serif TC',serif;">+ 加入</button>
+                </div>`;
+            }).join('');
+        }
+ 
+        function backToCategoryMob() {
+            document.getElementById('mob-productView').style.display  = 'none';
+            document.getElementById('mob-categoryView').style.display = 'block';
+        }
+    </script>
+</body>
+</html>
