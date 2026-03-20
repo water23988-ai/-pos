@@ -3,13 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>拾逅花事 | 快速結帳系統</title>
+    <title>拾逅花事 | 快速結帳系統 V2.1</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
-        body { font-family: 'Noto Serif TC', serif; background-color: #fcfbf9; color: #4a4a4a; padding-bottom: 120px; overflow-x: hidden; }
+        body { font-family: 'Noto Serif TC', serif; background-color: #fcfbf9; color: #4a4a4a; padding-bottom: 140px; overflow-x: hidden; }
         
-        /* 統一按鈕樣式 */
         .btn-action { 
             border: 2px solid #e5e7eb; background: white; border-radius: 12px; 
             padding: 14px 8px; font-size: 14px; transition: all 0.2s; cursor: pointer;
@@ -18,7 +17,6 @@
         }
         .btn-action.active { border-color: #8e9775; background-color: #f1f3eb; color: #6d7756; font-weight: bold; box-shadow: 0 2px 8px rgba(142,151,117,0.1); }
         
-        /* 結帳列固定底部 */
         .checkout-bar {
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
             background: #2e2926; color: white; padding: 16px 20px;
@@ -27,11 +25,7 @@
             padding-bottom: calc(16px + env(safe-area-inset-bottom));
         }
 
-        /* 隱藏捲軸 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        
-        /* 管理員觸發區特效 */
-        #adminTrigger:active { opacity: 0.6; transform: scale(0.98); }
     </style>
 </head>
 <body>
@@ -39,9 +33,9 @@
     <div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div id="adminTrigger" class="select-none">
             <h1 class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
-            <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統運作中...</p>
+            <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統連接中...</p>
         </div>
-        <div class="text-[10px] text-gray-300">V2.0 Secure</div>
+        <div class="text-[9px] text-gray-300">SECURE V2.1</div>
     </div>
 
     <div class="p-4 space-y-8">
@@ -56,52 +50,43 @@
 
         <section class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
             <h2 class="text-xs font-bold mb-4 text-gray-400 tracking-widest uppercase text-center">🌸 商品選單</h2>
-            
-            <div id="categoryGrid" class="grid grid-cols-3 gap-2 mb-6">
-                </div>
+            <div id="categoryGrid" class="grid grid-cols-3 gap-2 mb-6"></div>
 
             <div id="productSection" class="hidden border-t border-dashed pt-5">
                 <div class="flex justify-between items-center mb-4">
                     <span id="currentCatLabel" class="font-bold text-[#8e9775] border-l-4 border-[#8e9775] pl-2"></span>
                     <button onclick="closeProducts()" class="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">✕ 關閉</button>
                 </div>
-                <div id="productGrid" class="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto no-scrollbar">
-                    </div>
+                <div id="productGrid" class="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto no-scrollbar"></div>
             </div>
         </section>
 
-        <section>
-            <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">💳 支付方式</h2>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="setPayment('現金')" class="btn-action pay-btn">現金</button>
-                <button onclick="setPayment('LINEPAY')" class="btn-action pay-btn">LINEPAY</button>
-                <button onclick="setPayment('匯款')" class="btn-action pay-btn">匯款</button>
-                <button onclick="setPayment('刷卡')" class="btn-action pay-btn">刷卡</button>
-            </div>
-        </section>
-
-        <section>
-            <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
-            <div class="grid grid-cols-3 gap-2">
-                <button onclick="setSource('路過')" class="btn-action source-btn">路過</button>
-                <button onclick="setSource('IG/FB')" class="btn-action source-btn">IG/FB</button>
-                <button onclick="setSource('朋友介紹')" class="btn-action source-btn">朋友介紹</button>
-                <button onclick="setSource('市集常客')" class="btn-action source-btn">市集常客</button>
-                <button onclick="setSource('員工')" class="btn-action source-btn">員工</button>
-                <button onclick="setSource('Google')" class="btn-action source-btn">Google</button>
-            </div>
-        </section>
-
+        <div class="grid grid-cols-2 gap-6">
+            <section>
+                <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">💳 支付方式</h2>
+                <div class="space-y-2">
+                    <button onclick="setPayment('現金')" class="btn-action pay-btn w-full">現金</button>
+                    <button onclick="setPayment('LINEPAY')" class="btn-action pay-btn w-full">LINEPAY</button>
+                    <button onclick="setPayment('匯款')" class="btn-action pay-btn w-full">匯款</button>
+                </div>
+            </section>
+            <section>
+                <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
+                <div class="space-y-2">
+                    <button onclick="setSource('路過')" class="btn-action source-btn w-full text-xs">路過</button>
+                    <button onclick="setSource('IG/FB')" class="btn-action source-btn w-full text-xs">IG/FB</button>
+                    <button onclick="setSource('朋友介紹')" class="btn-action source-btn w-full text-xs">朋友</button>
+                </div>
+            </section>
+        </div>
     </div>
 
     <div class="checkout-bar">
         <div class="flex flex-col">
-            <div id="summaryText" class="text-[10px] text-gray-400 mb-1 tracking-tighter uppercase">
-                讀取中...
-            </div>
+            <div id="summaryText" class="text-[10px] text-gray-400 mb-1 tracking-tighter uppercase">載入中...</div>
             <div id="totalDisplay" class="text-2xl font-bold text-[#DFC07A]">NT$ 0</div>
         </div>
-        <button onclick="processCheckout()" id="checkoutBtn" class="bg-[#8e9775] px-10 py-4 rounded-2xl font-bold text-lg active:scale-95 shadow-lg">
+        <button onclick="processCheckout()" id="checkoutBtn" class="bg-[#8e9775] px-8 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
             確認結帳
         </button>
     </div>
@@ -112,114 +97,90 @@
                 <h3 class="font-bold text-lg text-[#8e9775]">老闆專屬後台</h3>
                 <button onclick="closeSettings()" class="text-gray-300">✕</button>
             </div>
-
-            <div class="bg-gray-50 p-4 rounded-2xl mb-6">
-                <label class="text-[10px] font-bold text-gray-400 mb-2 block uppercase">系統連線設定 (API URL)</label>
-                <input type="password" id="apiUrlInput" placeholder="請在此貼上 API 連結" class="w-full border border-gray-200 rounded-xl px-4 py-2 text-xs mb-3">
-                <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-2 rounded-xl text-sm font-bold">更新 API 連結</button>
+            <div class="bg-gray-50 p-4 rounded-2xl mb-6 text-xs">
+                <label class="font-bold text-gray-400 mb-2 block">API URL (SECRET)</label>
+                <input type="password" id="apiUrlInput" class="w-full border border-gray-200 rounded-xl px-4 py-2 mb-3">
+                <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-2 rounded-xl font-bold">儲存 API</button>
             </div>
-
             <hr class="mb-6 border-dashed">
-
             <div class="space-y-4">
-                <h4 class="font-bold text-sm flex items-center gap-2">📊 營業額對帳 <span class="text-[10px] font-normal text-gray-400">(依目前選擇門市)</span></h4>
+                <h4 class="font-bold text-sm italic">📊 營業額查詢</h4>
                 <div class="flex gap-2">
                     <input type="date" id="reportDate" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs">
-                    <button onclick="getDailyReport()" class="bg-gray-100 text-[#8e9775] px-5 py-2 rounded-xl text-xs font-bold">查詢</button>
+                    <button onclick="getDailyReport()" class="bg-gray-100 text-[#8e9775] px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
                 </div>
-                <div id="reportDisplay" class="bg-[#fcfbf9] rounded-2xl border border-gray-100 p-4 min-h-[120px]">
-                    <p class="text-center text-gray-300 text-[10px] italic py-10">點擊查詢獲取數據</p>
+                <div id="reportDisplay" class="bg-[#fcfbf9] rounded-2xl border border-gray-100 p-4 min-h-[100px]">
+                    <p class="text-center text-gray-300 text-[10px] py-8">僅限老闆查閱數據</p>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        // --- 初始化參數 ---
         let API_URL = localStorage.getItem('moment_flor_api') || '';
         let currentStore = localStorage.getItem('moment_flor_store') || '台南FOCUS';
         let selectedPayment = '現金';
         let selectedSource = '路過';
         let cart = [];
-        let products = [];
-        const ADMIN_PASSWORD = "1234"; // 你可以把這裡改成你的自訂密碼
-        const CAT_ICONS = { '主花': '🌹', '配花': '🌸', '葉材': '🌿', '花束': '💐', '花瓶': '🏺', '其他': '✨' };
+        let rawProducts = []; // 儲存 GAS 的原始資料
+        const ADMIN_PASSWORD = "1234"; 
 
         window.onload = () => {
             setStore(currentStore);
             setPayment('現金');
             setSource('路過');
             document.getElementById('reportDate').valueAsDate = new Date();
-            if(API_URL) testConnection();
-            else alert("系統尚未設定，請聯繫管理員。");
+            if(API_URL) fetchProducts();
         };
 
-        // --- 隱形管理入口 (長按 3 秒) ---
+        // 長按 3 秒標題進入後台
         let pressTimer;
         const trigger = document.getElementById('adminTrigger');
-
         ['touchstart', 'mousedown'].forEach(evt => {
             trigger.addEventListener(evt, () => {
                 pressTimer = setTimeout(() => {
-                    const pw = prompt("管理員認證：");
+                    const pw = prompt("身份認證：");
                     if (pw === ADMIN_PASSWORD) document.getElementById('settingsModal').classList.remove('hidden');
-                    else if (pw !== null) alert("權限不足");
                 }, 3000);
             });
         });
+        ['touchend', 'mouseup', 'mouseleave'].forEach(evt => trigger.addEventListener(evt, () => clearTimeout(pressTimer)));
 
-        ['touchend', 'mouseup', 'mouseleave'].forEach(evt => {
-            trigger.addEventListener(evt, () => clearTimeout(pressTimer));
-        });
-
-        // --- 核心設定功能 ---
         function setStore(val) {
             currentStore = val;
             localStorage.setItem('moment_flor_store', val);
             updateBtnActive('.store-btn', val);
             updateSummary();
+            if (rawProducts.length > 0) renderCategories(); // 切換門市時重新渲染（因為價格會變）
         }
 
-        function setPayment(val) {
-            selectedPayment = val;
-            updateBtnActive('.pay-btn', val);
-            updateSummary();
-        }
-
-        function setSource(val) {
-            selectedSource = val;
-            updateBtnActive('.source-btn', val);
-            updateSummary();
-        }
+        function setPayment(val) { selectedPayment = val; updateBtnActive('.pay-btn', val); updateSummary(); }
+        function setSource(val) { selectedSource = val; updateBtnActive('.source-btn', val); updateSummary(); }
 
         function updateBtnActive(cls, val) {
-            document.querySelectorAll(cls).forEach(btn => {
-                btn.classList.toggle('active', btn.innerText === val);
-            });
+            document.querySelectorAll(cls).forEach(btn => btn.classList.toggle('active', btn.innerText.includes(val)));
         }
 
         function updateSummary() {
-            document.getElementById('summaryText').innerText = `${currentStore} / ${selectedPayment} / ${selectedSource}`;
+            document.getElementById('summaryText').innerText = `${currentStore} | ${selectedPayment} | ${selectedSource}`;
         }
 
-        // --- 產品與 API 連接 ---
-        async function testConnection() {
+        async function fetchProducts() {
             try {
                 const res = await fetch(`${API_URL}?action=getProducts`);
-                products = await res.json();
-                document.getElementById('statusInfo').innerText = '✅ 雲端連線正常';
+                rawProducts = await res.json();
+                document.getElementById('statusInfo').innerText = '✅ 連線正常';
                 renderCategories();
             } catch (e) {
-                document.getElementById('statusInfo').innerText = '❌ 連線異常，請長按標題檢查';
+                document.getElementById('statusInfo').innerText = '❌ API 連線錯誤';
             }
         }
 
         function renderCategories() {
-            const cats = [...new Set(products.map(p => p.category))];
+            const cats = [...new Set(rawProducts.map(p => p.category))];
             const grid = document.getElementById('categoryGrid');
             grid.innerHTML = cats.map(cat => `
                 <button onclick="openProducts('${cat}')" class="btn-action">
-                    <span class="text-xl mb-1">${CAT_ICONS[cat] || '🏷️'}</span>
                     <span class="text-[10px] font-bold">${cat}</span>
                 </button>
             `).join('');
@@ -229,94 +190,91 @@
             document.getElementById('productSection').classList.remove('hidden');
             document.getElementById('currentCatLabel').innerText = cat;
             const grid = document.getElementById('productGrid');
-            const list = products.filter(p => p.category === cat);
+            
+            // 根據門市自動對齊 GAS 欄位 (priceTN/priceKH, stockTN/stockKH)
+            const list = rawProducts.filter(p => p.category === cat).map(p => ({
+                id: p.id,
+                name: p.name,
+                price: currentStore === '台南FOCUS' ? p.priceTN : p.priceKH,
+                stock: currentStore === '台南FOCUS' ? p.stockTN : p.stockKH
+            }));
+
             grid.innerHTML = list.map(p => `
-                <button onclick="addToCart('${p.name}', ${p.price})" class="btn-action items-start p-4 active:bg-gray-50 border-gray-100 shadow-sm">
-                    <span class="font-bold text-sm mb-1">${p.name}</span>
+                <button onclick="addToCart('${p.name}', ${p.price}, ${p.id})" class="btn-action items-start p-3 border-gray-100 shadow-sm relative overflow-hidden">
+                    <div class="flex justify-between w-full items-start">
+                        <span class="font-bold text-xs text-left leading-tight mb-2">${p.name}</span>
+                        <span class="text-[8px] bg-gray-100 px-1 rounded text-gray-400">餘:${p.stock}</span>
+                    </div>
                     <span class="text-[#8e9775] font-bold">$${p.price}</span>
                 </button>
             `).join('');
-            document.getElementById('productSection').scrollIntoView({ behavior: 'smooth', block: 'center' });
         }
 
-        function closeProducts() { document.getElementById('productSection').classList.add('hidden'); }
-
-        function addToCart(name, price) {
-            cart.push({ name, price });
-            updateCartDisplay();
-        }
-
-        function updateCartDisplay() {
+        function addToCart(name, price, id) {
+            cart.push({ name, price, id, qty: 1 });
             const total = cart.reduce((sum, item) => sum + item.price, 0);
             document.getElementById('totalDisplay').innerText = `NT$ ${total.toLocaleString()}`;
-            document.getElementById('checkoutBtn').innerText = cart.length > 0 ? `確認結帳 (${cart.length})` : '確認結帳';
+            document.getElementById('checkoutBtn').innerText = `確認結帳 (${cart.length})`;
         }
 
-        // --- 結帳與報表處理 ---
         async function processCheckout() {
             if (cart.length === 0) return alert('請先點選商品');
             const btn = document.getElementById('checkoutBtn');
             btn.disabled = true;
-            btn.innerText = '傳送中...';
+            btn.innerText = '處理中...';
 
             const payload = {
-                action: 'checkout',
-                store: currentStore,
-                payment: selectedPayment,
-                source: selectedSource,
-                items: JSON.stringify(cart),
-                total: cart.reduce((sum, i) => sum + i.price, 0)
+                action: 'addTransaction',
+                data: {
+                    id: 'T' + Date.now(),
+                    date: new Date().toISOString(),
+                    store: currentStore,
+                    total: cart.reduce((sum, i) => sum + i.price, 0),
+                    pay: selectedPayment,
+                    source: selectedSource,
+                    items: cart.map(i => ({ id: i.id, name: i.name, qty: 1, unitPrice: i.price }))
+                }
             };
 
             try {
-                const query = new URLSearchParams(payload).toString();
-                await fetch(`${API_URL}?${query}`, { method: 'POST' });
+                await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
                 alert('✨ 結帳成功');
                 cart = [];
-                updateCartDisplay();
+                document.getElementById('totalDisplay').innerText = `NT$ 0`;
+                document.getElementById('checkoutBtn').innerText = '確認結帳';
                 closeProducts();
+                fetchProducts(); // 重新抓取庫存
             } catch (e) {
-                alert('結帳連線失敗');
-            } finally {
-                btn.disabled = false;
-                btn.innerText = '確認結帳';
-            }
+                alert('連線失敗，請檢查網路');
+            } finally { btn.disabled = false; }
         }
 
         async function getDailyReport() {
             const date = document.getElementById('reportDate').value;
             const display = document.getElementById('reportDisplay');
-            display.innerHTML = '<p class="text-center text-xs py-10 animate-pulse">數據讀取中...</p>';
-
+            display.innerHTML = '<p class="text-center text-xs py-8 animate-pulse">讀取中...</p>';
             try {
-                const res = await fetch(`${API_URL}?action=getReport&date=${date}&store=${currentStore}`);
-                const data = await res.json();
-                if (data.totalAmount === 0) {
-                    display.innerHTML = '<p class="text-center text-gray-400 py-10 text-xs">該日無交易資料</p>';
-                    return;
-                }
+                const res = await fetch(`${API_URL}?action=getDailyReport&date=${date}&store=${currentStore}`);
+                const d = await res.json();
                 display.innerHTML = `
-                    <div class="space-y-3">
-                        <div class="flex justify-between border-b pb-2"><span class="text-xs">總營收</span><span class="font-bold text-[#8e9775]">$${data.totalAmount.toLocaleString()}</span></div>
-                        <div class="flex justify-between border-b pb-2"><span class="text-xs">訂單數</span><span class="font-bold">${data.orderCount} 筆</span></div>
-                        <div class="text-[10px] text-gray-400 pt-2">支付細目：</div>
-                        ${Object.entries(data.payments).map(([pay, val]) => `<div class="flex justify-between text-xs"><span>${pay}</span><span>$${val.toLocaleString()}</span></div>`).join('')}
+                    <div class="text-xs space-y-2">
+                        <div class="flex justify-between border-b pb-1"><span>今日營收</span><span class="font-bold text-[#8e9775]">$${d.revenue.toLocaleString()}</span></div>
+                        <div class="flex justify-between border-b pb-1"><span>客單價</span><span class="font-bold">$${d.customers > 0 ? Math.round(d.revenue/d.customers) : 0}</span></div>
+                        <div class="flex justify-between border-b pb-1"><span>新/舊客</span><span>${d.newCount} / ${d.memberCount}</span></div>
                     </div>
                 `;
-            } catch (e) {
-                display.innerHTML = '<p class="text-center text-red-400 py-10 text-[10px]">報表載入失敗</p>';
-            }
+            } catch (e) { display.innerHTML = '<p class="text-center text-red-400 py-8">無法讀取報表</p>'; }
         }
 
-        // --- 後台管理功能 ---
+        function closeProducts() { document.getElementById('productSection').classList.add('hidden'); }
         function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
         function saveSettings() {
             const url = document.getElementById('apiUrlInput').value.trim();
             if(url) {
                 localStorage.setItem('moment_flor_api', url);
                 API_URL = url;
-                testConnection();
-                alert("API 已更新");
+                fetchProducts();
+                alert("API 設定成功");
             }
         }
     </script>
