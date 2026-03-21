@@ -211,7 +211,7 @@
         const ADMIN_PASSWORD = '1234';
         const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
         const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加購'];
-        const CAT_ICONS      = { '主花':'🌹','配花':'🌸','葉材':'🌿','花束':'💐','花瓶':'🏺','其他加購':'✨' };
+        
 
         // Studio 共用高雄的售價和庫存
         function isKH() { return currentStore !== '台南FOCUS'; }
@@ -300,9 +300,8 @@
             });
             document.getElementById('categoryGrid').innerHTML = cats.map(cat => `
                 <button onclick="openProducts('${cat}')" class="btn-action">
-                    <span style="font-size:22px;margin-bottom:4px;">${CAT_ICONS[cat] || '🌸'}</span>
-                    <span style="font-size:11px;font-weight:bold;">${cat}</span>
-                    <span style="font-size:9px;color:#9ca3af;">${catMap[cat]}項</span>
+                    <span style="font-size:18px;font-weight:bold;">${cat}</span>
+                    <span style="font-size:10px;color:#9ca3af;margin-top:3px;">${catMap[cat]}項</span>
                 </button>
             `).join('');
         }
@@ -312,15 +311,29 @@
             document.getElementById('currentCatLabel').innerText = cat;
             const list = rawProducts.filter(p => (p.category || '其他加購') === cat);
             document.getElementById('productGrid').innerHTML = list.map(p => {
-                const price = isKH() ? p.priceKH : p.priceTN;
-                const stock = isKH() ? p.stockKH : p.stockTN;
-                return `<button onclick="addToCart('${p.id}')" class="btn-action items-start p-3 border-gray-100 shadow-sm">
-                    <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;margin-bottom:4px;">
+                const price   = isKH() ? p.priceKH : p.priceTN;
+                const stock   = isKH() ? p.stockKH : p.stockTN;
+                const soldout = stock <= 0;
+                if (soldout) {
+                    return `<div style="background:#f3f4f6;border:2px solid #e5e7eb;border-radius:12px;padding:12px 10px;opacity:0.5;pointer-events:none;">
+                        <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;margin-bottom:4px;">
+                            <span style="font-weight:bold;font-size:12px;text-align:left;line-height:1.3;color:#9ca3af;">${p.name}</span>
+                            <span style="font-size:9px;background:#e5e7eb;padding:1px 5px;border-radius:4px;color:#9ca3af;margin-left:4px;flex-shrink:0;">售罄</span>
+                        </div>
+                        <span style="color:#d1d5db;font-weight:bold;font-size:14px;">$${price}</span>
+                    </div>`;
+                }
+                return `<div style="background:white;border:2px solid #e5e7eb;border-radius:12px;padding:10px;">
+                    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
                         <span style="font-weight:bold;font-size:12px;text-align:left;line-height:1.3;">${p.name}</span>
-                        <span style="font-size:8px;background:#f3f4f6;padding:1px 4px;border-radius:4px;color:#9ca3af;margin-left:4px;flex-shrink:0;">餘:${stock}</span>
+                        <span style="font-size:9px;background:#f3f4f6;padding:1px 4px;border-radius:4px;color:#9ca3af;margin-left:4px;flex-shrink:0;">餘:${stock}</span>
                     </div>
-                    <span style="color:#8e9775;font-weight:bold;font-size:14px;">$${price}</span>
-                </button>`;
+                    <span style="color:#8e9775;font-weight:bold;font-size:14px;display:block;margin-bottom:8px;">$${price}</span>
+                    <div style="display:flex;gap:5px;">
+                        <button onclick="addToCart('${p.id}')" style="flex:1;background:#8e9775;color:white;border:none;border-radius:8px;padding:8px 4px;font-size:12px;cursor:pointer;font-family:'Noto Serif TC',serif;">+ 加入</button>
+                        <button onclick="reportWaste('${p.id}')" style="background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:8px 8px;font-size:11px;cursor:pointer;">廢</button>
+                    </div>
+                </div>`;
             }).join('');
         }
 
@@ -377,22 +390,43 @@
                 updateCheckoutBar();
                 return;
             }
-            container.innerHTML = cart.map(item => {
+            container.innerHTML = cart.map((item, idx) => {
                 const price = getItemPrice(item);
                 return `<div class="cart-item">
                     <span class="cart-item-name">${item.name}</span>
                     <div class="cart-item-qty">
                         <button class="qty-btn" onclick="updateCartQty('${item.id}',-1)">−</button>
-                        <span class="qty-val">${item.qty}</span>
+                        <span class="qty-val" onclick="editQty(${idx})" title="點擊修改">${item.qty}</span>
                         <button class="qty-btn plus" onclick="updateCartQty('${item.id}',1)">+</button>
                     </div>
                     <div style="display:flex;align-items:center;gap:6px;">
-                        <span class="cart-item-price">NT$${(price * item.qty).toLocaleString()}</span>
+                        <span class="cart-item-price" onclick="editPrice(${idx})" title="點擊修改" style="cursor:pointer;text-decoration:underline dotted;">NT$${(price * item.qty).toLocaleString()}</span>
                         <button onclick="removeFromCart('${item.id}')" style="color:#d1d5db;background:none;border:none;font-size:18px;cursor:pointer;line-height:1;">×</button>
                     </div>
                 </div>`;
             }).join('');
             updateCheckoutBar();
+        }
+
+        function editQty(idx) {
+            const item = cart[idx];
+            const val  = prompt(`修改「${item.name}」數量：`, item.qty);
+            if (val === null) return;
+            const n = parseInt(val);
+            if (!isNaN(n) && n > 0) { item.qty = n; renderCart(); }
+        }
+
+        function editPrice(idx) {
+            const item  = cart[idx];
+            const price = getItemPrice(item);
+            const val   = prompt(`修改「${item.name}」單價：`, price);
+            if (val === null) return;
+            const n = parseInt(val);
+            if (!isNaN(n) && n >= 0) {
+                if (isKH()) item.priceKH = n;
+                else        item.priceTN = n;
+                renderCart();
+            }
         }
 
         function updateCheckoutBar() {
@@ -478,6 +512,38 @@
             document.getElementById('memberResult').innerHTML = '';
             document.getElementById('memberSearch').value = '';
             updateSummary();
+        }
+
+        // ── 報廢 ──
+        async function reportWaste(id) {
+            const p = rawProducts.find(x => String(x.id) === String(id));
+            if (!p) return;
+            const stock = isKH() ? p.stockKH : p.stockTN;
+            const qty   = prompt(`報廢「${p.name}」幾枝？（庫存 ${stock} 枝）`);
+            if (!qty || isNaN(qty) || Number(qty) <= 0) return;
+            if (Number(qty) > stock) return alert('報廢數量超過庫存');
+            const note = prompt('報廢原因（可略過）') || '';
+            try {
+                const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+                    action: 'addWaste',
+                    data: {
+                        date:        new Date().toISOString(),
+                        store:       storeForGAS(),
+                        productId:   p.id,
+                        productName: p.name,
+                        qty:         Number(qty),
+                        unitCost:    p.cost || 0,
+                        note
+                    }
+                })});
+                const result = await res.json();
+                if (result.success) {
+                    alert(`✅ 已記錄報廢：${p.name} ${qty} 枝`);
+                    fetchProducts();
+                } else {
+                    alert('報廢失敗：' + (result.error || ''));
+                }
+            } catch (e) { alert('連線失敗'); }
         }
 
         // ── 結帳 ──
