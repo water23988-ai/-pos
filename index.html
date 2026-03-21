@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -8,125 +9,612 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
         body { font-family: 'Noto Serif TC', serif; background-color: #fcfbf9; color: #4a4a4a; padding-bottom: 140px; overflow-x: hidden; }
-        
-        .btn-action { 
-            border: 2px solid #e5e7eb; background: white; border-radius: 12px; 
-            padding: 14px 8px; font-size: 14px; transition: all 0.2s; cursor: pointer;
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .btn-action.active { border-color: #8e9775; background-color: #f1f3eb; color: #6d7756; font-weight: bold; box-shadow: 0 2px 8px rgba(142,151,117,0.1); }
-        
-        .checkout-bar {
-            position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
-            background: #2e2926; color: white; padding: 16px 20px;
-            display: flex; align-items: center; justify-content: space-between;
-            box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
-            padding-bottom: calc(16px + env(safe-area-inset-bottom));
-        }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-    </style>
+```
+    .btn-action {
+        border: 2px solid #e5e7eb; background: white; border-radius: 12px;
+        padding: 14px 8px; font-size: 14px; transition: all 0.2s; cursor: pointer;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .btn-action.active {
+        border-color: #8e9775; background-color: #f1f3eb; color: #6d7756;
+        font-weight: bold; box-shadow: 0 2px 8px rgba(142,151,117,0.1);
+    }
+
+    .checkout-bar {
+        position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+        background: #2e2926; color: white; padding: 16px 20px;
+        display: flex; align-items: center; justify-content: space-between;
+        box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
+        padding-bottom: calc(16px + env(safe-area-inset-bottom));
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+
+    .cart-item {
+        display: flex; align-items: center; justify-content: space-between;
+        background: #fafaf9; border: 1px solid #f3f4f6;
+        border-radius: 10px; padding: 10px 12px; margin-bottom: 6px;
+    }
+    .cart-item-name { font-size: 13px; font-weight: bold; flex: 1; }
+    .cart-item-qty { display: flex; align-items: center; gap: 8px; }
+    .qty-btn {
+        width: 30px; height: 30px; border-radius: 50%;
+        border: 1px solid #e5e7eb; background: white;
+        font-size: 16px; cursor: pointer;
+        display: flex; align-items: center; justify-content: center;
+        -webkit-tap-highlight-color: transparent;
+    }
+    .qty-btn.plus { background: #8e9775; border-color: #8e9775; color: white; }
+    .qty-val { font-size: 15px; font-weight: bold; min-width: 20px; text-align: center; }
+    .cart-item-price { font-size: 13px; font-weight: bold; color: #9b6b62; min-width: 60px; text-align: right; }
+
+    .modal-overlay {
+        display: none; position: fixed; inset: 0;
+        background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+        z-index: 300; align-items: center; justify-content: center;
+    }
+    .modal-overlay.show { display: flex; }
+</style>
+```
+
 </head>
 <body>
 
-    <div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-        <div id="adminTrigger" class="select-none">
-            <h1 class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
-            <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統連接中...</p>
-        </div>
-        <div class="text-[9px] text-gray-300">SECURE V2.1</div>
+```
+<div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
+    <div id="adminTrigger" class="select-none">
+        <h1 class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
+        <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統連接中...</p>
     </div>
+    <div class="text-[9px] text-gray-300">SECURE V2.1</div>
+</div>
 
-    <div class="p-4 space-y-8">
-        
+<div class="p-4 space-y-6">
+
+    <section>
+        <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📍 營運據點</h2>
+        <div class="grid grid-cols-3 gap-3">
+            <button onclick="setStore('台南FOCUS')"   class="btn-action store-btn">台南FOCUS</button>
+            <button onclick="setStore('高雄FOCUS 13')" class="btn-action store-btn">高雄FOCUS 13</button>
+            <button onclick="setStore('Studio')"      class="btn-action store-btn">Studio</button>
+        </div>
+    </section>
+
+    <section>
+        <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">👥 會員查詢</h2>
+        <div class="flex gap-2 mb-3">
+            <input type="tel" id="memberSearch" placeholder="手機號碼"
+                class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+            <button onclick="searchMember()" class="bg-[#8e9775] text-white px-4 py-3 rounded-xl text-sm font-bold">查詢</button>
+        </div>
+        <div id="memberResult"></div>
+    </section>
+
+    <section class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
+        <h2 class="text-xs font-bold mb-4 text-gray-400 tracking-widest uppercase text-center">🌸 商品選單</h2>
+        <div id="categoryGrid" class="grid grid-cols-3 gap-2 mb-2"></div>
+        <div id="productSection" class="hidden border-t border-dashed pt-5 mt-4">
+            <div class="flex justify-between items-center mb-4">
+                <span id="currentCatLabel" class="font-bold text-[#8e9775] border-l-4 border-[#8e9775] pl-2"></span>
+                <button onclick="closeProducts()" class="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">✕ 關閉</button>
+            </div>
+            <div id="productGrid" class="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto no-scrollbar"></div>
+        </div>
+    </section>
+
+    <section>
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="text-xs font-bold text-gray-400 tracking-widest uppercase">🛒 結帳清單</h2>
+            <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
+        </div>
+        <div id="cartList">
+            <p class="text-center text-gray-200 text-xs py-6">尚無商品</p>
+        </div>
+        <div class="flex justify-between items-center mt-3 px-1">
+            <span class="text-xs text-gray-400">折扣</span>
+            <div class="flex items-center gap-2">
+                <span id="discountDisplay" class="text-xs text-red-400">—</span>
+                <button onclick="openDiscountModal()" class="text-[10px] border border-[#8e9775] text-[#8e9775] px-2 py-1 rounded-full">折扣</button>
+            </div>
+        </div>
+    </section>
+
+    <div class="grid grid-cols-2 gap-4">
         <section>
-            <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📍 營運據點</h2>
-            <div class="grid grid-cols-2 gap-3">
-                <button onclick="setStore('台南FOCUS')" class="btn-action store-btn">台南FOCUS</button>
-                <button onclick="setStore('高雄FOCUS 13')" class="btn-action store-btn">高雄FOCUS 13</button>
+            <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">💳 支付方式</h2>
+            <div class="space-y-2">
+                <button onclick="setPayment('現金')"   class="btn-action pay-btn w-full text-sm">現金</button>
+                <button onclick="setPayment('LINEPAY')" class="btn-action pay-btn w-full text-sm">LINEPAY</button>
+                <button onclick="setPayment('匯款')"   class="btn-action pay-btn w-full text-sm">匯款</button>
+                <button onclick="setPayment('刷卡')"   class="btn-action pay-btn w-full text-sm">刷卡</button>
             </div>
         </section>
-
-        <section class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-            <h2 class="text-xs font-bold mb-4 text-gray-400 tracking-widest uppercase text-center">🌸 商品選單</h2>
-            <div id="categoryGrid" class="grid grid-cols-3 gap-2 mb-6"></div>
-
-            <div id="productSection" class="hidden border-t border-dashed pt-5">
-                <div class="flex justify-between items-center mb-4">
-                    <span id="currentCatLabel" class="font-bold text-[#8e9775] border-l-4 border-[#8e9775] pl-2"></span>
-                    <button onclick="closeProducts()" class="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">✕ 關閉</button>
-                </div>
-                <div id="productGrid" class="grid grid-cols-2 gap-2 max-h-[400px] overflow-y-auto no-scrollbar"></div>
+        <section>
+            <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
+            <div class="space-y-2">
+                <button onclick="setSource('walk')"   class="btn-action source-btn w-full text-xs">路過</button>
+                <button onclick="setSource('ig')"     class="btn-action source-btn w-full text-xs">IG/FB</button>
+                <button onclick="setSource('friend')" class="btn-action source-btn w-full text-xs">朋友介紹</button>
+                <button onclick="setSource('market')" class="btn-action source-btn w-full text-xs">市集常客</button>
+                <button onclick="setSource('staff')"  class="btn-action source-btn w-full text-xs">員工</button>
+                <button onclick="setSource('google')" class="btn-action source-btn w-full text-xs">Google</button>
             </div>
         </section>
-
-        <div class="grid grid-cols-2 gap-6">
-            <section>
-                <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">💳 支付方式</h2>
-                <div class="space-y-2">
-                    <button onclick="setPayment('現金')" class="btn-action pay-btn w-full">現金</button>
-                    <button onclick="setPayment('LINEPAY')" class="btn-action pay-btn w-full">LINEPAY</button>
-                    <button onclick="setPayment('匯款')" class="btn-action pay-btn w-full">匯款</button>
-                </div>
-            </section>
-            <section>
-                <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
-                <div class="space-y-2">
-                    <button onclick="setSource('路過')" class="btn-action source-btn w-full text-xs">路過</button>
-                    <button onclick="setSource('IG/FB')" class="btn-action source-btn w-full text-xs">IG/FB</button>
-                    <button onclick="setSource('朋友介紹')" class="btn-action source-btn w-full text-xs">朋友</button>
-                </div>
-            </section>
-        </div>
     </div>
 
-    <div class="checkout-bar">
-        <div class="flex flex-col">
-            <div id="summaryText" class="text-[10px] text-gray-400 mb-1 tracking-tighter uppercase">載入中...</div>
-            <div id="totalDisplay" class="text-2xl font-bold text-[#DFC07A]">NT$ 0</div>
-        </div>
-        <button onclick="processCheckout()" id="checkoutBtn" class="bg-[#8e9775] px-8 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
-            確認結帳
-        </button>
-    </div>
+</div>
 
-    <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-6">
-        <div class="bg-white p-6 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
-            <div class="flex justify-between items-center mb-6">
-                <h3 class="font-bold text-lg text-[#8e9775]">老闆專屬後台</h3>
-                <button onclick="closeSettings()" class="text-gray-300">✕</button>
-            </div>
-            <div class="bg-gray-50 p-4 rounded-2xl mb-6 text-xs">
-                <label class="font-bold text-gray-400 mb-2 block">API URL (SECRET)</label>
-                <input type="password" id="apiUrlInput" class="w-full border border-gray-200 rounded-xl px-4 py-2 mb-3">
-                <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-2 rounded-xl font-bold">儲存 API</button>
-            </div>
-            <hr class="mb-6 border-dashed">
-            <div class="space-y-4">
-                <h4 class="font-bold text-sm italic">📊 營業額查詢</h4>
-                <div class="flex gap-2">
-                    <input type="date" id="reportDate" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs">
-                    <button onclick="getDailyReport()" class="bg-gray-100 text-[#8e9775] px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
-                </div>
-                <div id="reportDisplay" class="bg-[#fcfbf9] rounded-2xl border border-gray-100 p-4 min-h-[100px]">
-                    <p class="text-center text-gray-300 text-[10px] py-8">僅限老闆查閱數據</p>
-                </div>
-            </div>
+<div class="checkout-bar">
+    <div class="flex flex-col">
+        <div id="summaryText" class="text-[10px] text-gray-400 mb-1 tracking-tighter">載入中...</div>
+        <div id="totalDisplay" class="text-2xl font-bold text-[#DFC07A]">NT$ 0</div>
+    </div>
+    <button onclick="processCheckout()" id="checkoutBtn"
+        class="bg-[#8e9775] px-8 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform">
+        確認結帳
+    </button>
+</div>
+
+<!-- 折扣 Modal -->
+<div class="modal-overlay" id="discountModal">
+    <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
+        <h3 class="font-bold text-base mb-1">整單折扣</h3>
+        <p class="text-gray-400 text-xs mb-4">輸入折數，例如 8＝八折、85＝八五折</p>
+        <div class="flex items-center gap-2 mb-2">
+            <input type="number" id="discountRateInput" placeholder="例：85" min="1" max="99" step="1"
+                class="flex-1 border-2 border-[#8e9775] rounded-xl px-4 py-3 text-xl text-center outline-none font-bold">
+            <span class="text-gray-400 text-lg">折</span>
+        </div>
+        <p id="discountPreview" class="text-center text-[#8e9775] text-sm mb-4 h-5"></p>
+        <div class="flex gap-2">
+            <button onclick="applyDiscount()"    class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold">套用</button>
+            <button onclick="clearDiscount()"    class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-xs">清除</button>
+            <button onclick="closeDiscountModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-xs">取消</button>
         </div>
     </div>
+</div>
 
-    <script>
-        let API_URL = localStorage.getItem('moment_flor_api') || '';
-        let currentStore = localStorage.getItem('moment_flor_store') || '台南FOCUS';
-        let selectedPayment = '現金';
-        let selectedSource = '路過';
-        let cart = [];
-        let rawProducts = []; // 儲存 GAS 的原始資料
-        const ADMIN_PASSWORD = "1234"; 
+<!-- 後台 Modal -->
+<div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-6">
+    <div class="bg-white p-6 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
+        <div class="flex justify-between items-center mb-6">
+            <h3 class="font-bold text-lg text-[#8e9775]">老闆專屬後台</h3>
+            <button onclick="closeSettings()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <div class="bg-gray-50 p-4 rounded-2xl mb-6 text-xs">
+            <label class="font-bold text-gray-400 mb-2 block">API URL</label>
+            <input type="password" id="apiUrlInput" class="w-full border border-gray-200 rounded-xl px-4 py-2 mb-3 text-xs">
+            <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-2 rounded-xl font-bold">儲存 API</button>
+        </div>
+        <hr class="mb-6 border-dashed">
+        <div class="space-y-4">
+            <h4 class="font-bold text-sm italic">📊 營業額查詢</h4>
+            <div class="flex gap-2">
+                <input type="date" id="reportDate" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs">
+                <button onclick="getDailyReport()" class="bg-gray-100 text-[#8e9775] px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
+            </div>
+            <div id="reportDisplay" class="bg-[#fcfbf9] rounded-2xl border border-gray-100 p-4 min-h-[100px]">
+                <p class="text-center text-gray-300 text-[10px] py-8">僅限老闆查閱數據</p>
+            </div>
+        </div>
+    </div>
+</div>
 
-        window.onload = () => {
-            setStore(currentStore);
+<script>
+    // ── 狀態變數 ──
+    let API_URL         = localStorage.getItem('moment_flor_api') || '';
+    let currentStore    = localStorage.getItem('moment_flor_store') || '台南FOCUS';
+    let selectedPayment = '現金';
+    let selectedSource  = 'walk';
+    let cart            = [];
+    let rawProducts     = [];
+    let currentMember   = null;
+    let discountRate    = 0;
+
+    const ADMIN_PASSWORD = '1234';
+    const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
+    const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加購'];
+    const CAT_ICONS      = { '主花':'🌹','配花':'🌸','葉材':'🌿','花束':'💐','花瓶':'🏺','其他加購':'✨' };
+
+    // Studio 共用高雄的售價和庫存
+    function isKH() { return currentStore !== '台南FOCUS'; }
+    function storeForGAS() { return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
+
+    // ── 初始化 ──
+    window.onload = () => {
+        setStore(currentStore);
+        setPayment('現金');
+        setSource('walk');
+        document.getElementById('reportDate').valueAsDate = new Date();
+        if (API_URL) fetchProducts();
+    };
+
+    // ── 長按標題進入後台 ──
+    let pressTimer;
+    const trigger  = document.getElementById('adminTrigger');
+    const isMobile = 'ontouchstart' in window;
+    trigger.addEventListener(isMobile ? 'touchstart' : 'mousedown', () => {
+        pressTimer = setTimeout(() => {
+            const pw = prompt('身份認證：');
+            if (pw === ADMIN_PASSWORD) {
+                document.getElementById('apiUrlInput').value = API_URL;
+                document.getElementById('settingsModal').classList.remove('hidden');
+            }
+        }, 3000);
+    });
+    trigger.addEventListener(isMobile ? 'touchend' : 'mouseup', () => clearTimeout(pressTimer));
+
+    // ── 門市 / 付款 / 來源 ──
+    function setStore(val) {
+        currentStore = val;
+        localStorage.setItem('moment_flor_store', val);
+        document.querySelectorAll('.store-btn').forEach(b =>
+            b.classList.toggle('active', b.innerText.trim() === val)
+        );
+        updateSummary();
+        if (rawProducts.length > 0) renderCategories();
+    }
+
+    function setPayment(val) {
+        selectedPayment = val;
+        document.querySelectorAll('.pay-btn').forEach(b =>
+            b.classList.toggle('active', b.innerText.trim() === val)
+        );
+        updateSummary();
+    }
+
+    function setSource(val) {
+        selectedSource = val;
+        const label = SOURCE_LABEL[val] || val;
+        document.querySelectorAll('.source-btn').forEach(b =>
+            b.classList.toggle('active', b.innerText.trim() === label)
+        );
+        updateSummary();
+    }
+
+    function updateSummary() {
+        const srcLabel = SOURCE_LABEL[selectedSource] || selectedSource;
+        const member   = currentMember ? ` | 👤 ${currentMember.name}` : '';
+        document.getElementById('summaryText').innerText =
+            `${currentStore} | ${selectedPayment} | ${srcLabel}${member}`;
+    }
+
+    // ── 產品 ──
+    async function fetchProducts() {
+        try {
+            const res   = await fetch(`${API_URL}?action=getProducts`);
+            rawProducts = await res.json();
+            document.getElementById('statusInfo').innerText = '✅ 連線正常';
+            renderCategories();
+        } catch (e) {
+            document.getElementById('statusInfo').innerText = '❌ API 連線錯誤';
+        }
+    }
+
+    function renderCategories() {
+        const catMap = {};
+        rawProducts.forEach(p => {
+            const cat = p.category || '其他加購';
+            catMap[cat] = (catMap[cat] || 0) + 1;
+        });
+        const cats = Object.keys(catMap).sort((a, b) => {
+            const ai = CAT_ORDER.indexOf(a); const bi = CAT_ORDER.indexOf(b);
+            return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+        });
+        document.getElementById('categoryGrid').innerHTML = cats.map(cat => `
+            <button onclick="openProducts('${cat}')" class="btn-action">
+                <span style="font-size:22px;margin-bottom:4px;">${CAT_ICONS[cat] || '🌸'}</span>
+                <span style="font-size:11px;font-weight:bold;">${cat}</span>
+                <span style="font-size:9px;color:#9ca3af;">${catMap[cat]}項</span>
+            </button>
+        `).join('');
+    }
+
+    function openProducts(cat) {
+        document.getElementById('productSection').classList.remove('hidden');
+        document.getElementById('currentCatLabel').innerText = cat;
+        const list = rawProducts.filter(p => (p.category || '其他加購') === cat);
+        document.getElementById('productGrid').innerHTML = list.map(p => {
+            const price = isKH() ? p.priceKH : p.priceTN;
+            const stock = isKH() ? p.stockKH : p.stockTN;
+            return `<button onclick="addToCart('${p.id}')" class="btn-action items-start p-3 border-gray-100 shadow-sm">
+                <div style="display:flex;justify-content:space-between;width:100%;align-items:flex-start;margin-bottom:4px;">
+                    <span style="font-weight:bold;font-size:12px;text-align:left;line-height:1.3;">${p.name}</span>
+                    <span style="font-size:8px;background:#f3f4f6;padding:1px 4px;border-radius:4px;color:#9ca3af;margin-left:4px;flex-shrink:0;">餘:${stock}</span>
+                </div>
+                <span style="color:#8e9775;font-weight:bold;font-size:14px;">$${price}</span>
+            </button>`;
+        }).join('');
+    }
+
+    function closeProducts() {
+        document.getElementById('productSection').classList.add('hidden');
+    }
+
+    // ── 購物車 ──
+    function addToCart(id) {
+        const p = rawProducts.find(x => String(x.id) === String(id));
+        if (!p) return;
+        const existing = cart.find(c => String(c.id) === String(id));
+        if (existing) {
+            existing.qty++;
+        } else {
+            cart.push({ id: p.id, name: p.name, qty: 1,
+                priceTN: p.priceTN, priceKH: p.priceKH,
+                stockTN: p.stockTN, stockKH: p.stockKH,
+                cost: p.cost || 0 });
+        }
+        renderCart();
+    }
+
+    function updateCartQty(id, delta) {
+        const item = cart.find(c => String(c.id) === String(id));
+        if (!item) return;
+        item.qty = Math.max(1, item.qty + delta);
+        renderCart();
+    }
+
+    function removeFromCart(id) {
+        cart = cart.filter(c => String(c.id) !== String(id));
+        renderCart();
+    }
+
+    function clearCart() {
+        cart = [];
+        discountRate = 0;
+        renderCart();
+    }
+
+    function getItemPrice(item) {
+        return isKH() ? item.priceKH : item.priceTN;
+    }
+
+    function getSubtotal() {
+        return cart.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0);
+    }
+
+    function renderCart() {
+        const container = document.getElementById('cartList');
+        if (!cart.length) {
+            container.innerHTML = '<p style="text-align:center;color:#e5e7eb;font-size:12px;padding:24px 0;">尚無商品</p>';
+            updateCheckoutBar();
+            return;
+        }
+        container.innerHTML = cart.map(item => {
+            const price = getItemPrice(item);
+            return `<div class="cart-item">
+                <span class="cart-item-name">${item.name}</span>
+                <div class="cart-item-qty">
+                    <button class="qty-btn" onclick="updateCartQty('${item.id}',-1)">−</button>
+                    <span class="qty-val">${item.qty}</span>
+                    <button class="qty-btn plus" onclick="updateCartQty('${item.id}',1)">+</button>
+                </div>
+                <div style="display:flex;align-items:center;gap:6px;">
+                    <span class="cart-item-price">NT$${(price * item.qty).toLocaleString()}</span>
+                    <button onclick="removeFromCart('${item.id}')" style="color:#d1d5db;background:none;border:none;font-size:18px;cursor:pointer;line-height:1;">×</button>
+                </div>
+            </div>`;
+        }).join('');
+        updateCheckoutBar();
+    }
+
+    function updateCheckoutBar() {
+        const sub   = getSubtotal();
+        const disc  = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+        const total = sub - disc;
+        const count = cart.reduce((a, c) => a + c.qty, 0);
+        document.getElementById('discountDisplay').innerText =
+            discountRate > 0 ? `${discountRate}折 — NT$ ${disc.toLocaleString()}` : '—';
+        document.getElementById('totalDisplay').innerText = `NT$ ${total.toLocaleString()}`;
+        document.getElementById('checkoutBtn').innerText  =
+            count > 0 ? `確認結帳 (${count})` : '確認結帳';
+    }
+
+    // ── 折扣 ──
+    function openDiscountModal() {
+        if (!cart.length) return alert('請先加入商品');
+        document.getElementById('discountRateInput').value = discountRate || '';
+        document.getElementById('discountPreview').innerText = '';
+        document.getElementById('discountModal').classList.add('show');
+        document.getElementById('discountRateInput').focus();
+        document.getElementById('discountRateInput').oninput = function() {
+            const rate = parseFloat(this.value);
+            if (rate > 0 && rate < 100) {
+                const sub   = getSubtotal();
+                const after = Math.round(sub * rate / 100);
+                document.getElementById('discountPreview').innerText =
+                    `折後：NT$ ${after.toLocaleString()}（省 NT$ ${(sub - after).toLocaleString()}）`;
+            } else {
+                document.getElementById('discountPreview').innerText = '';
+            }
+        };
+    }
+    function applyDiscount() {
+        const rate = parseFloat(document.getElementById('discountRateInput').value);
+        if (!rate || rate <= 0 || rate >= 100) return alert('請輸入 1–99 之間的折數');
+        discountRate = rate;
+        closeDiscountModal();
+        updateCheckoutBar();
+    }
+    function clearDiscount() {
+        discountRate = 0;
+        closeDiscountModal();
+        updateCheckoutBar();
+    }
+    function closeDiscountModal() {
+        document.getElementById('discountModal').classList.remove('show');
+    }
+
+    // ── 會員 ──
+    async function searchMember() {
+        const phone = document.getElementById('memberSearch').value.trim();
+        if (!phone) return alert('請輸入手機號碼');
+        try {
+            const res     = await fetch(`${API_URL}?action=getMembers`);
+            const members = await res.json();
+            const norm    = p => String(p).replace(/\D/g, '').replace(/^0/, '');
+            const m       = members.find(x => norm(x.phone) === norm(phone));
+            const el      = document.getElementById('memberResult');
+            if (m) {
+                currentMember = m;
+                const tier = m.totalSpent >= 30000 ? '👑 VIP'
+                           : m.totalSpent >= 10000 ? '🥇 金卡'
+                           : m.totalSpent >= 3000  ? '🥈 銀卡' : '🥉 銅卡';
+                el.innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <span style="font-weight:bold;color:#6d7756;">${m.name}</span>
+                        <span style="font-size:10px;margin-left:6px;">${tier}</span>
+                        <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.points} pt 累積點數</div>
+                    </div>
+                    <button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button>
+                </div>`;
+                updateSummary();
+            } else {
+                currentMember = null;
+                el.innerHTML = `<div style="background:#fef9ec;border:1px dashed #f59e0b;border-radius:12px;padding:10px 14px;font-size:12px;color:#92400e;">查無此會員</div>`;
+            }
+        } catch (e) { alert('查詢失敗，請確認連線'); }
+    }
+
+    function clearMember() {
+        currentMember = null;
+        document.getElementById('memberResult').innerHTML = '';
+        document.getElementById('memberSearch').value = '';
+        updateSummary();
+    }
+
+    // ── 結帳 ──
+    async function processCheckout() {
+        if (!cart.length) return alert('請先點選商品');
+
+        const sub         = getSubtotal();
+        const discountAmt = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+        const total       = sub - discountAmt;
+        const earnedPts   = currentMember ? Math.floor(total / 100) : 0;
+
+        // 庫存檢查
+        const low = cart.filter(i => {
+            const stock = isKH() ? (i.stockKH || 0) : (i.stockTN || 0);
+            return i.qty > stock;
+        });
+        if (low.length) {
+            const msg = low.map(i => {
+                const stock = isKH() ? (i.stockKH || 0) : (i.stockTN || 0);
+                return `・${i.name}（庫存 ${stock}，結帳 ${i.qty}）`;
+            }).join('\n');
+            if (!confirm(`以下品項庫存不足：\n\n${msg}\n\n是否仍要繼續？`)) return;
+        }
+
+        const btn = document.getElementById('checkoutBtn');
+        btn.disabled  = true;
+        btn.innerText = '處理中...';
+
+        const payload = {
+            action: 'addTransaction',
+            data: {
+                id:           'T' + Date.now().toString().slice(-8),
+                date:         new Date().toLocaleString(),
+                store:        storeForGAS(),
+                memberId:     currentMember ? currentMember.id   : '',
+                memberName:   currentMember ? currentMember.name : '散客',
+                subtotal:     sub,
+                discount:     discountAmt,
+                total:        total,
+                cost:         cart.reduce((a, c) => a + (c.cost || 0) * c.qty, 0),
+                pay:          selectedPayment,
+                earnedPoints: earnedPts,
+                note:         currentStore === 'Studio' ? 'Studio接單' : 'POS V2.1',
+                customerType: currentMember ? '舊客' : '新客',
+                source:       selectedSource,
+                items:        cart.map(i => ({
+                    id:        i.id,
+                    name:      i.name,
+                    qty:       i.qty,
+                    unitPrice: getItemPrice(i),
+                    unitCost:  i.cost || 0
+                }))
+            }
+        };
+
+        try {
+            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
+            const result = await res.json();
+            if (result.success) {
+                alert(`✨ 結帳成功！NT$ ${total.toLocaleString()}${earnedPts ? '\n+' + earnedPts + ' pt' : ''}`);
+                cart = []; discountRate = 0; currentMember = null;
+                document.getElementById('memberResult').innerHTML = '';
+                document.getElementById('memberSearch').value = '';
+                renderCart();
+                updateSummary();
+                closeProducts();
+                fetchProducts();
+            } else {
+                alert('結帳失敗：' + (result.error || '原因不明'));
+            }
+        } catch (e) {
+            alert('連線失敗，請檢查網路');
+        } finally {
+            btn.disabled  = false;
+            btn.innerText = cart.length > 0 ? `確認結帳 (${cart.reduce((a,c)=>a+c.qty,0)})` : '確認結帳';
+        }
+    }
+
+    // ── 日報 ──
+    async function getDailyReport() {
+        const date    = document.getElementById('reportDate').value;
+        const display = document.getElementById('reportDisplay');
+        display.innerHTML = '<p style="text-align:center;font-size:12px;padding:32px 0;color:#9ca3af;" class="animate-pulse">讀取中...</p>';
+        try {
+            const res = await fetch(`${API_URL}?action=getDailyReport&date=${date}&store=${encodeURIComponent(storeForGAS())}`);
+            const d   = await res.json();
+            const src = d.sourceBreakdown || {};
+            display.innerHTML = `
+                <div style="font-size:12px;line-height:1.8;">
+                    <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding-bottom:4px;margin-bottom:4px;">
+                        <span>今日營收</span><span style="font-weight:bold;color:#8e9775;">NT$${(d.revenue||0).toLocaleString()}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding-bottom:4px;margin-bottom:4px;">
+                        <span>來客數</span><span style="font-weight:bold;">${d.customers||0}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding-bottom:4px;margin-bottom:4px;">
+                        <span>客單價</span><span style="font-weight:bold;">NT$${d.customers>0?Math.round(d.revenue/d.customers):0}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;border-bottom:1px solid #f3f4f6;padding-bottom:4px;margin-bottom:4px;">
+                        <span>新客 / 舊客</span><span>${d.newCount||0} / ${d.memberCount||0}</span>
+                    </div>
+                    <div style="display:flex;justify-content:space-between;padding-bottom:4px;margin-bottom:8px;">
+                        <span>淨利</span><span style="font-weight:bold;color:#16a34a;">NT$${(d.profit||0).toLocaleString()}</span>
+                    </div>
+                    <div style="font-size:10px;color:#9ca3af;">
+                        路過 ${src.walk||0} · IG ${src.ig||0} · 朋友 ${src.friend||0} · 市集 ${src.market||0} · 員工 ${src.staff||0} · Google ${src.google||0}
+                    </div>
+                </div>`;
+        } catch (e) {
+            display.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">無法讀取報表</p>';
+        }
+    }
+
+    // ── 設定 ──
+    function closeSettings() {
+        document.getElementById('settingsModal').classList.add('hidden');
+    }
+    function saveSettings() {
+        const url = document.getElementById('apiUrlInput').value.trim();
+        if (url) {
+            localStorage.setItem('moment_flor_api', url);
+            API_URL = url;
+            fetchProducts();
+            closeSettings();
+            alert('API 設定成功');
+        }
+    }
+</script>
+```
+
+</body>
+</html>
             setPayment('現金');
             setSource('路過');
             document.getElementById('reportDate').valueAsDate = new Date();
