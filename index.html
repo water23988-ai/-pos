@@ -180,7 +180,7 @@
             </div>
             <div class="bg-gray-50 p-4 rounded-2xl mb-6 text-xs">
                 <label class="font-bold text-gray-400 mb-2 block">API URL</label>
-                <input type="password" id="apiUrlInput" class="w-full border border-gray-200 rounded-xl px-4 py-2 mb-3 text-xs">
+                <input type="text" id="apiUrlInput" class="w-full border border-gray-200 rounded-xl px-4 py-2 mb-3 text-xs">
                 <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-2 rounded-xl font-bold">儲存 API</button>
             </div>
             <hr class="mb-6 border-dashed">
@@ -331,7 +331,7 @@
                     <span style="color:#8e9775;font-weight:bold;font-size:14px;display:block;margin-bottom:8px;">$${price}</span>
                     <div style="display:flex;gap:5px;">
                         <button onclick="addToCart('${p.id}')" style="flex:1;background:#8e9775;color:white;border:none;border-radius:8px;padding:8px 4px;font-size:12px;cursor:pointer;font-family:'Noto Serif TC',serif;">+ 加入</button>
-                        <button onclick="reportWaste('${p.id}')" style="background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:8px 8px;font-size:11px;cursor:pointer;">廢</button>
+                        <button onclick="reportWaste('${p.id}')" style="flex:1;background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:8px 4px;font-size:12px;cursor:pointer;">報廢</button>
                     </div>
                 </div>`;
             }).join('');
