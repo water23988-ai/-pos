@@ -810,20 +810,3 @@
     </script>
 </body>
 </html>
-        // ── 設定 ──
-        function closeSettings() {
-            document.getElementById('settingsModal').classList.add('hidden');
-        }
-        function saveSettings() {
-            const url = document.getElementById('apiUrlInput').value.trim();
-            if (url) {
-                localStorage.setItem('moment_flor_api', url);
-                API_URL = url;
-                fetchProducts();
-                closeSettings();
-                alert('API 設定成功');
-            }
-        }
-    </script>
-</body>
-</html>
