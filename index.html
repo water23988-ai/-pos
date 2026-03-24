@@ -197,21 +197,33 @@
     <!-- 新增會員 Modal -->
     <div class="modal-overlay" id="newMemberModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
-            <div class="flex justify-between items-center mb-5">
+            <div class="flex justify-between items-center mb-2">
                 <h3 class="font-bold text-base">✦ 新增會員</h3>
                 <button onclick="closeNewMemberModal()" class="text-gray-300 text-xl">✕</button>
             </div>
-            <p class="text-xs text-gray-400 mb-4">查無此手機號碼，是否立即建立？</p>
+            <p class="text-xs text-gray-400 mb-5">查無此手機號碼，是否立即建立？</p>
+
+            <!-- 電話（醒目顯示） -->
+            <div class="bg-[#f1f3eb] border-2 border-[#8e9775] rounded-2xl p-4 mb-4 text-center">
+                <div class="text-[10px] text-[#8e9775] font-bold tracking-widest uppercase mb-1">查詢號碼</div>
+                <div id="newMemberPhoneDisplay" class="text-2xl font-bold text-[#4a4a4a] tracking-wider"></div>
+                <input type="hidden" id="newMemberPhone">
+            </div>
+
             <div class="space-y-3 mb-5">
-                <input type="text" id="newMemberName" placeholder="姓名 *"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
-                <input type="tel" id="newMemberPhone" placeholder="手機號碼 *" readonly
-                    class="w-full border border-gray-100 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-400">
-                <input type="date" id="newMemberBirthday"
-                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+                <div>
+                    <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-1">姓名 *</label>
+                    <input type="text" id="newMemberName" placeholder="請輸入姓名"
+                        class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base outline-none focus:border-[#8e9775] font-bold">
+                </div>
+                <div>
+                    <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-1">生日（選填）</label>
+                    <input type="date" id="newMemberBirthday"
+                        class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+                </div>
             </div>
             <div class="flex gap-2">
-                <button onclick="registerMember()" class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold">建立會員</button>
+                <button onclick="registerMember()" class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold text-base">建立會員</button>
                 <button onclick="closeNewMemberModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm">略過</button>
             </div>
         </div>
@@ -588,7 +600,8 @@
                     updateSummary();
                 } else {
                     // 查無會員 → 開啟新增 Modal
-                    document.getElementById('newMemberPhone').value    = phone;
+                    document.getElementById('newMemberPhone').value        = phone;
+                    document.getElementById('newMemberPhoneDisplay').innerText = phone;
                     document.getElementById('newMemberName').value     = '';
                     document.getElementById('newMemberBirthday').value = '';
                     document.getElementById('newMemberModal').classList.add('show');
@@ -780,6 +793,23 @@
             }
         }
 
+        // ── 設定 ──
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+        function saveSettings() {
+            const url = document.getElementById('apiUrlInput').value.trim();
+            if (url) {
+                localStorage.setItem('moment_flor_api', url);
+                API_URL = url;
+                fetchProducts();
+                closeSettings();
+                alert('API 設定成功');
+            }
+        }
+    </script>
+</body>
+</html>
         // ── 設定 ──
         function closeSettings() {
             document.getElementById('settingsModal').classList.add('hidden');
