@@ -155,18 +155,64 @@
     <!-- 折扣 Modal -->
     <div class="modal-overlay" id="discountModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
-            <h3 class="font-bold text-base mb-1">整單折扣</h3>
-            <p class="text-gray-400 text-xs mb-4">輸入折數，例如 8＝八折、85＝八五折</p>
-            <div class="flex items-center gap-2 mb-2">
-                <input type="number" id="discountRateInput" placeholder="例：85" min="1" max="99" step="1"
-                    class="flex-1 border-2 border-[#8e9775] rounded-xl px-4 py-3 text-xl text-center outline-none font-bold">
-                <span class="text-gray-400 text-lg">折</span>
+            <h3 class="font-bold text-base mb-4">折扣設定</h3>
+
+            <!-- 折數 -->
+            <div class="mb-4">
+                <div class="text-xs text-gray-400 font-bold mb-2 tracking-widest uppercase">折數折扣</div>
+                <div class="flex items-center gap-2">
+                    <input type="number" id="discountRateInput" placeholder="例：85" min="1" max="99" step="1"
+                        class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 text-xl text-center outline-none font-bold focus:border-[#8e9775]">
+                    <span class="text-gray-400 text-lg">折</span>
+                    <button onclick="applyDiscountRate()" class="bg-[#8e9775] text-white px-4 py-3 rounded-xl font-bold text-sm">套用</button>
+                </div>
+                <p id="discountRatePreview" class="text-center text-[#8e9775] text-xs mt-2 h-4"></p>
             </div>
-            <p id="discountPreview" class="text-center text-[#8e9775] text-sm mb-4 h-5"></p>
+
+            <div class="flex items-center gap-3 my-4">
+                <div class="flex-1 h-px bg-gray-100"></div>
+                <span class="text-xs text-gray-300">或</span>
+                <div class="flex-1 h-px bg-gray-100"></div>
+            </div>
+
+            <!-- 固定金額 -->
+            <div class="mb-5">
+                <div class="text-xs text-gray-400 font-bold mb-2 tracking-widest uppercase">折扣金額</div>
+                <div class="flex items-center gap-2">
+                    <span class="text-gray-400 text-lg">NT$</span>
+                    <input type="number" id="discountAmtInput" placeholder="輸入折扣金額" min="0" step="1"
+                        class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 text-xl text-center outline-none font-bold focus:border-[#8e9775]">
+                    <button onclick="applyDiscountAmt()" class="bg-[#8e9775] text-white px-4 py-3 rounded-xl font-bold text-sm">套用</button>
+                </div>
+                <p id="discountAmtPreview" class="text-center text-[#8e9775] text-xs mt-2 h-4"></p>
+            </div>
+
             <div class="flex gap-2">
-                <button onclick="applyDiscount()"    class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold">套用</button>
-                <button onclick="clearDiscount()"    class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-xs">清除</button>
-                <button onclick="closeDiscountModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-xs">取消</button>
+                <button onclick="clearDiscount()"      class="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl text-sm">清除折扣</button>
+                <button onclick="closeDiscountModal()" class="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl text-sm">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 新增會員 Modal -->
+    <div class="modal-overlay" id="newMemberModal">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
+            <div class="flex justify-between items-center mb-5">
+                <h3 class="font-bold text-base">✦ 新增會員</h3>
+                <button onclick="closeNewMemberModal()" class="text-gray-300 text-xl">✕</button>
+            </div>
+            <p class="text-xs text-gray-400 mb-4">查無此手機號碼，是否立即建立？</p>
+            <div class="space-y-3 mb-5">
+                <input type="text" id="newMemberName" placeholder="姓名 *"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+                <input type="tel" id="newMemberPhone" placeholder="手機號碼 *" readonly
+                    class="w-full border border-gray-100 rounded-xl px-4 py-3 text-sm bg-gray-50 text-gray-400">
+                <input type="date" id="newMemberBirthday"
+                    class="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+            </div>
+            <div class="flex gap-2">
+                <button onclick="registerMember()" class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold">建立會員</button>
+                <button onclick="closeNewMemberModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm">略過</button>
             </div>
         </div>
     </div>
@@ -207,6 +253,7 @@
         let rawProducts     = [];
         let currentMember   = null;
         let discountRate    = 0;
+        let discountAmt     = 0; // 固定折扣金額
 
         const ADMIN_PASSWORD = '1234';
         const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
@@ -372,6 +419,7 @@
         function clearCart() {
             cart = [];
             discountRate = 0;
+            discountAmt  = 0;
             renderCart();
         }
 
@@ -381,6 +429,13 @@
 
         function getSubtotal() {
             return cart.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0);
+        }
+
+        function getDiscountAmt() {
+            const sub = getSubtotal();
+            if (discountRate > 0) return Math.round(sub * (1 - discountRate / 100));
+            if (discountAmt  > 0) return discountAmt;
+            return 0;
         }
 
         function renderCart() {
@@ -431,47 +486,78 @@
 
         function updateCheckoutBar() {
             const sub   = getSubtotal();
-            const disc  = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+            let disc    = 0;
+            if (discountRate > 0)     disc = Math.round(sub * (1 - discountRate / 100));
+            else if (discountAmt > 0) disc = discountAmt;
             const total = sub - disc;
             const count = cart.reduce((a, c) => a + c.qty, 0);
-            document.getElementById('discountDisplay').innerText =
-                discountRate > 0 ? `${discountRate}折 — NT$ ${disc.toLocaleString()}` : '—';
-            document.getElementById('totalDisplay').innerText = `NT$ ${total.toLocaleString()}`;
-            document.getElementById('checkoutBtn').innerText  =
+            let discLabel = '—';
+            if (discountRate > 0)     discLabel = `${discountRate}折 — NT$ ${disc.toLocaleString()}`;
+            else if (discountAmt > 0) discLabel = `折扣 — NT$ ${disc.toLocaleString()}`;
+            document.getElementById('discountDisplay').innerText = discLabel;
+            document.getElementById('totalDisplay').innerText    = `NT$ ${total.toLocaleString()}`;
+            document.getElementById('checkoutBtn').innerText     =
                 count > 0 ? `確認結帳 (${count})` : '確認結帳';
         }
 
         // ── 折扣 ──
         function openDiscountModal() {
             if (!cart.length) return alert('請先加入商品');
-            document.getElementById('discountRateInput').value = discountRate || '';
-            document.getElementById('discountPreview').innerText = '';
+            document.getElementById('discountRateInput').value = '';
+            document.getElementById('discountAmtInput').value  = '';
+            document.getElementById('discountRatePreview').innerText = '';
+            document.getElementById('discountAmtPreview').innerText  = '';
             document.getElementById('discountModal').classList.add('show');
-            document.getElementById('discountRateInput').focus();
+
             document.getElementById('discountRateInput').oninput = function() {
                 const rate = parseFloat(this.value);
                 if (rate > 0 && rate < 100) {
-                    const sub   = getSubtotal();
-                    const after = Math.round(sub * rate / 100);
-                    document.getElementById('discountPreview').innerText =
-                        `折後：NT$ ${after.toLocaleString()}（省 NT$ ${(sub - after).toLocaleString()}）`;
+                    const after = Math.round(getSubtotal() * rate / 100);
+                    document.getElementById('discountRatePreview').innerText =
+                        `折後 NT$ ${after.toLocaleString()}（省 NT$ ${(getSubtotal()-after).toLocaleString()}）`;
                 } else {
-                    document.getElementById('discountPreview').innerText = '';
+                    document.getElementById('discountRatePreview').innerText = '';
+                }
+            };
+
+            document.getElementById('discountAmtInput').oninput = function() {
+                const amt = parseInt(this.value);
+                if (amt > 0) {
+                    const after = Math.max(0, getSubtotal() - amt);
+                    document.getElementById('discountAmtPreview').innerText =
+                        `折後 NT$ ${after.toLocaleString()}`;
+                } else {
+                    document.getElementById('discountAmtPreview').innerText = '';
                 }
             };
         }
-        function applyDiscount() {
+
+        function applyDiscountRate() {
             const rate = parseFloat(document.getElementById('discountRateInput').value);
             if (!rate || rate <= 0 || rate >= 100) return alert('請輸入 1–99 之間的折數');
             discountRate = rate;
+            discountAmt  = 0;
             closeDiscountModal();
             updateCheckoutBar();
         }
-        function clearDiscount() {
+
+        function applyDiscountAmt() {
+            const amt = parseInt(document.getElementById('discountAmtInput').value);
+            if (!amt || amt <= 0) return alert('請輸入折扣金額');
+            if (amt >= getSubtotal()) return alert('折扣金額不能大於或等於小計');
+            discountAmt  = amt;
             discountRate = 0;
             closeDiscountModal();
             updateCheckoutBar();
         }
+
+        function clearDiscount() {
+            discountRate = 0;
+            discountAmt  = 0;
+            closeDiscountModal();
+            updateCheckoutBar();
+        }
+
         function closeDiscountModal() {
             document.getElementById('discountModal').classList.remove('show');
         }
@@ -501,10 +587,47 @@
                     </div>`;
                     updateSummary();
                 } else {
-                    currentMember = null;
-                    el.innerHTML = `<div style="background:#fef9ec;border:1px dashed #f59e0b;border-radius:12px;padding:10px 14px;font-size:12px;color:#92400e;">查無此會員</div>`;
+                    // 查無會員 → 開啟新增 Modal
+                    document.getElementById('newMemberPhone').value    = phone;
+                    document.getElementById('newMemberName').value     = '';
+                    document.getElementById('newMemberBirthday').value = '';
+                    document.getElementById('newMemberModal').classList.add('show');
                 }
             } catch (e) { alert('查詢失敗，請確認連線'); }
+        }
+
+        function closeNewMemberModal() {
+            document.getElementById('newMemberModal').classList.remove('show');
+        }
+
+        async function registerMember() {
+            const name     = document.getElementById('newMemberName').value.trim();
+            const phone    = document.getElementById('newMemberPhone').value.trim();
+            const birthday = document.getElementById('newMemberBirthday').value;
+            if (!name) return alert('請輸入姓名');
+            try {
+                const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+                    action: 'addMember', data: { name, phone, birthday }
+                })});
+                const result = await res.json();
+                if (result.success) {
+                    currentMember = { id: result.id, name, phone, birthday, points: 0, totalSpent: 0 };
+                    closeNewMemberModal();
+                    document.getElementById('memberResult').innerHTML = `
+                        <div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+                            <div>
+                                <span style="font-weight:bold;color:#6d7756;">${name}</span>
+                                <span style="font-size:10px;margin-left:6px;">🥉 銅卡</span>
+                                <div style="font-size:11px;color:#9ca3af;margin-top:2px;">新會員</div>
+                            </div>
+                            <button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button>
+                        </div>`;
+                    updateSummary();
+                    alert('✅ 會員建立成功！');
+                } else {
+                    alert('建立失敗：' + (result.error || ''));
+                }
+            } catch (e) { alert('系統連線異常'); }
         }
 
         function clearMember() {
@@ -551,7 +674,7 @@
             if (!cart.length) return alert('請先點選商品');
 
             const sub         = getSubtotal();
-            const discountAmt = discountRate > 0 ? Math.round(sub * (1 - discountRate / 100)) : 0;
+            const discountAmt = getDiscountAmt();
             const total       = sub - discountAmt;
             const earnedPts   = currentMember ? Math.floor(total / 100) : 0;
 
@@ -604,7 +727,7 @@
                 const result = await res.json();
                 if (result.success) {
                     alert(`✨ 結帳成功！NT$ ${total.toLocaleString()}${earnedPts ? '\n+' + earnedPts + ' pt' : ''}`);
-                    cart = []; discountRate = 0; currentMember = null;
+                    cart = []; discountRate = 0; discountAmt = 0; currentMember = null;
                     document.getElementById('memberResult').innerHTML = '';
                     document.getElementById('memberSearch').value = '';
                     renderCart();
