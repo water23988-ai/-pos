@@ -70,7 +70,10 @@
             <h1 class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
             <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統連接中...</p>
         </div>
-        <div class="text-[9px] text-gray-300">SECURE V2.1</div>
+        <div class="flex items-center gap-3">
+            <button onclick="openApiSettings()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full hover:text-gray-400 hover:border-gray-300 transition">⚙ 連線設定</button>
+            <div class="text-[9px] text-gray-300">SECURE V2.1</div>
+        </div>
     </div>
 
     <div class="p-4 space-y-5">
@@ -272,6 +275,20 @@
                 <button onclick="registerMember()" class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold text-base">建立會員</button>
                 <button onclick="closeNewMemberModal()" class="px-4 py-3 bg-gray-100 text-gray-500 rounded-xl text-sm">略過</button>
             </div>
+        </div>
+    </div>
+
+    <!-- ══ API 連線設定 Modal ══ -->
+    <div class="modal-overlay" id="apiModal">
+        <div class="bg-white p-6 rounded-3xl w-full max-w-sm mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="font-bold text-base text-[#8e9775]">⚙ 連線設定</h3>
+                <button onclick="closeApiSettings()" class="text-gray-300 text-xl">✕</button>
+            </div>
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">API URL</label>
+            <input type="text" id="apiUrlInput"
+                class="w-full border border-gray-200 rounded-xl px-4 py-3 text-xs outline-none focus:border-[#8e9775] mb-4">
+            <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold">儲存並連線</button>
         </div>
     </div>
 
@@ -876,14 +893,22 @@
         }
 
         // ── 設定 ──
+        function openApiSettings() {
+            document.getElementById('apiUrlInput').value = API_URL;
+            document.getElementById('apiModal').classList.add('show');
+        }
+        function closeApiSettings() {
+            document.getElementById('apiModal').classList.remove('show');
+        }
         function closeSettings() { document.getElementById('settingsModal').classList.add('hidden'); }
         function saveSettings() {
             const url = document.getElementById('apiUrlInput').value.trim();
             if (url) {
                 localStorage.setItem('moment_flor_api', url);
                 API_URL = url;
-                fetchProducts();
+                closeApiSettings();
                 closeSettings();
+                fetchProducts();
                 alert('API 設定成功');
             }
         }
