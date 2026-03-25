@@ -109,14 +109,17 @@
             <div id="memberResult"></div>
         </section>
 
-        <!-- 4. 結帳清單 -->
+        <!-- 4. 結帳清單 + 加入商品按鈕 -->
         <section>
             <div class="flex justify-between items-center mb-3">
                 <h2 class="text-xs font-bold text-gray-400 tracking-widest uppercase">🛒 結帳清單</h2>
-                <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
+                <div class="flex gap-2">
+                    <button onclick="openProductModal()" class="text-[10px] bg-[#8e9775] text-white px-3 py-1 rounded-full">＋ 加入商品</button>
+                    <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
+                </div>
             </div>
             <div id="cartList">
-                <p class="text-center text-gray-200 text-xs py-6">尚無商品</p>
+                <p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p>
             </div>
             <div class="flex justify-between items-center mt-2 px-1">
                 <span class="text-xs text-gray-400">折扣</span>
@@ -126,21 +129,6 @@
                 </div>
             </div>
         </section>
-
-        <!-- 5. 商品選單 -->
-        <section class="bg-white p-4 rounded-3xl shadow-sm border border-gray-100">
-            <h2 class="text-xs font-bold mb-4 text-gray-400 tracking-widest uppercase text-center">🌸 商品選單</h2>
-            <div id="categoryGrid" class="grid grid-cols-3 gap-2 mb-2"></div>
-            <div id="productSection" class="hidden border-t border-dashed pt-5 mt-4">
-                <div class="flex justify-between items-center mb-4">
-                    <span id="currentCatLabel" class="font-bold text-[#8e9775] border-l-4 border-[#8e9775] pl-2"></span>
-                    <button onclick="closeProducts()" class="text-xs text-gray-300 bg-gray-50 px-3 py-1 rounded-full">✕ 關閉</button>
-                </div>
-                <div id="productGrid" class="grid grid-cols-2 gap-2 max-h-[380px] overflow-y-auto no-scrollbar"></div>
-            </div>
-        </section>
-
-        <!-- 6. 支付方式（隱藏，在確認結帳 modal 裡選） -->
 
     </div>
 
@@ -195,6 +183,28 @@
         </div>
     </div>
 
+    <!-- ══ 商品選單 Modal ══ -->
+    <div class="modal-overlay" id="productModal">
+        <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:88vh;display:flex;flex-direction:column;">
+            <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+                <h3 class="font-bold text-base">🌸 商品選單</h3>
+                <button onclick="closeProductModal()" class="text-gray-300 text-xl">✕</button>
+            </div>
+            <!-- 類別 -->
+            <div id="modalCategoryView" class="p-4 overflow-y-auto no-scrollbar">
+                <div id="modalCategoryGrid" class="grid grid-cols-3 gap-2"></div>
+            </div>
+            <!-- 品項（點進類別後顯示） -->
+            <div id="modalProductView" style="display:none;flex-direction:column;flex:1;overflow:hidden;">
+                <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
+                    <button onclick="backToModalCategory()" class="text-sm text-[#8e9775]">← 返回</button>
+                    <span id="modalCurrentCatLabel" class="font-bold text-sm text-[#4a4a4a]"></span>
+                </div>
+                <div id="modalProductGrid" class="grid grid-cols-2 gap-2 p-4 overflow-y-auto no-scrollbar flex-1"></div>
+            </div>
+        </div>
+    </div>
+
     <!-- ══ 折扣 Modal ══ -->
     <div class="modal-overlay" id="discountModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
@@ -220,9 +230,9 @@
             <div class="mb-5">
                 <div class="text-xs text-gray-400 font-bold mb-2 tracking-widest uppercase">折扣金額</div>
                 <div class="flex items-center gap-2">
-                    <input type="number" id="discountAmtInput" placeholder="輸入折扣金額 NT$" min="0" step="1"
-                        class="flex-1 border-2 border-gray-200 rounded-xl px-4 py-3 text-xl text-center outline-none font-bold focus:border-[#8e9775]">
-                    <button onclick="applyDiscountAmt()" class="bg-[#8e9775] text-white px-4 py-3 rounded-xl font-bold text-sm">套用</button>
+                    <input type="number" id="discountAmtInput" placeholder="輸入折扣金額" min="0" step="1"
+                        class="flex-1 min-w-0 border-2 border-gray-200 rounded-xl px-4 py-3 text-xl text-center outline-none font-bold focus:border-[#8e9775]">
+                    <button onclick="applyDiscountAmt()" class="flex-shrink-0 bg-[#8e9775] text-white px-4 py-3 rounded-xl font-bold text-sm">套用</button>
                 </div>
                 <p id="discountAmtPreview" class="text-center text-[#8e9775] text-xs mt-2 h-4"></p>
             </div>
@@ -350,7 +360,7 @@
         function setPayment(val) {
             selectedPayment = val;
             document.querySelectorAll('.pay-btn').forEach(b =>
-                b.classList.toggle('active', b.innerText.trim() === val)
+                b.classList.toggle('active', b.innerText.trim().replace(/\s/g,'').toUpperCase() === val.replace(/\s/g,'').toUpperCase())
             );
             updateSummary();
         }
@@ -385,6 +395,22 @@
         }
 
         function renderCategories() {
+            // 商品選單改為 popup，renderCategories 在 openProductModal 時呼叫
+            renderModalCategories();
+        }
+
+        function openProductModal() {
+            document.getElementById('modalCategoryView').style.display = 'block';
+            document.getElementById('modalProductView').style.display  = 'none';
+            renderModalCategories();
+            document.getElementById('productModal').classList.add('show');
+        }
+
+        function closeProductModal() {
+            document.getElementById('productModal').classList.remove('show');
+        }
+
+        function renderModalCategories() {
             const catMap = {};
             rawProducts.forEach(p => {
                 const cat = p.category || '其他加購';
@@ -394,19 +420,20 @@
                 const ai = CAT_ORDER.indexOf(a); const bi = CAT_ORDER.indexOf(b);
                 return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
             });
-            document.getElementById('categoryGrid').innerHTML = cats.map(cat => `
-                <button onclick="openProducts('${cat}')" class="btn-action">
+            document.getElementById('modalCategoryGrid').innerHTML = cats.map(cat => `
+                <button onclick="openModalProducts('${cat}')" class="btn-action">
                     <span style="font-size:18px;font-weight:bold;">${cat}</span>
                     <span style="font-size:10px;color:#9ca3af;margin-top:3px;">${catMap[cat]}項</span>
                 </button>
             `).join('');
         }
 
-        function openProducts(cat) {
-            document.getElementById('productSection').classList.remove('hidden');
-            document.getElementById('currentCatLabel').innerText = cat;
+        function openModalProducts(cat) {
+            document.getElementById('modalCategoryView').style.display = 'none';
+            document.getElementById('modalProductView').style.display  = 'flex';
+            document.getElementById('modalCurrentCatLabel').innerText  = cat;
             const list = rawProducts.filter(p => (p.category || '其他加購') === cat);
-            document.getElementById('productGrid').innerHTML = list.map(p => {
+            document.getElementById('modalProductGrid').innerHTML = list.map(p => {
                 const price   = isKH() ? p.priceKH : p.priceTN;
                 const stock   = isKH() ? p.stockKH : p.stockTN;
                 const soldout = stock <= 0;
@@ -426,16 +453,20 @@
                     </div>
                     <span style="color:#8e9775;font-weight:bold;font-size:14px;display:block;margin-bottom:8px;">$${price}</span>
                     <div style="display:flex;gap:5px;">
-                        <button onclick="addToCart('${p.id}')" style="flex:1;background:#8e9775;color:white;border:none;border-radius:8px;padding:9px 4px;font-size:13px;cursor:pointer;font-family:'Noto Serif TC',serif;-webkit-tap-highlight-color:transparent;">+ 加入</button>
-                        <button onclick="reportWaste('${p.id}')" style="flex:1;background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:9px 4px;font-size:13px;cursor:pointer;-webkit-tap-highlight-color:transparent;">報廢</button>
+                        <button onclick="addToCart('${p.id}')" style="flex:1;background:#8e9775;color:white;border:none;border-radius:8px;padding:9px 4px;font-size:13px;cursor:pointer;font-family:'Noto Serif TC',serif;">+ 加入</button>
+                        <button onclick="reportWaste('${p.id}')" style="flex:1;background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:9px 4px;font-size:13px;cursor:pointer;">報廢</button>
                     </div>
                 </div>`;
             }).join('');
         }
 
-        function closeProducts() {
-            document.getElementById('productSection').classList.add('hidden');
+        function backToModalCategory() {
+            document.getElementById('modalProductView').style.display  = 'none';
+            document.getElementById('modalCategoryView').style.display = 'block';
         }
+
+        // 保留舊的 closeProducts 相容性
+        function closeProducts() { closeProductModal(); }
 
         // ── 購物車 ──
         // 點擊加入直接累加數量（連續點擊）
