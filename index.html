@@ -121,13 +121,6 @@
             <div id="cartList">
                 <p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p>
             </div>
-            <div class="flex justify-between items-center mt-2 px-1">
-                <span class="text-xs text-gray-400">折扣</span>
-                <div class="flex items-center gap-2">
-                    <span id="discountDisplay" class="text-xs text-red-400">—</span>
-                    <button onclick="openDiscountModal()" class="text-[10px] border border-[#8e9775] text-[#8e9775] px-2 py-1 rounded-full">折扣</button>
-                </div>
-            </div>
         </section>
 
     </div>
@@ -162,7 +155,13 @@
             <!-- 小計 / 折扣 / 總計 -->
             <div class="px-5 py-3 border-t border-gray-100 space-y-1 text-sm">
                 <div class="flex justify-between text-gray-400"><span>小計</span><span id="modalSubtotal">NT$ 0</span></div>
-                <div id="modalDiscountRow" class="flex justify-between text-red-400 hidden"><span>折扣</span><span id="modalDiscount"></span></div>
+                <div class="flex justify-between items-center text-gray-400">
+                    <span>折扣</span>
+                    <div class="flex items-center gap-2">
+                        <span id="discountDisplay" class="text-xs text-red-400">—</span>
+                        <button onclick="openDiscountModal()" class="text-[10px] border border-[#8e9775] text-[#8e9775] px-2 py-1 rounded-full">折扣</button>
+                    </div>
+                </div>
                 <div class="flex justify-between font-bold text-base"><span>合計</span><span id="modalTotal" class="text-[#8e9775]">NT$ 0</span></div>
             </div>
 
@@ -570,10 +569,18 @@
             let discLabel = '—';
             if (discountRate  > 0) discLabel = `${discountRate}折 — NT$ ${disc.toLocaleString()}`;
             else if (discountFixed > 0) discLabel = `折扣 — NT$ ${disc.toLocaleString()}`;
-            document.getElementById('discountDisplay').innerText = discLabel;
-            document.getElementById('totalDisplay').innerText    = `NT$ ${total.toLocaleString()}`;
-            document.getElementById('checkoutBtn').innerText     =
-                count > 0 ? `確認結帳 (${count})` : '確認結帳';
+
+            // 更新底部列
+            document.getElementById('totalDisplay').innerText = `NT$ ${total.toLocaleString()}`;
+            document.getElementById('checkoutBtn').innerText  = count > 0 ? `確認結帳 (${count})` : '確認結帳';
+
+            // 更新 modal 內折扣和合計（同一個 discountDisplay、modalTotal）
+            const discEl = document.getElementById('discountDisplay');
+            if (discEl) discEl.innerText = discLabel;
+            const modalTotalEl = document.getElementById('modalTotal');
+            if (modalTotalEl) modalTotalEl.innerText = `NT$ ${total.toLocaleString()}`;
+            const modalSubEl = document.getElementById('modalSubtotal');
+            if (modalSubEl) modalSubEl.innerText = `NT$ ${sub.toLocaleString()}`;
         }
 
         // ── 折扣 ──
@@ -641,10 +648,6 @@
         function openCheckoutModal() {
             if (!cart.length) return alert('請先加入商品');
 
-            const sub   = getSubtotal();
-            const disc  = getDiscountAmt();
-            const total = sub - disc;
-
             // 更新清單
             document.getElementById('checkoutItemList').innerHTML = cart.map(item => {
                 const price = getItemPrice(item);
@@ -654,28 +657,20 @@
                 </div>`;
             }).join('');
 
-            // 更新金額
-            document.getElementById('modalSubtotal').innerText = `NT$ ${sub.toLocaleString()}`;
-            document.getElementById('modalTotal').innerText    = `NT$ ${total.toLocaleString()}`;
-
-            const discRow = document.getElementById('modalDiscountRow');
-            if (disc > 0) {
-                discRow.classList.remove('hidden');
-                document.getElementById('modalDiscount').innerText =
-                    discountRate > 0 ? `${discountRate}折 — NT$ ${disc.toLocaleString()}` : `— NT$ ${disc.toLocaleString()}`;
-            } else {
-                discRow.classList.add('hidden');
-            }
+            // 金額、折扣、合計（呼叫共用函式）
+            updateCheckoutBar();
 
             // 會員資訊
-            const memberEl = document.getElementById('modalMemberInfo');
-            memberEl.innerText = currentMember
+            const total = getSubtotal() - getDiscountAmt();
+            document.getElementById('modalMemberInfo').innerText = currentMember
                 ? `👤 ${currentMember.name} · +${Math.floor(total/100)} pt`
                 : '散客';
 
             // 同步支付方式按鈕狀態
             document.querySelectorAll('.pay-btn').forEach(b =>
-                b.classList.toggle('active', b.innerText.trim() === selectedPayment)
+                b.classList.toggle('active',
+                    b.innerText.trim().replace(/\s/g,'').toUpperCase() === selectedPayment.replace(/\s/g,'').toUpperCase()
+                )
             );
 
             document.getElementById('checkoutModal').classList.add('show');
@@ -893,7 +888,5 @@
             }
         }
     </script>
-</body>
-</html>
 </body>
 </html>
