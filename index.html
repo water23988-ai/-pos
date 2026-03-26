@@ -8,7 +8,7 @@
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
         body { font-family: 'Noto Serif TC', serif; background-color: #fcfbf9; color: #4a4a4a; padding-bottom: 140px; overflow-x: hidden; }
- 
+
         .btn-action {
             border: 2px solid #e5e7eb; background: white; border-radius: 12px;
             padding: 14px 8px; font-size: 14px; transition: all 0.2s; cursor: pointer;
@@ -19,7 +19,7 @@
             border-color: #8e9775; background-color: #f1f3eb; color: #6d7756;
             font-weight: bold; box-shadow: 0 2px 8px rgba(142,151,117,0.1);
         }
- 
+
         .checkout-bar {
             position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
             background: #2e2926; color: white; padding: 16px 20px;
@@ -27,9 +27,9 @@
             box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
             padding-bottom: calc(16px + env(safe-area-inset-bottom));
         }
- 
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
- 
+
         .cart-item {
             display: flex; align-items: center; justify-content: space-between;
             background: #fafaf9; border: 1px solid #f3f4f6;
@@ -45,14 +45,14 @@
         }
         .qty-btn.plus { background: #8e9775; border-color: #8e9775; color: white; }
         .qty-val { font-size: 15px; font-weight: bold; min-width: 22px; text-align: center; cursor: pointer; }
- 
+
         .modal-overlay {
             display: none; position: fixed; inset: 0;
             background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
             z-index: 300; align-items: center; justify-content: center;
         }
         .modal-overlay.show { display: flex; }
- 
+
         /* 客源統計小圓點樣式 */
         .source-chip {
             border: 1.5px solid #e5e7eb; background: white; border-radius: 20px;
@@ -63,7 +63,7 @@
     </style>
 </head>
 <body>
- 
+
     <!-- Header -->
     <div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
         <div id="adminTrigger" class="select-none">
@@ -76,9 +76,9 @@
             <div class="text-[9px] text-gray-300">SECURE V2.1</div>
         </div>
     </div>
- 
+
     <div class="p-4 space-y-5">
- 
+
         <!-- 1. 門市 -->
         <section>
             <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📍 營運據點</h2>
@@ -88,7 +88,7 @@
                 <button onclick="setStore('Studio')"       class="btn-action store-btn">Studio</button>
             </div>
         </section>
- 
+
         <!-- 2. 客源統計（小巧版） -->
         <section>
             <h2 class="text-xs font-bold mb-2 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
@@ -101,7 +101,7 @@
                 <button onclick="setSource('google')" class="source-chip source-btn">Google</button>
             </div>
         </section>
- 
+
         <!-- 3. 會員查詢 -->
         <section>
             <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">👥 會員查詢</h2>
@@ -112,7 +112,7 @@
             </div>
             <div id="memberResult"></div>
         </section>
- 
+
         <!-- 4. 結帳清單 + 加入商品按鈕 -->
         <section>
             <div class="flex justify-between items-center mb-3">
@@ -129,9 +129,9 @@
             <!-- 掛單列表 -->
             <div id="hangList" class="mt-3 space-y-2 hidden"></div>
         </section>
- 
+
     </div>
- 
+
     <!-- 固定結帳列 -->
     <div class="checkout-bar">
         <div class="flex flex-col">
@@ -143,11 +143,11 @@
             確認結帳
         </button>
     </div>
- 
+
     <!-- ══ 確認結帳 Modal ══ -->
     <div class="modal-overlay" id="checkoutModal">
         <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
- 
+
             <div class="p-5 border-b border-gray-100">
                 <div class="flex justify-between items-center">
                     <h3 class="font-bold text-base">確認結帳清單</h3>
@@ -155,10 +155,10 @@
                 </div>
                 <div id="modalMemberInfo" class="mt-2 text-xs text-gray-400"></div>
             </div>
- 
+
             <!-- 清單 -->
             <div id="checkoutItemList" class="overflow-y-auto px-5 py-3 flex-1 no-scrollbar"></div>
- 
+
             <!-- 小計 / 折扣 / 總計 -->
             <div class="px-5 py-3 border-t border-gray-100 space-y-1 text-sm">
                 <div class="flex justify-between text-gray-400"><span>小計</span><span id="modalSubtotal">NT$ 0</span></div>
@@ -171,7 +171,7 @@
                 </div>
                 <div class="flex justify-between font-bold text-base"><span>合計</span><span id="modalTotal" class="text-[#8e9775]">NT$ 0</span></div>
             </div>
- 
+
             <!-- 支付方式 -->
             <div class="px-5 pb-3">
                 <div class="text-xs text-gray-400 font-bold tracking-widest uppercase mb-2">支付方式</div>
@@ -188,7 +188,7 @@
             </div>
         </div>
     </div>
- 
+
     <!-- ══ 商品選單 Modal ══ -->
     <div class="modal-overlay" id="productModal">
         <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:88vh;display:flex;flex-direction:column;">
@@ -210,12 +210,12 @@
             </div>
         </div>
     </div>
- 
+
     <!-- ══ 折扣 Modal ══ -->
     <div class="modal-overlay" id="discountModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
             <h3 class="font-bold text-base mb-4">折扣設定</h3>
- 
+
             <div class="mb-4">
                 <div class="text-xs text-gray-400 font-bold mb-2 tracking-widest uppercase">折數折扣</div>
                 <div class="flex items-center gap-2">
@@ -226,13 +226,13 @@
                 </div>
                 <p id="discountRatePreview" class="text-center text-[#8e9775] text-xs mt-2 h-4"></p>
             </div>
- 
+
             <div class="flex items-center gap-3 my-3">
                 <div class="flex-1 h-px bg-gray-100"></div>
                 <span class="text-xs text-gray-300">或</span>
                 <div class="flex-1 h-px bg-gray-100"></div>
             </div>
- 
+
             <div class="mb-5">
                 <div class="text-xs text-gray-400 font-bold mb-2 tracking-widest uppercase">折扣金額</div>
                 <div class="flex items-center gap-2">
@@ -242,14 +242,14 @@
                 </div>
                 <p id="discountAmtPreview" class="text-center text-[#8e9775] text-xs mt-2 h-4"></p>
             </div>
- 
+
             <div class="flex gap-2">
                 <button onclick="clearDiscount()"      class="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl text-sm">清除折扣</button>
                 <button onclick="closeDiscountModal()" class="flex-1 bg-gray-100 text-gray-500 py-3 rounded-xl text-sm">取消</button>
             </div>
         </div>
     </div>
- 
+
     <!-- ══ 新增會員 Modal ══ -->
     <div class="modal-overlay" id="newMemberModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
@@ -281,7 +281,7 @@
             </div>
         </div>
     </div>
- 
+
     <!-- ══ 日結對帳 Modal ══ -->
     <div class="modal-overlay" id="dailyModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-sm mx-4">
@@ -294,7 +294,7 @@
             </div>
         </div>
     </div>
- 
+
     <!-- ══ 掛單命名 Modal ══ -->
     <div class="modal-overlay" id="hangNameModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
@@ -308,7 +308,7 @@
             <button onclick="confirmHang()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold">確認掛單</button>
         </div>
     </div>
- 
+
     <!-- ══ API 連線設定 Modal ══ -->
     <div class="modal-overlay" id="apiModal">
         <div class="bg-white p-6 rounded-3xl w-full max-w-sm mx-4">
@@ -322,7 +322,7 @@
             <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold">儲存並連線</button>
         </div>
     </div>
- 
+
     <!-- ══ 後台 Modal ══ -->
     <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-6">
         <div class="bg-white p-6 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
@@ -348,7 +348,7 @@
             </div>
         </div>
     </div>
- 
+
     <script>
         // ── 狀態變數 ──
         let API_URL         = localStorage.getItem('moment_flor_api') || '';
@@ -360,14 +360,14 @@
         let currentMember   = null;
         let discountRate    = 0;
         let discountFixed   = 0;
- 
+
         const ADMIN_PASSWORD = '1234';
         const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
         const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加購'];
- 
+
         function isKH()       { return currentStore !== '台南FOCUS'; }
         function storeForGAS(){ return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
- 
+
         // ── 初始化 ──
         window.onload = () => {
             setStore(currentStore);
@@ -376,7 +376,7 @@
             document.getElementById('reportDate').valueAsDate = new Date();
             if (API_URL) fetchProducts();
         };
- 
+
         // ── 長按標題進入後台 ──
         let pressTimer;
         const trigger  = document.getElementById('adminTrigger');
@@ -391,7 +391,7 @@
             }, 3000);
         });
         trigger.addEventListener(isMobile ? 'touchend' : 'mouseup', () => clearTimeout(pressTimer));
- 
+
         // ── 門市 ──
         function setStore(val) {
             currentStore = val;
@@ -402,7 +402,7 @@
             updateSummary();
             if (rawProducts.length > 0) renderCategories();
         }
- 
+
         // ── 支付方式 ──
         function setPayment(val) {
             selectedPayment = val;
@@ -411,7 +411,7 @@
             );
             updateSummary();
         }
- 
+
         // ── 客源 ──
         function setSource(val) {
             selectedSource = val;
@@ -421,14 +421,14 @@
             );
             updateSummary();
         }
- 
+
         function updateSummary() {
             const srcLabel = SOURCE_LABEL[selectedSource] || selectedSource;
             const member   = currentMember ? ` | 👤 ${currentMember.name}` : '';
             document.getElementById('summaryText').innerText =
                 `${currentStore} | ${selectedPayment} | ${srcLabel}${member}`;
         }
- 
+
         // ── 產品 ──
         async function fetchProducts() {
             try {
@@ -440,23 +440,23 @@
                 document.getElementById('statusInfo').innerText = '❌ API 連線錯誤';
             }
         }
- 
+
         function renderCategories() {
             // 商品選單改為 popup，renderCategories 在 openProductModal 時呼叫
             renderModalCategories();
         }
- 
+
         function openProductModal() {
             document.getElementById('modalCategoryView').style.display = 'block';
             document.getElementById('modalProductView').style.display  = 'none';
             renderModalCategories();
             document.getElementById('productModal').classList.add('show');
         }
- 
+
         function closeProductModal() {
             document.getElementById('productModal').classList.remove('show');
         }
- 
+
         function renderModalCategories() {
             const catMap = {};
             rawProducts.forEach(p => {
@@ -474,7 +474,7 @@
                 </button>
             `).join('');
         }
- 
+
         function openModalProducts(cat) {
             document.getElementById('modalCategoryView').style.display = 'none';
             document.getElementById('modalProductView').style.display  = 'flex';
@@ -507,15 +507,15 @@
                 </div>`;
             }).join('');
         }
- 
+
         function backToModalCategory() {
             document.getElementById('modalProductView').style.display  = 'none';
             document.getElementById('modalCategoryView').style.display = 'block';
         }
- 
+
         // 保留舊的 closeProducts 相容性
         function closeProducts() { closeProductModal(); }
- 
+
         // ── 購物車 ──
         // 點擊加入直接累加數量（連續點擊）
         function addToCart(id) {
@@ -532,39 +532,39 @@
             }
             renderCart();
         }
- 
+
         function updateCartQty(id, delta) {
             const item = cart.find(c => String(c.id) === String(id));
             if (!item) return;
             item.qty = Math.max(1, item.qty + delta);
             renderCart();
         }
- 
+
         function removeFromCart(id) {
             cart = cart.filter(c => String(c.id) !== String(id));
             renderCart();
         }
- 
+
         function clearCart() {
             cart = [];
             discountRate  = 0;
             discountFixed = 0;
             renderCart();
         }
- 
+
         function getItemPrice(item) { return isKH() ? item.priceKH : item.priceTN; }
- 
+
         function getSubtotal() {
             return cart.reduce((sum, item) => sum + getItemPrice(item) * item.qty, 0);
         }
- 
+
         function getDiscountAmt() {
             const sub = getSubtotal();
             if (discountRate  > 0) return Math.round(sub * (1 - discountRate / 100));
             if (discountFixed > 0) return discountFixed;
             return 0;
         }
- 
+
         function renderCart() {
             const container = document.getElementById('cartList');
             if (!cart.length) {
@@ -589,7 +589,7 @@
             }).join('');
             updateCheckoutBar();
         }
- 
+
         function editQty(idx) {
             const item = cart[idx];
             const val  = prompt(`修改「${item.name}」數量：`, item.qty);
@@ -597,7 +597,7 @@
             const n = parseInt(val);
             if (!isNaN(n) && n > 0) { item.qty = n; renderCart(); }
         }
- 
+
         function editPrice(idx) {
             const item  = cart[idx];
             const price = getItemPrice(item);
@@ -609,7 +609,7 @@
                 renderCart();
             }
         }
- 
+
         function updateCheckoutBar() {
             const sub   = getSubtotal();
             const disc  = getDiscountAmt();
@@ -618,11 +618,11 @@
             let discLabel = '—';
             if (discountRate  > 0) discLabel = `${discountRate}折 — NT$ ${disc.toLocaleString()}`;
             else if (discountFixed > 0) discLabel = `折扣 — NT$ ${disc.toLocaleString()}`;
- 
+
             // 更新底部列
             document.getElementById('totalDisplay').innerText = `NT$ ${total.toLocaleString()}`;
             document.getElementById('checkoutBtn').innerText  = count > 0 ? `確認結帳 (${count})` : '確認結帳';
- 
+
             // 更新 modal 內折扣和合計（同一個 discountDisplay、modalTotal）
             const discEl = document.getElementById('discountDisplay');
             if (discEl) discEl.innerText = discLabel;
@@ -631,7 +631,7 @@
             const modalSubEl = document.getElementById('modalSubtotal');
             if (modalSubEl) modalSubEl.innerText = `NT$ ${sub.toLocaleString()}`;
         }
- 
+
         // ── 折扣 ──
         function openDiscountModal() {
             if (!cart.length) return alert('請先加入商品');
@@ -640,7 +640,7 @@
             document.getElementById('discountRatePreview').innerText = '';
             document.getElementById('discountAmtPreview').innerText  = '';
             document.getElementById('discountModal').classList.add('show');
- 
+
             document.getElementById('discountRateInput').oninput = function() {
                 const rate = parseFloat(this.value);
                 if (rate > 0 && rate < 100) {
@@ -662,7 +662,7 @@
                 }
             };
         }
- 
+
         function applyDiscountRate() {
             const rate = parseFloat(document.getElementById('discountRateInput').value);
             if (!rate || rate <= 0 || rate >= 100) return alert('請輸入 1–99 之間的折數');
@@ -671,7 +671,7 @@
             closeDiscountModal();
             updateCheckoutBar();
         }
- 
+
         function applyDiscountAmt() {
             const amt = parseInt(document.getElementById('discountAmtInput').value);
             if (!amt || amt <= 0) return alert('請輸入折扣金額');
@@ -681,22 +681,22 @@
             closeDiscountModal();
             updateCheckoutBar();
         }
- 
+
         function clearDiscount() {
             discountRate  = 0;
             discountFixed = 0;
             closeDiscountModal();
             updateCheckoutBar();
         }
- 
+
         function closeDiscountModal() {
             document.getElementById('discountModal').classList.remove('show');
         }
- 
+
         // ── 確認結帳 Modal ──
         function openCheckoutModal() {
             if (!cart.length) return alert('請先加入商品');
- 
+
             // 更新清單
             document.getElementById('checkoutItemList').innerHTML = cart.map(item => {
                 const price = getItemPrice(item);
@@ -705,36 +705,36 @@
                     <span style="font-weight:bold;">NT$ ${(price*item.qty).toLocaleString()}</span>
                 </div>`;
             }).join('');
- 
+
             // 金額、折扣、合計（呼叫共用函式）
             updateCheckoutBar();
- 
+
             // 會員資訊
             const total = getSubtotal() - getDiscountAmt();
             document.getElementById('modalMemberInfo').innerText = currentMember
                 ? `👤 ${currentMember.name} · +${Math.floor(total/100)} pt`
                 : '散客';
- 
+
             // 同步支付方式按鈕狀態
             document.querySelectorAll('.pay-btn').forEach(b =>
                 b.classList.toggle('active',
                     b.innerText.trim().replace(/\s/g,'').toUpperCase() === selectedPayment.replace(/\s/g,'').toUpperCase()
                 )
             );
- 
+
             document.getElementById('checkoutModal').classList.add('show');
         }
- 
+
         function closeCheckoutModal() {
             document.getElementById('checkoutModal').classList.remove('show');
         }
- 
+
         async function confirmCheckout() {
             const sub         = getSubtotal();
             const discountAmt = getDiscountAmt();
             const total       = sub - discountAmt;
             const earnedPts   = currentMember ? Math.floor(total / 100) : 0;
- 
+
             // 庫存檢查
             const low = cart.filter(i => i.qty > (isKH() ? (i.stockKH||0) : (i.stockTN||0)));
             if (low.length) {
@@ -744,11 +744,11 @@
                 }).join('\n');
                 if (!confirm(`以下品項庫存不足：\n\n${msg}\n\n是否仍要繼續？`)) return;
             }
- 
+
             const btn = document.getElementById('confirmBtn');
             btn.disabled  = true;
             btn.innerText = '處理中...';
- 
+
             const payload = {
                 action: 'addTransaction',
                 data: {
@@ -775,7 +775,7 @@
                     }))
                 }
             };
- 
+
             try {
                 const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
                 const result = await res.json();
@@ -802,7 +802,7 @@
                 btn.innerText = '確認收款';
             }
         }
- 
+
         // ── 會員 ──
         async function searchMember() {
             const phone = document.getElementById('memberSearch').value.trim();
@@ -836,11 +836,11 @@
                 }
             } catch (e) { alert('查詢失敗，請確認連線'); }
         }
- 
+
         function closeNewMemberModal() {
             document.getElementById('newMemberModal').classList.remove('show');
         }
- 
+
         async function registerMember() {
             const name     = document.getElementById('newMemberName').value.trim();
             const phone    = document.getElementById('newMemberPhone').value.trim();
@@ -870,14 +870,14 @@
                 }
             } catch (e) { alert('系統連線異常'); }
         }
- 
+
         function clearMember() {
             currentMember = null;
             document.getElementById('memberResult').innerHTML = '';
             document.getElementById('memberSearch').value = '';
             updateSummary();
         }
- 
+
         // ── 報廢 ──
         async function reportWaste(id) {
             const p = rawProducts.find(x => String(x.id) === String(id));
@@ -900,7 +900,7 @@
                 else alert('報廢失敗：' + (result.error || ''));
             } catch (e) { alert('連線失敗'); }
         }
- 
+
         // ── 日報 ──
         async function getDailyReport() {
             const date    = document.getElementById('reportDate').value;
@@ -923,7 +923,7 @@
                 display.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">無法讀取報表</p>';
             }
         }
- 
+
         // ── 補庫存 ──
         async function restockProduct(id) {
             const p = rawProducts.find(x => String(x.id) === String(id));
@@ -952,20 +952,20 @@
                 }
             } catch (e) { alert('連線失敗'); }
         }
- 
+
         // ── 掛單 ──
         let hangOrders = []; // [{ name, cart, member }]
- 
+
         function hangOrder() {
             if (!cart.length) return alert('購物清單是空的');
             document.getElementById('hangNameInput').value = '';
             document.getElementById('hangNameModal').classList.add('show');
         }
- 
+
         function closeHangNameModal() {
             document.getElementById('hangNameModal').classList.remove('show');
         }
- 
+
         function confirmHang() {
             const name = document.getElementById('hangNameInput').value.trim() ||
                 `掛單 ${hangOrders.length + 1}`;
@@ -979,7 +979,7 @@
             closeHangNameModal();
             renderHangList();
         }
- 
+
         function renderHangList() {
             const container = document.getElementById('hangList');
             if (!hangOrders.length) {
@@ -1004,11 +1004,11 @@
                     </div>`;
                 }).join('')}`;
         }
- 
+
         function getItemPriceFromCart(item) {
             return currentStore === '台南FOCUS' ? item.priceTN : item.priceKH;
         }
- 
+
         function recallOrder(idx) {
             const order = hangOrders[idx];
             if (cart.length && !confirm('目前清單有商品，叫回掛單會清空現有清單，確定嗎？')) return;
@@ -1032,12 +1032,12 @@
             updateSummary();
             renderHangList();
         }
- 
+
         function deleteHang(idx) {
             hangOrders.splice(idx, 1);
             renderHangList();
         }
- 
+
         // ── 日結對帳 ──
         async function openDailyModal() {
             document.getElementById('dailyModal').classList.add('show');
@@ -1084,7 +1084,7 @@
                     '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">無法載入，請確認連線</p>';
             }
         }
- 
+
         async function fetchPayBreakdown(date) {
             try {
                 const res  = await fetch(`${API_URL}?action=getPayBreakdown&date=${date}&store=${encodeURIComponent(storeForGAS())}`);
@@ -1102,11 +1102,11 @@
                 if (el) el.innerHTML = '<span style="color:#9ca3af;font-size:11px;">需更新 Apps Script 才能顯示付款別</span>';
             }
         }
- 
+
         function closeDailyModal() {
             document.getElementById('dailyModal').classList.remove('show');
         }
- 
+
         // ── 設定 ──
         function openApiSettings() {
             document.getElementById('apiUrlInput').value = API_URL;
@@ -1130,4 +1130,3 @@
     </script>
 </body>
 </html>
- 
