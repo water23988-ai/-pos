@@ -71,9 +71,10 @@
             <span class="gas-dot" id="gasDot"></span>
             <span id="gasLabel" class="text-[9px] text-gray-300">—</span>
         </div>
+        <button onclick="openHistoryModal()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">🔍 記錄</button>
         <button onclick="openDailyModal()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">📋 日結</button>
         <button onclick="openApiSettings()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">⚙ 設定</button>
-        <div class="text-[9px] text-gray-200">V2.2</div>
+        <div class="text-[9px] text-gray-200">V2.3</div>
     </div>
 </div>
 
@@ -226,7 +227,20 @@
                     <button onclick="openDiscountModal()" class="text-[10px] border border-[#8e9775] text-[#8e9775] px-2 py-1 rounded-full">折扣</button>
                 </div>
             </div>
-            <div class="flex justify-between font-bold text-base"><span>合計</span><span id="modalTotal" class="text-[#8e9775]">NT$ 0</span></div>
+            <!-- 點數兌換 -->
+            <div id="pointsSection" class="hidden pt-1">
+                <div class="flex justify-between items-center mb-1">
+                    <span class="text-gray-400 text-xs">可用點數</span>
+                    <span id="availablePoints" class="text-xs font-bold text-[#8e9775]">0 pt</span>
+                </div>
+                <div class="flex gap-2 items-center">
+                    <input type="number" id="redeemPointsInput" placeholder="兌換幾點（1pt = NT$1）" min="0" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775]">
+                    <button onclick="applyPoints()" class="text-[10px] bg-[#8e9775] text-white px-3 py-2 rounded-xl">套用</button>
+                    <button onclick="clearPoints()" class="text-[10px] text-gray-400 border border-gray-200 px-2 py-2 rounded-xl">清除</button>
+                </div>
+                <div id="pointsPreview" class="text-[10px] text-[#8e9775] mt-1 h-3"></div>
+            </div>
+            <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-100"><span>合計</span><span id="modalTotal" class="text-[#8e9775]">NT$ 0</span></div>
         </div>
         <div class="px-5 pb-4">
             <div class="text-xs text-gray-400 font-bold tracking-widest uppercase mb-2">支付方式</div>
@@ -302,7 +316,17 @@
         </div>
         <div class="space-y-3 mb-5">
             <div><label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-1">姓名 *</label><input type="text" id="newMemberName" placeholder="請輸入姓名" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base outline-none focus:border-[#8e9775] font-bold"></div>
-            <div><label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-1">生日（選填）</label><input type="date" id="newMemberBirthday" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]"></div>
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">年齡區間（選填）</label>
+                <div class="flex flex-wrap gap-2" id="ageGroupBtns">
+                    <button onclick="selectAgeGroup(this)" data-val="20歲以下" class="age-btn source-chip">20歲以下</button>
+                    <button onclick="selectAgeGroup(this)" data-val="20-29"  class="age-btn source-chip">20-29</button>
+                    <button onclick="selectAgeGroup(this)" data-val="30-39"  class="age-btn source-chip">30-39</button>
+                    <button onclick="selectAgeGroup(this)" data-val="40-49"  class="age-btn source-chip">40-49</button>
+                    <button onclick="selectAgeGroup(this)" data-val="50歲以上" class="age-btn source-chip">50歲以上</button>
+                </div>
+                <input type="hidden" id="newMemberBirthday">
+            </div>
         </div>
         <div class="flex gap-2">
             <button onclick="registerMember()" class="flex-1 bg-[#8e9775] text-white py-3 rounded-xl font-bold text-base">建立會員</button>
@@ -334,6 +358,39 @@
         <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">掛單名稱（選填）</label>
         <input type="text" id="hangNameInput" placeholder="例：桌花、王小姐" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base outline-none focus:border-[#8e9775] mb-4">
         <button onclick="confirmHang()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold">確認掛單</button>
+    </div>
+</div>
+
+<!-- 查詢記錄 Modal -->
+<div class="modal-overlay" id="historyModal">
+    <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:88vh;display:flex;flex-direction:column;">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 class="font-bold text-base">🔍 銷售紀錄</h3>
+            <button onclick="closeHistoryModal()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <div class="p-3 border-b border-gray-100 flex gap-2">
+            <input type="date" id="historyDateInput" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775]">
+            <button onclick="loadHistory()" class="bg-[#8e9775] text-white px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
+        </div>
+        <div id="historyList" class="overflow-y-auto flex-1 p-4 no-scrollbar">
+            <p class="text-center text-gray-300 text-xs py-8">查詢中...</p>
+        </div>
+    </div>
+</div>
+
+<!-- 交易明細 Modal -->
+<div class="modal-overlay" id="txDetailModal">
+    <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 class="font-bold text-base" id="txDetailTitle">交易明細</h3>
+            <button onclick="closeTxDetailModal()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <div id="txDetailContent" class="overflow-y-auto flex-1 px-5 py-3 no-scrollbar">
+            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+        </div>
+        <div class="px-5 pb-4 border-t border-gray-100 pt-3">
+            <button id="voidBtn" onclick="confirmVoid()" class="w-full py-3 rounded-xl font-bold text-sm" style="background:#fee2e2;color:#dc2626;">執行退款</button>
+        </div>
     </div>
 </div>
 
@@ -382,11 +439,14 @@ let cart            = [];
 let currentMember   = null;
 let discountRate    = 0;
 let discountFixed   = 0;
+let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
 let productModalMode = 'pos';
 let studioItems     = [];
 let studioTags      = { type: '', color: '', pay: '現金', status: '已付' };
-let _pendingTx      = null; // 樂觀更新暫存
+let _pendingTx      = null;
+let _historyData    = [];  // 新增：暫存查詢結果
+let _currentVoidTxId = null; // 新增：待退款的交易ID // 樂觀更新暫存
 
 const ADMIN_PASSWORD = '1234';
 const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
@@ -420,7 +480,7 @@ window.onload = () => {
     setSource('walk');
     document.getElementById('reportDate').valueAsDate = new Date();
     document.getElementById('s-pickup-date').valueAsDate = new Date();
-    if (API_URL) fetchProducts();
+    if (API_URL) { fetchProducts(); loadHangOrders(); }
     else openApiSettings();
 };
 
@@ -591,15 +651,16 @@ function updateCartQty(id, delta) {
     renderCart();
 }
 function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); renderCart(); }
-function clearCart() { cart = []; discountRate = 0; discountFixed = 0; renderCart(); }
+function clearCart() { cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; renderCart(); }
 function getItemPrice(item) { return isKH() ? item.priceKH : item.priceTN; }
 function getSubtotal()      { return cart.reduce((s, i) => s + getItemPrice(i) * i.qty, 0); }
-function getDiscountAmt() {
+function getItemDiscount() {
     const sub = getSubtotal();
     if (discountRate  > 0) return Math.round(sub * (1 - discountRate / 100));
     if (discountFixed > 0) return discountFixed;
     return 0;
 }
+function getDiscountAmt() { return getItemDiscount() + pointsRedeemed; }
 function renderCart() {
     const container = document.getElementById('cartList');
     if (!cart.length) {
@@ -697,6 +758,18 @@ function openCheckoutModal() {
             <span style="font-weight:bold;">NT$ ${(price*item.qty).toLocaleString()}</span>
         </div>`;
     }).join('');
+    // 重置點數
+    pointsRedeemed = 0;
+    document.getElementById('redeemPointsInput').value = '';
+    document.getElementById('pointsPreview').innerText = '';
+    // 點數區塊：有會員且有點數才顯示
+    if (currentMember && currentMember.points > 0) {
+        document.getElementById('pointsSection').classList.remove('hidden');
+        document.getElementById('availablePoints').innerText = `${currentMember.points} pt`;
+        document.getElementById('redeemPointsInput').max = currentMember.points;
+    } else {
+        document.getElementById('pointsSection').classList.add('hidden');
+    }
     updateCheckoutBar();
     const total = getSubtotal() - getDiscountAmt();
     document.getElementById('modalMemberInfo').innerText = currentMember ? `👤 ${currentMember.name} · +${Math.floor(total/100)} pt` : '散客';
@@ -731,8 +804,9 @@ async function confirmCheckout() {
             subtotal: sub, discount: discountAmt, total,
             cost: cart.reduce((a,c) => a+(c.cost||0)*c.qty, 0),
             pay: selectedPayment, earnedPoints: earnedPts,
-            note: 'POS V2.2', customerType: currentMember ? '舊客' : '新客',
+            note: 'POS V2.3', customerType: currentMember ? '舊客' : '新客',
             source: selectedSource,
+            pointsRedeemed,
             items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unitPrice: getItemPrice(i), unitCost: i.cost||0 }))
         }
     };
@@ -744,7 +818,7 @@ async function confirmCheckout() {
 
     const prevCart   = [...cart];
     const prevMember = currentMember;
-    cart = []; discountRate = 0; discountFixed = 0; currentMember = null;
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); closeProducts();
@@ -810,21 +884,40 @@ async function reportWaste(id) {
     } catch (e) { alert('連線失敗'); setGasStatus('error'); }
 }
 
-// ── 掛單 ──
+// ── 掛單（GAS 跨裝置版）──
+async function loadHangOrders() {
+    if (!API_URL) return;
+    try {
+        const res  = await fetch(`${API_URL}?action=getHangOrders&store=${enc(storeForGAS())}`);
+        const data = await res.json();
+        if (Array.isArray(data)) {
+            hangOrders = data.map(h => ({ gasId: h.id, name: h.name, cart: h.cart || [], member: h.member || null }));
+            renderHangList();
+        }
+    } catch(e) { console.log('掛單載入失敗'); }
+}
 function hangOrder() {
     if (!cart.length) return alert('購物清單是空的');
     document.getElementById('hangNameInput').value = '';
     document.getElementById('hangNameModal').classList.add('show');
 }
 function closeHangNameModal() { document.getElementById('hangNameModal').classList.remove('show'); }
-function confirmHang() {
+async function confirmHang() {
     const name = document.getElementById('hangNameInput').value.trim() || `掛單 ${hangOrders.length + 1}`;
-    hangOrders.push({ name, cart: [...cart.map(i => ({...i}))], member: currentMember });
-    cart = []; currentMember = null;
+    const localHang = { gasId: null, name, cart: [...cart.map(i => ({...i}))], member: currentMember };
+    hangOrders.push(localHang);
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); closeHangNameModal(); renderHangList();
     showToast(`📌 已掛單：${name}`);
+    if (API_URL) {
+        try {
+            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveHangOrder', data: { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: localHang.cart, member: localHang.member } }) });
+            const result = await res.json();
+            if (result.success) localHang.gasId = result.id;
+        } catch(e) { console.log('掛單儲存 GAS 失敗，本機保存'); }
+    }
 }
 function renderHangList() {
     const container = document.getElementById('hangList');
@@ -846,7 +939,7 @@ function renderHangList() {
             </div>`;
         }).join('');
 }
-function recallOrder(idx) {
+async function recallOrder(idx) {
     const order = hangOrders[idx];
     if (cart.length && !confirm('目前清單有商品，叫回掛單會清空現有清單，確定嗎？')) return;
     cart = order.cart.map(i => ({...i})); currentMember = order.member;
@@ -854,10 +947,22 @@ function recallOrder(idx) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    hangOrders.splice(idx, 1); renderCart(); updateSummary(); renderHangList();
+    const gasId = order.gasId;
+    hangOrders.splice(idx, 1);
+    renderCart(); updateSummary(); renderHangList();
     showToast(`📌 已叫回：${order.name}`);
+    if (API_URL && gasId) {
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
+    }
 }
-function deleteHang(idx) { hangOrders.splice(idx, 1); renderHangList(); }
+async function deleteHang(idx) {
+    const gasId = hangOrders[idx].gasId;
+    hangOrders.splice(idx, 1);
+    renderHangList();
+    if (API_URL && gasId) {
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
+    }
+}
 
 // ── 會員 ──
 async function searchMember() {
@@ -885,11 +990,10 @@ async function searchMember() {
         }
     } catch (e) { setGasStatus('error'); alert('查詢失敗，請確認連線'); }
 }
-function closeNewMemberModal() { document.getElementById('newMemberModal').classList.remove('show'); }
 async function registerMember() {
     const name     = document.getElementById('newMemberName').value.trim();
     const phone    = document.getElementById('newMemberPhone').value.trim();
-    const birthday = document.getElementById('newMemberBirthday').value;
+    const birthday = document.getElementById('newMemberBirthday').value; // 現在存年齡區間
     if (!name) return alert('請輸入姓名');
     setGasStatus('loading');
     try {
@@ -909,6 +1013,154 @@ function clearMember() {
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     updateSummary();
+}
+
+// ── 年齡區間選擇 ──
+function selectAgeGroup(btn) {
+    document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('newMemberBirthday').value = btn.dataset.val;
+}
+function closeNewMemberModal() {
+    document.getElementById('newMemberModal').classList.remove('show');
+    document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('newMemberBirthday').value = '';
+}
+
+// ── 點數兌換 ──
+function applyPoints() {
+    const input = parseInt(document.getElementById('redeemPointsInput').value) || 0;
+    if (input <= 0) return;
+    const available = currentMember?.points || 0;
+    if (input > available) return alert(`可用點數只有 ${available} pt`);
+    const sub = getSubtotal() - getItemDiscount();
+    if (input > sub) return alert('折抵點數不能超過應付金額');
+    pointsRedeemed = input;
+    document.getElementById('pointsPreview').innerText = `折抵 NT$ ${pointsRedeemed.toLocaleString()}`;
+    updateCheckoutBar();
+}
+function clearPoints() {
+    pointsRedeemed = 0;
+    document.getElementById('redeemPointsInput').value = '';
+    document.getElementById('pointsPreview').innerText = '';
+    updateCheckoutBar();
+}
+
+// ── 查詢記錄 ──
+function openHistoryModal() {
+    const pw = prompt('身份認證：');
+    if (pw !== ADMIN_PASSWORD) return;
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+    document.getElementById('historyDateInput').value = today;
+    document.getElementById('historyModal').classList.add('show');
+    loadHistory();
+}
+function closeHistoryModal() { document.getElementById('historyModal').classList.remove('show'); }
+
+async function loadHistory() {
+    const date = document.getElementById('historyDateInput').value;
+    const el   = document.getElementById('historyList');
+    el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">查詢中...</p>';
+    setGasStatus('loading');
+    try {
+        const res  = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}&store=${enc(storeForGAS())}`);
+        _historyData = await res.json();
+        setGasStatus('ok');
+        if (!Array.isArray(_historyData) || _historyData.length === 0) {
+            el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">當日無交易記錄</p>';
+            return;
+        }
+        el.innerHTML = _historyData.map(tx => {
+            const time   = String(tx.date || '').slice(0, 8) + String(tx.date || '').slice(10, 16);
+            const badge  = tx.voided ? '<span style="background:#fee2e2;color:#dc2626;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">已退款</span>' : '';
+            const member = tx.memberName && tx.memberName !== '散客' ? `👤 ${tx.memberName}` : '散客';
+            return `<div onclick="openTxDetail('${tx.id}')" style="background:#fafaf9;border:1px solid #f3f4f6;border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <span style="font-size:11px;color:#9ca3af;">${member}${badge}</span>
+                    <span style="font-weight:bold;font-size:14px;color:#8e9775;">NT$ ${Number(tx.total).toLocaleString()}</span>
+                </div>
+                <div style="font-size:10px;color:#c4b8ac;margin-top:3px;">${tx.pay || ''} · ${tx.id}</div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        setGasStatus('error');
+        el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗，請確認連線</p>';
+    }
+}
+
+async function openTxDetail(txId) {
+    _currentVoidTxId = txId;
+    document.getElementById('txDetailModal').classList.add('show');
+    document.getElementById('txDetailTitle').innerText = `明細 · ${txId}`;
+    document.getElementById('txDetailContent').innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
+    const voidBtn = document.getElementById('voidBtn');
+    voidBtn.style.display = 'none';
+    setGasStatus('loading');
+    try {
+        const [itemsRes] = await Promise.all([
+            fetch(`${API_URL}?action=getTransactionItems&txId=${encodeURIComponent(txId)}`)
+        ]);
+        const items = await itemsRes.json();
+        setGasStatus('ok');
+
+        // 找到對應的 tx 資料
+        const tx = _historyData.find(t => t.id === txId) || {};
+
+        document.getElementById('txDetailContent').innerHTML = `
+            <div style="font-size:10px;color:#9ca3af;text-align:center;margin-bottom:12px;">
+                ${tx.date ? String(tx.date).slice(0,19) : ''} · ${tx.store || ''}
+            </div>
+            ${Array.isArray(items) && items.length ? items.map(item => `
+                <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f9fafb;font-size:13px;">
+                    <span>${item['品項名稱']} × ${item['數量']}</span>
+                    <span style="font-weight:bold;">NT$ ${Number(item['小計']).toLocaleString()}</span>
+                </div>`).join('') : '<p style="color:#9ca3af;text-align:center;font-size:12px;padding:16px 0;">無品項資料</p>'}
+            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:12px;">
+                <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>付款方式</span><span>${tx.pay || '—'}</span></div>
+                <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>會員</span><span>${tx.memberName || '散客'}</span></div>
+                ${Number(tx.discount)>0 ? `<div style="display:flex;justify-content:space-between;color:#f87171;margin-bottom:3px;"><span>折扣</span><span>-NT$ ${Number(tx.discount).toLocaleString()}</span></div>` : ''}
+                <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;color:#8e9775;margin-top:4px;"><span>合計</span><span>NT$ ${Number(tx.total).toLocaleString()}</span></div>
+            </div>`;
+
+        // 不是已退款才顯示退款按鈕
+        if (!tx.voided) {
+            voidBtn.style.display = 'block';
+            voidBtn.disabled = false;
+            voidBtn.innerText = '執行退款';
+        }
+    } catch(e) {
+        setGasStatus('error');
+        document.getElementById('txDetailContent').innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗</p>';
+    }
+}
+function closeTxDetailModal() { document.getElementById('txDetailModal').classList.remove('show'); }
+
+async function confirmVoid() {
+    const txId  = _currentVoidTxId;
+    if (!txId) return;
+    const reason = prompt('退款原因（可略過）：') || '';
+    const btn    = document.getElementById('voidBtn');
+    btn.disabled = true; btn.innerText = '處理中...';
+    setGasStatus('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'voidTransaction', data: { txId, reason } }) });
+        const result = await res.json();
+        if (result.success) {
+            setGasStatus('ok');
+            showToast('✅ 退款成功，庫存已還原', 2500);
+            closeTxDetailModal();
+            loadHistory();
+            fetchProducts();
+        } else {
+            setGasStatus('error');
+            alert('退款失敗：' + (result.error || ''));
+            btn.disabled = false; btn.innerText = '執行退款';
+        }
+    } catch(e) {
+        setGasStatus('error');
+        alert('連線失敗');
+        btn.disabled = false; btn.innerText = '執行退款';
+    }
 }
 
 // ══ Studio ══
