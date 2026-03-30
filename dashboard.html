@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>拾逅花事 | 營運後台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        body { font-family: 'Noto Serif TC', serif; background: #f8f6f2; color: #4a4a4a; }
+        .card { background: white; border-radius: 16px; box-shadow: 0 2px 12px rgba(0,0,0,0.05); padding: 20px; }
+        .kpi-val { font-size: 28px; font-weight: bold; color: #4a4a4a; line-height: 1.1; }
+        .kpi-label { font-size: 11px; color: #9ca3af; font-weight: bold; letter-spacing: 0.05em; text-transform: uppercase; margin-bottom: 4px; }
+        .kpi-sub { font-size: 11px; color: #9ca3af; margin-top: 3px; }
+        .badge { display: inline-block; padding: 2px 8px; border-radius: 20px; font-size: 10px; font-weight: bold; }
+        .badge-green { background: #dcfce7; color: #15803d; }
+        .badge-red { background: #fee2e2; color: #dc2626; }
+        .badge-gray { background: #f3f4f6; color: #6b7280; }
+        .tag { font-size: 10px; background: #f1f3eb; color: #6d7756; border-radius: 20px; padding: 2px 8px; }
+        .section-title { font-size: 11px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 14px; }
+        .store-btn { padding: 8px 18px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; cursor: pointer; font-size: 13px; font-family: 'Noto Serif TC', serif; transition: all 0.2s; }
+        .store-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
+        .item-row:hover { background: #fafaf9; }
+        .loading { animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }
+        .trend-up { color: #16a34a; }
+        .trend-down { color: #dc2626; }
+        .progress-bar { height: 6px; background: #f3f4f6; border-radius: 3px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 3px; background: #8e9775; transition: width 0.6s ease; }
+    </style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-sm">
+    <div class="max-w-6xl mx-auto px-6 py-4 flex justify-between items-center">
+        <div>
+            <h1 class="text-xl font-bold text-[#8e9775]">🌸 拾逅花事 <span class="text-gray-300 text-sm font-normal">營運後台</span></h1>
+            <p id="lastUpdated" class="text-[10px] text-gray-400 mt-0.5">載入中...</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <!-- 日期選擇 -->
+            <input type="date" id="dateInput" class="border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#8e9775]">
+            <!-- 門市切換 -->
+            <div class="flex gap-2">
+                <button onclick="setStore('高雄FOCUS 13')" class="store-btn active" id="btn-高雄FOCUS 13">高雄</button>
+                <button onclick="setStore('台南FOCUS')"    class="store-btn"        id="btn-台南FOCUS">台南</button>
+                <button onclick="setStore('Studio')"       class="store-btn"        id="btn-Studio" style="border-color:#c4a882;color:#8a6a42;">Studio</button>
+            </div>
+            <!-- 連線設定 -->
+            <button onclick="openSettings()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full hover:text-gray-400 transition">⚙ 設定</button>
+        </div>
+    </div>
+</div>
+
+<div class="max-w-6xl mx-auto px-6 py-6 space-y-6">
+
+    <!-- ══ 今日快報 ══ -->
+    <div>
+        <div class="section-title">📊 今日快報</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div class="card">
+                <div class="kpi-label">今日營收</div>
+                <div class="kpi-val text-[#8e9775]" id="kpi-revenue">—</div>
+                <div class="kpi-sub" id="kpi-revenue-vs">vs 上週 —</div>
+            </div>
+            <div class="card">
+                <div class="kpi-label">毛利</div>
+                <div class="kpi-val" id="kpi-profit">—</div>
+                <div class="kpi-sub" id="kpi-margin">毛利率 —%</div>
+            </div>
+            <div class="card">
+                <div class="kpi-label">來客數</div>
+                <div class="kpi-val" id="kpi-customers">—</div>
+                <div class="kpi-sub" id="kpi-aov">客單價 —</div>
+            </div>
+            <div class="card">
+                <div class="kpi-label">報廢損失</div>
+                <div class="kpi-val text-red-400" id="kpi-waste">—</div>
+                <div class="kpi-sub" id="kpi-waste-sub">佔毛利 —%</div>
+            </div>
+        </div>
+
+        <!-- 付款別 + 來源 -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card">
+                <div class="section-title">💳 付款別總額</div>
+                <div id="payBreakdown" class="space-y-3 loading">
+                    <div class="h-4 bg-gray-100 rounded w-full"></div>
+                    <div class="h-4 bg-gray-100 rounded w-3/4"></div>
+                    <div class="h-4 bg-gray-100 rounded w-1/2"></div>
+                    <div class="h-4 bg-gray-100 rounded w-2/3"></div>
+                </div>
+            </div>
+            <div class="card">
+                <div class="section-title">📣 來客來源</div>
+                <div id="sourceBreakdown" class="space-y-2 loading">
+                    <div class="h-4 bg-gray-100 rounded w-full"></div>
+                    <div class="h-4 bg-gray-100 rounded w-4/5"></div>
+                    <div class="h-4 bg-gray-100 rounded w-3/5"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ 近4週趨勢 ══ -->
+    <div class="card">
+        <div class="section-title">📈 近4週趨勢</div>
+        <div class="grid grid-cols-2 gap-6">
+            <div>
+                <div class="text-xs text-gray-400 mb-2">營收 vs 毛利（NT$）</div>
+                <canvas id="trendChart" height="160"></canvas>
+            </div>
+            <div>
+                <div class="text-xs text-gray-400 mb-2">來客數</div>
+                <canvas id="customerChart" height="160"></canvas>
+            </div>
+        </div>
+        <div id="trendSummary" class="grid grid-cols-4 gap-3 mt-4"></div>
+    </div>
+
+    <!-- ══ 品項排行 ══ -->
+    <div class="card">
+        <div class="flex justify-between items-center mb-4">
+            <div class="section-title mb-0">🌸 品項銷售排行</div>
+            <div class="flex gap-2 text-xs">
+                <button onclick="sortItems('sales')"  id="sort-sales"  class="tag cursor-pointer">依營收</button>
+                <button onclick="sortItems('margin')" id="sort-margin" class="tag cursor-pointer opacity-50">依毛利率</button>
+                <button onclick="sortItems('waste')"  id="sort-waste"  class="tag cursor-pointer opacity-50">依報廢率</button>
+            </div>
+        </div>
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-[10px] text-gray-400 border-b border-gray-100">
+                        <th class="text-left py-2 font-bold">品項</th>
+                        <th class="text-right py-2 font-bold">銷量</th>
+                        <th class="text-right py-2 font-bold">營收</th>
+                        <th class="text-right py-2 font-bold">成本</th>
+                        <th class="text-right py-2 font-bold">毛利</th>
+                        <th class="text-right py-2 font-bold">毛利率</th>
+                        <th class="text-right py-2 font-bold">報廢</th>
+                        <th class="text-right py-2 font-bold">報廢率</th>
+                    </tr>
+                </thead>
+                <tbody id="itemTable">
+                    <tr><td colspan="8" class="text-center text-gray-300 py-8 text-xs">載入中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ══ 會員洞察 ══ -->
+    <div class="card">
+        <div class="section-title">👥 會員洞察</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+            <div class="text-center">
+                <div class="kpi-label">總會員數</div>
+                <div class="kpi-val" id="m-total">—</div>
+            </div>
+            <div class="text-center">
+                <div class="kpi-label">本月新增</div>
+                <div class="kpi-val text-[#8e9775]" id="m-new">—</div>
+            </div>
+            <div class="text-center">
+                <div class="kpi-label">今日新客/舊客</div>
+                <div class="kpi-val" id="m-ratio">—</div>
+            </div>
+            <div class="text-center">
+                <div class="kpi-label">回購率</div>
+                <div class="kpi-val" id="m-return">—</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-4 gap-3" id="tierBreakdown"></div>
+    </div>
+
+</div>
+
+<!-- 設定 Modal -->
+<div id="settingsModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+    <div class="bg-white p-6 rounded-2xl w-full max-w-sm">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-[#8e9775]">⚙ 連線設定</h3>
+            <button onclick="closeSettings()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">Apps Script API URL</label>
+        <input type="text" id="apiInput" class="w-full border border-gray-200 rounded-xl px-4 py-3 text-xs outline-none focus:border-[#8e9775] mb-4">
+        <button onclick="saveSettings()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold">儲存並重新載入</button>
+    </div>
+</div>
+
+<script>
+    let API_URL     = localStorage.getItem('moment_flor_api') || '';
+    let currentStore = localStorage.getItem('dashboard_store') || '高雄FOCUS 13';
+    let itemData    = [];
+    let currentSort = 'sales';
+    let trendChart, customerChart;
+
+    // ── 初始化 ──
+    window.onload = () => {
+        const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+        document.getElementById('dateInput').value = today;
+        document.getElementById('dateInput').addEventListener('change', loadAll);
+        setStore(currentStore, false);
+        if (!API_URL) openSettings();
+        else loadAll();
+    };
+
+    function setStore(store, reload = true) {
+        currentStore = store;
+        localStorage.setItem('dashboard_store', store);
+        document.querySelectorAll('.store-btn').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById('btn-' + store);
+        if (btn) btn.classList.add('active');
+        if (reload) loadAll();
+    }
+
+    async function loadAll() {
+        const date = document.getElementById('dateInput').value;
+        document.getElementById('lastUpdated').innerText = `更新中... ${new Date().toLocaleTimeString('zh-TW')}`;
+        await Promise.all([
+            loadDailyReport(date),
+            loadPayBreakdown(date),
+            loadWeeklyTrend(),
+            loadItemRanking(date),
+            loadMemberStats()
+        ]);
+        document.getElementById('lastUpdated').innerText = `最後更新：${new Date().toLocaleTimeString('zh-TW')}`;
+    }
+
+    // ── 今日快報 ──
+    async function loadDailyReport(date) {
+        try {
+            const res = await fetch(`${API_URL}?action=getDailyReport&date=${date}&store=${enc(currentStore)}`);
+            const d   = await res.json();
+            if (!d || d.error) return;
+
+            const lw      = d.lastWeek || {};
+            const revDiff = d.revenue - (lw.revenue || 0);
+            const margin  = d.revenue > 0 ? Math.round(d.profit / d.revenue * 100) : 0;
+            const aov     = d.customers > 0 ? Math.round(d.revenue / d.customers) : 0;
+            const wastePct = d.profit > 0 ? Math.round(d.totalWasteCost / d.profit * 100) : 0;
+
+            set('kpi-revenue', `NT$ ${(d.revenue||0).toLocaleString()}`);
+            set('kpi-revenue-vs', `vs 上週 ${revDiff >= 0 ? '▲' : '▼'} NT$ ${Math.abs(revDiff).toLocaleString()}`);
+            document.getElementById('kpi-revenue-vs').className = `kpi-sub ${revDiff >= 0 ? 'trend-up' : 'trend-down'}`;
+
+            set('kpi-profit',   `NT$ ${(d.profit||0).toLocaleString()}`);
+            set('kpi-margin',   `毛利率 ${margin}%`);
+            set('kpi-customers', `${d.customers||0} 人`);
+            set('kpi-aov',      `客單價 NT$ ${aov}`);
+            set('kpi-waste',    `NT$ ${(d.totalWasteCost||0).toLocaleString()}`);
+            set('kpi-waste-sub', `佔毛利 ${wastePct}%`);
+
+            // 來源分佈
+            const src = d.sourceBreakdown || {};
+            const srcLabels = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
+            const total = d.customers || 1;
+            document.getElementById('sourceBreakdown').className = 'space-y-2';
+            document.getElementById('sourceBreakdown').innerHTML = Object.entries(srcLabels).map(([k, label]) => {
+                const cnt = src[k] || 0;
+                const pct = Math.round(cnt / total * 100);
+                return `<div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-500">${label}</span>
+                        <span class="font-bold">${cnt} 人 <span class="text-gray-400">${pct}%</span></span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%"></div></div>
+                </div>`;
+            }).join('');
+
+            // 會員比例
+            set('m-ratio', `${d.newCount||0} / ${d.memberCount||0}`);
+            const returnRate = total > 0 ? Math.round((d.memberCount||0) / total * 100) : 0;
+            set('m-return', `${returnRate}%`);
+
+        } catch(e) { console.error('dailyReport error', e); }
+    }
+
+    // ── 付款別 ──
+    async function loadPayBreakdown(date) {
+        try {
+            const res  = await fetch(`${API_URL}?action=getPayBreakdown&date=${date}&store=${enc(currentStore)}`);
+            const data = await res.json();
+            const pays = ['現金','LINEPAY','匯款','刷卡'];
+            const max  = Math.max(...pays.map(p => data[p] || 0), 1);
+            document.getElementById('payBreakdown').className = 'space-y-3';
+            document.getElementById('payBreakdown').innerHTML = pays.map(p => {
+                const amt = data[p] || 0;
+                const pct = Math.round(amt / max * 100);
+                return `<div>
+                    <div class="flex justify-between text-xs mb-1">
+                        <span class="text-gray-500">${p}</span>
+                        <span class="font-bold">NT$ ${amt.toLocaleString()}</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:${amt>0?'#8e9775':'#e5e7eb'}"></div></div>
+                </div>`;
+            }).join('');
+        } catch(e) { console.error('payBreakdown error', e); }
+    }
+
+    // ── 週趨勢 ──
+    async function loadWeeklyTrend() {
+        try {
+            const res  = await fetch(`${API_URL}?action=getWeeklyTrend&store=${enc(currentStore)}`);
+            const data = await res.json();
+            if (!Array.isArray(data)) return;
+
+            const labels   = data.map(d => d.label);
+            const revenues = data.map(d => d.revenue);
+            const profits  = data.map(d => d.profit);
+            const customers = data.map(d => d.customers);
+
+            // 趨勢摘要卡片
+            document.getElementById('trendSummary').innerHTML = data.map((d, i) => {
+                const prev     = i > 0 ? data[i-1].revenue : null;
+                const diff     = prev !== null ? d.revenue - prev : null;
+                const margin   = d.revenue > 0 ? Math.round(d.profit / d.revenue * 100) : 0;
+                return `<div class="bg-[#fafaf9] rounded-xl p-3 text-center">
+                    <div class="text-[9px] text-gray-400 mb-1">${d.label}</div>
+                    <div class="text-base font-bold text-[#8e9775]">NT$ ${d.revenue.toLocaleString()}</div>
+                    <div class="text-[10px] text-gray-400">毛利率 ${margin}%</div>
+                    ${diff !== null ? `<div class="text-[10px] ${diff >= 0 ? 'text-green-500' : 'text-red-400'}">${diff >= 0 ? '▲' : '▼'} ${Math.abs(diff).toLocaleString()}</div>` : ''}
+                </div>`;
+            }).join('');
+
+            // 圖表
+            if (trendChart)    trendChart.destroy();
+            if (customerChart) customerChart.destroy();
+
+            const chartOpts = { responsive: true, plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, boxWidth: 12 } } }, scales: { y: { ticks: { font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } };
+
+            trendChart = new Chart(document.getElementById('trendChart'), {
+                type: 'bar',
+                data: {
+                    labels,
+                    datasets: [
+                        { label: '營收', data: revenues, backgroundColor: 'rgba(142,151,117,0.8)', borderRadius: 6 },
+                        { label: '毛利', data: profits,  backgroundColor: 'rgba(223,192,122,0.8)', borderRadius: 6 }
+                    ]
+                },
+                options: chartOpts
+            });
+
+            customerChart = new Chart(document.getElementById('customerChart'), {
+                type: 'line',
+                data: {
+                    labels,
+                    datasets: [{ label: '來客數', data: customers, borderColor: '#8e9775', backgroundColor: 'rgba(142,151,117,0.1)', tension: 0.3, fill: true, pointRadius: 4 }]
+                },
+                options: { ...chartOpts, scales: { y: { beginAtZero: true, ticks: { stepSize: 1, font: { size: 10 } } }, x: { ticks: { font: { size: 10 } } } } }
+            });
+
+        } catch(e) { console.error('weeklyTrend error', e); }
+    }
+
+    // ── 品項排行 ──
+    async function loadItemRanking(date) {
+        try {
+            const res = await fetch(`${API_URL}?action=getItemRanking&date=${date}&store=${enc(currentStore)}`);
+            itemData  = await res.json();
+            if (!Array.isArray(itemData)) return;
+            renderItemTable();
+        } catch(e) { console.error('itemRanking error', e); }
+    }
+
+    function sortItems(key) {
+        currentSort = key;
+        document.querySelectorAll('[id^="sort-"]').forEach(b => b.classList.add('opacity-50'));
+        document.getElementById('sort-' + key).classList.remove('opacity-50');
+        renderItemTable();
+    }
+
+    function renderItemTable() {
+        const sorted = [...itemData].sort((a, b) => {
+            if (currentSort === 'margin') return b.margin - a.margin;
+            if (currentSort === 'waste')  return b.wasteRate - a.wasteRate;
+            return b.sales - a.sales;
+        });
+
+        document.getElementById('itemTable').innerHTML = sorted.length ? sorted.map(item => {
+            const marginClass = item.margin >= 60 ? 'text-green-600 font-bold' : item.margin >= 30 ? 'text-yellow-500' : 'text-red-400';
+            const wasteClass  = item.wasteRate > 20 ? 'text-red-400 font-bold' : 'text-gray-400';
+            return `<tr class="item-row border-b border-gray-50 text-xs">
+                <td class="py-2.5 font-medium">${item.name}</td>
+                <td class="text-right text-gray-500">${item.qty}</td>
+                <td class="text-right font-bold">NT$ ${item.sales.toLocaleString()}</td>
+                <td class="text-right text-gray-400">NT$ ${Math.round(item.cost).toLocaleString()}</td>
+                <td class="text-right text-green-600">NT$ ${Math.round(item.profit).toLocaleString()}</td>
+                <td class="text-right ${marginClass}">${item.margin}%</td>
+                <td class="text-right text-gray-400">${item.waste}</td>
+                <td class="text-right ${wasteClass}">${item.wasteRate}%</td>
+            </tr>`;
+        }).join('') : '<tr><td colspan="8" class="text-center text-gray-300 py-8 text-xs">當日無銷售資料</td></tr>';
+    }
+
+    // ── 會員統計 ──
+    async function loadMemberStats() {
+        try {
+            const res  = await fetch(`${API_URL}?action=getMemberStats`);
+            const data = await res.json();
+            set('m-total', data.total || 0);
+            set('m-new',   data.newThisMonth || 0);
+
+            const tiers = data.tiers || {};
+            const total = data.total || 1;
+            const tierColors = { '銅卡': '#cd7f32', '銀卡': '#9ca3af', '金卡': '#d97706', 'VIP': '#8e9775' };
+            document.getElementById('tierBreakdown').innerHTML = ['銅卡','銀卡','金卡','VIP'].map(t => {
+                const cnt = tiers[t] || 0;
+                const pct = Math.round(cnt / total * 100);
+                return `<div class="bg-[#fafaf9] rounded-xl p-3 text-center">
+                    <div class="text-lg font-bold" style="color:${tierColors[t]}">${cnt}</div>
+                    <div class="text-[10px] text-gray-400">${t}</div>
+                    <div class="text-[10px] text-gray-300">${pct}%</div>
+                </div>`;
+            }).join('');
+        } catch(e) { console.error('memberStats error', e); }
+    }
+
+    // ── 工具 ──
+    function set(id, val) {
+        const el = document.getElementById(id);
+        if (el) { el.innerText = val; el.classList.remove('loading'); }
+    }
+    function enc(s) { return encodeURIComponent(s); }
+
+    // ── 設定 ──
+    function openSettings() {
+        document.getElementById('apiInput').value = API_URL;
+        document.getElementById('settingsModal').classList.remove('hidden');
+    }
+    function closeSettings() {
+        document.getElementById('settingsModal').classList.add('hidden');
+    }
+    function saveSettings() {
+        const url = document.getElementById('apiInput').value.trim();
+        if (url) {
+            localStorage.setItem('moment_flor_api', url);
+            API_URL = url;
+            closeSettings();
+            loadAll();
+        }
+    }
+</script>
+</body>
+</html>
