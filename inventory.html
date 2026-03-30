@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾逅花事 | 盤點系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        * { font-family: 'Noto Serif TC', serif; }
+        body { background: #fcfbf9; color: #4a4a4a; }
+        .tab-btn { padding: 8px 20px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
+        .inv-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; border-radius: 10px; background: #fafaf9; border: 1px solid #f3f4f6; margin-bottom: 6px; }
+        .stock-badge { font-size: 12px; font-weight: bold; padding: 3px 10px; border-radius: 12px; }
+        .stock-ok   { background: #dcfce7; color: #16a34a; }
+        .stock-low  { background: #fef9c3; color: #ca8a04; }
+        .stock-zero { background: #fee2e2; color: #dc2626; }
+        .s-input { width: 100%; border: 2px solid #e8ddd0; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; background: white; transition: border-color 0.2s; }
+        .s-input:focus { border-color: #8e9775; }
+        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; font-family: 'Noto Serif TC', serif; }
+        .btn-primary:active { opacity: 0.8; }
+        .gas-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #9ca3af; }
+        .gas-dot.ok      { background: #22c55e; }
+        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
+        .gas-dot.error   { background: #ef4444; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease; pointer-events: none; white-space: nowrap; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .cat-header { font-size: 10px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; padding: 8px 14px 4px; }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- 密碼遮罩 -->
+<div id="lockScreen" class="fixed inset-0 bg-[#2e2926] z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-3xl p-8 w-full max-w-xs text-center">
+        <div class="text-3xl mb-3">🔒</div>
+        <h2 class="font-bold text-lg text-[#8e9775] mb-2">盤點系統</h2>
+        <p class="text-xs text-gray-400 mb-5">請輸入管理密碼</p>
+        <input type="password" id="lockInput" placeholder="密碼"
+            class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-center text-xl outline-none focus:border-[#8e9775] mb-4">
+        <button onclick="unlockScreen()" class="btn-primary">確認</button>
+    </div>
+</div>
+
+<!-- Header -->
+<div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <div>
+        <h1 class="text-base font-bold text-[#8e9775]">📦 拾逅花事 | 盤點系統</h1>
+        <p id="statusInfo" class="text-[10px] text-gray-400 italic">連接中...</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <span class="gas-dot" id="gasDot"></span>
+        <div class="flex gap-1">
+            <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="tab-btn active" style="padding:6px 14px;font-size:12px;">高雄</button>
+            <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="tab-btn"        style="padding:6px 14px;font-size:12px;">台南</button>
+        </div>
+        <a href="pos.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">← POS</a>
+    </div>
+</div>
+
+<!-- 分頁切換 -->
+<div class="p-4 pb-0 flex gap-3 overflow-x-auto no-scrollbar">
+    <button onclick="switchTab('stock')"   id="tab-stock"   class="tab-btn active flex-shrink-0">📋 庫存盤點</button>
+    <button onclick="switchTab('receive')" id="tab-receive" class="tab-btn flex-shrink-0">📥 進貨入庫</button>
+    <button onclick="switchTab('status')"  id="tab-status"  class="tab-btn flex-shrink-0">📊 庫存狀況</button>
+</div>
+
+<!-- ══ Tab 1: 庫存盤點 ══ -->
+<div id="tab-stock-view" class="p-4">
+    <div class="flex gap-2 mb-4">
+        <input type="text" id="stockSearch" placeholder="搜尋品項..." oninput="renderStockList()"
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+        <button onclick="refreshProducts()" class="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400">🔄</button>
+    </div>
+    <div id="stockList">
+        <p class="text-center text-gray-300 text-xs py-12">載入中...</p>
+    </div>
+</div>
+
+<!-- ══ Tab 2: 進貨入庫 ══ -->
+<div id="tab-receive-view" class="p-4 hidden">
+    <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+        <div>
+            <div class="text-[10px] text-gray-400 font-bold tracking-widest uppercase mb-2">選擇品項</div>
+            <input type="text" id="receiveSearch" placeholder="輸入品項名稱搜尋..." oninput="renderReceiveSearch()" class="s-input">
+            <div id="receiveSearchResult" class="hidden mt-1 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto no-scrollbar"></div>
+        </div>
+        <div id="selectedProductArea" class="hidden bg-[#f1f3eb] border border-[#8e9775] rounded-xl p-3">
+            <div class="flex justify-between items-center">
+                <span id="selectedProductName" class="font-bold text-sm text-[#6d7756]"></span>
+                <button onclick="clearSelectedProduct()" class="text-[10px] text-red-400 border border-red-200 px-2 py-1 rounded-full">取消</button>
+            </div>
+            <div class="text-xs text-gray-400 mt-1">目前庫存：<span id="selectedProductStock" class="font-bold text-[#8e9775]">—</span>　進價：<span id="selectedProductCost" class="text-gray-500">—</span></div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">進貨數量 *</label>
+                <input type="number" id="receiveQty" placeholder="枝數" min="1" class="s-input">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價（選填）</label>
+                <input type="number" id="receiveUnitCost" placeholder="更新成本" min="0" step="0.01" class="s-input">
+            </div>
+        </div>
+        <div>
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
+            <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
+        </div>
+        <button onclick="submitReceive()" class="btn-primary">✅ 確認入庫</button>
+    </div>
+</div>
+
+<!-- ══ Tab 3: 庫存狀況 ══ -->
+<div id="tab-status-view" class="p-4 hidden">
+    <div id="statusList">
+        <p class="text-center text-gray-300 text-xs py-12">載入中...</p>
+    </div>
+</div>
+
+<!-- 盤點調整 Modal -->
+<div id="adjustModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-xs">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="font-bold text-base" id="adjustTitle">調整庫存</h3>
+            <button onclick="closeAdjustModal()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <div class="text-xs text-gray-400 mb-3">
+            目前庫存：<span id="adjustCurrentStock" class="font-bold text-[#8e9775]">—</span>
+        </div>
+        <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">調整後數量</label>
+        <input type="number" id="adjustQtyInput" placeholder="輸入新的庫存數量" min="0" class="s-input mb-3">
+        <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">調整原因（選填）</label>
+        <input type="text" id="adjustNoteInput" placeholder="盤點調整、破損…" class="s-input mb-4">
+        <button onclick="submitAdjust()" class="btn-primary">確認調整</button>
+    </div>
+</div>
+
+<script>
+const ADMIN_PASSWORD = '1234';
+let API_URL          = localStorage.getItem('moment_flor_api') || '';
+let currentStore     = '高雄FOCUS 13';
+let rawProducts      = [];
+let _adjustProduct   = null;
+let _selectedProduct = null;
+let _toastTimer;
+
+// ── 密碼解鎖 ──
+function unlockScreen() {
+    const val = document.getElementById('lockInput').value;
+    if (val === ADMIN_PASSWORD) {
+        document.getElementById('lockScreen').style.display = 'none';
+        if (!API_URL) {
+            API_URL = prompt('請輸入 API URL：') || '';
+            if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
+        }
+        init();
+    } else {
+        document.getElementById('lockInput').value = '';
+        document.getElementById('lockInput').style.borderColor = '#ef4444';
+        setTimeout(() => document.getElementById('lockInput').style.borderColor = '', 1000);
+    }
+}
+document.getElementById('lockInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlockScreen(); });
+
+// ── 初始化 ──
+async function init() {
+    setGas('loading');
+    try {
+        const res = await fetch(`${API_URL}?action=getProducts`);
+        rawProducts = await res.json();
+        document.getElementById('statusInfo').innerText = `✅ 已載入 ${rawProducts.length} 項`;
+        setGas('ok');
+        renderStockList();
+    } catch(e) {
+        document.getElementById('statusInfo').innerText = '❌ API 連線錯誤';
+        setGas('error');
+    }
+}
+
+async function refreshProducts() {
+    setGas('loading');
+    try {
+        const res = await fetch(`${API_URL}?action=getProducts`);
+        rawProducts = await res.json();
+        setGas('ok');
+        renderStockList();
+        showToast('✅ 資料已更新');
+    } catch(e) { setGas('error'); showToast('❌ 更新失敗'); }
+}
+
+// ── 門市切換 ──
+function setStore(store) {
+    currentStore = store;
+    document.getElementById('btn-kh').classList.toggle('active', store === '高雄FOCUS 13');
+    document.getElementById('btn-tn').classList.toggle('active', store === '台南FOCUS');
+    renderStockList();
+    clearSelectedProduct();
+    document.getElementById('receiveSearch').value = '';
+    document.getElementById('receiveSearchResult').classList.add('hidden');
+}
+
+// ── Tab 切換 ──
+function switchTab(tab) {
+    ['stock','receive','status'].forEach(t => {
+        document.getElementById(`tab-${t}-view`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
+    });
+    if (tab === 'status') renderStatusList();
+}
+
+// ══ Tab 1: 庫存盤點 ══
+const CAT_ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
+
+function renderStockList() {
+    const keyword = (document.getElementById('stockSearch').value || '').trim().toLowerCase();
+    const isKH    = currentStore !== '台南FOCUS';
+    const catMap  = {};
+
+    rawProducts.forEach(p => {
+        if (keyword && !p.name.toLowerCase().includes(keyword)) return;
+        const cat = p.category || '其他加購';
+        if (!catMap[cat]) catMap[cat] = [];
+        catMap[cat].push(p);
+    });
+
+    const cats = Object.keys(catMap).sort((a,b) => {
+        const ai = CAT_ORDER.indexOf(a); const bi = CAT_ORDER.indexOf(b);
+        return (ai===-1?99:ai) - (bi===-1?99:bi);
+    });
+
+    if (!cats.length) {
+        document.getElementById('stockList').innerHTML = '<p class="text-center text-gray-300 text-xs py-12">查無品項</p>';
+        return;
+    }
+
+    document.getElementById('stockList').innerHTML = cats.map(cat => `
+        <div class="cat-header">${cat}</div>
+        ${catMap[cat].map(p => {
+            const stock = isKH ? p.stockKH : p.stockTN;
+            const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
+            return `<div class="inv-row">
+                <span style="font-size:13px;font-weight:bold;flex:1;">${p.name}</span>
+                <span class="stock-badge ${badge}" style="margin-right:10px;">${stock} 枝</span>
+                <button onclick="openAdjustModal(${p.id})" style="background:#f1f3eb;border:none;border-radius:8px;padding:6px 12px;font-size:12px;color:#6d7756;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">調整</button>
+            </div>`;
+        }).join('')}`).join('');
+}
+
+// ── 調整 Modal ──
+function openAdjustModal(id) {
+    const p = rawProducts.find(x => Number(x.id) === Number(id));
+    if (!p) return;
+    _adjustProduct = p;
+    const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
+    document.getElementById('adjustTitle').innerText = `調整：${p.name}`;
+    document.getElementById('adjustCurrentStock').innerText = `${stock} 枝`;
+    document.getElementById('adjustQtyInput').value = stock;
+    document.getElementById('adjustNoteInput').value = '';
+    document.getElementById('adjustModal').classList.remove('hidden');
+    setTimeout(() => { const el = document.getElementById('adjustQtyInput'); el.focus(); el.select(); }, 100);
+}
+function closeAdjustModal() {
+    document.getElementById('adjustModal').classList.add('hidden');
+    _adjustProduct = null;
+}
+async function submitAdjust() {
+    if (!_adjustProduct) return;
+    const qty  = parseInt(document.getElementById('adjustQtyInput').value);
+    const note = document.getElementById('adjustNoteInput').value.trim() || '盤點調整';
+    if (isNaN(qty) || qty < 0) return alert('請輸入有效數量（0 以上）');
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateStock', data: { id: _adjustProduct.id, store: currentStore, qty, note } }) });
+        const result = await res.json();
+        if (result.success) {
+            const p = rawProducts.find(x => Number(x.id) === Number(_adjustProduct.id));
+            if (p) { if (currentStore !== '台南FOCUS') p.stockKH = qty; else p.stockTN = qty; }
+            setGas('ok');
+            showToast(`✅ ${_adjustProduct.name} 庫存 → ${qty} 枝`);
+            closeAdjustModal();
+            renderStockList();
+        } else { setGas('error'); alert('調整失敗：' + (result.error || '')); }
+    } catch(e) { setGas('error'); alert('連線失敗'); }
+}
+
+// ══ Tab 2: 進貨入庫 ══
+function renderReceiveSearch() {
+    const keyword  = document.getElementById('receiveSearch').value.trim().toLowerCase();
+    const resultEl = document.getElementById('receiveSearchResult');
+    if (!keyword) { resultEl.classList.add('hidden'); return; }
+    const matches = rawProducts.filter(p => p.name.toLowerCase().includes(keyword)).slice(0, 8);
+    if (!matches.length) { resultEl.classList.add('hidden'); return; }
+    resultEl.classList.remove('hidden');
+    resultEl.innerHTML = matches.map(p => {
+        const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
+        return `<div onclick="selectReceiveProduct(${p.id})" style="padding:10px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px;">
+            <span>${p.name}</span>
+            <span style="font-size:11px;color:#9ca3af;">庫存 ${stock} 枝</span>
+        </div>`;
+    }).join('');
+}
+
+function selectReceiveProduct(id) {
+    const p = rawProducts.find(x => Number(x.id) === Number(id));
+    if (!p) return;
+    _selectedProduct = p;
+    const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
+    document.getElementById('selectedProductName').innerText  = p.name;
+    document.getElementById('selectedProductStock').innerText = `${stock} 枝`;
+    document.getElementById('selectedProductCost').innerText  = p.cost ? `NT$ ${p.cost}` : '—';
+    document.getElementById('selectedProductArea').classList.remove('hidden');
+    document.getElementById('receiveSearch').value = '';
+    document.getElementById('receiveSearchResult').classList.add('hidden');
+    document.getElementById('receiveQty').focus();
+}
+
+function clearSelectedProduct() {
+    _selectedProduct = null;
+    document.getElementById('selectedProductArea').classList.add('hidden');
+    document.getElementById('receiveSearch').value = '';
+    document.getElementById('receiveSearchResult').classList.add('hidden');
+}
+
+async function submitReceive() {
+    if (!_selectedProduct) return alert('請先選擇品項');
+    const qty      = parseInt(document.getElementById('receiveQty').value);
+    const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
+    const note     = document.getElementById('receiveNote').value.trim() || '進貨入庫';
+    if (isNaN(qty) || qty <= 0) return alert('請輸入進貨數量');
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'receiveStock', data: { id: _selectedProduct.id, store: currentStore, qty, unitCost, note } }) });
+        const result = await res.json();
+        if (result.success) {
+            const p = rawProducts.find(x => Number(x.id) === Number(_selectedProduct.id));
+            if (p) {
+                if (currentStore !== '台南FOCUS') p.stockKH = result.newStock;
+                else p.stockTN = result.newStock;
+                if (unitCost > 0) p.cost = unitCost;
+            }
+            setGas('ok');
+            showToast(`✅ ${_selectedProduct.name} 入庫 +${qty} 枝 → 共 ${result.newStock} 枝`, 3000);
+            document.getElementById('receiveQty').value = '';
+            document.getElementById('receiveUnitCost').value = '';
+            document.getElementById('receiveNote').value = '';
+            // 更新顯示的庫存
+            document.getElementById('selectedProductStock').innerText = `${result.newStock} 枝`;
+        } else { setGas('error'); alert('入庫失敗：' + (result.error || '')); }
+    } catch(e) { setGas('error'); alert('連線失敗'); }
+}
+
+// ══ Tab 3: 庫存狀況 ══
+function renderStatusList() {
+    const isKH = currentStore !== '台南FOCUS';
+    const sorted = [...rawProducts].sort((a,b) => {
+        const sa = isKH ? a.stockKH : a.stockTN;
+        const sb = isKH ? b.stockKH : b.stockTN;
+        return sa - sb;
+    });
+
+    const zero = sorted.filter(p => (isKH ? p.stockKH : p.stockTN) <= 0);
+    const low  = sorted.filter(p => { const s = isKH ? p.stockKH : p.stockTN; return s > 0 && s <= 3; });
+    const ok   = sorted.filter(p => (isKH ? p.stockKH : p.stockTN) > 3);
+
+    const rowHtml = (p) => {
+        const stock = isKH ? p.stockKH : p.stockTN;
+        const badge = stock > 3 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
+        return `<div class="inv-row">
+            <span style="font-size:13px;flex:1;">${p.name}</span>
+            <span class="stock-badge ${badge}">${stock} 枝</span>
+        </div>`;
+    };
+
+    document.getElementById('statusList').innerHTML = `
+        ${zero.length ? `<div class="cat-header" style="color:#dc2626;">⚠️ 已售罄（${zero.length} 項）</div>${zero.map(rowHtml).join('')}` : ''}
+        ${low.length  ? `<div class="cat-header" style="color:#ca8a04;">⚡ 低庫存 ≤3（${low.length} 項）</div>${low.map(rowHtml).join('')}`  : ''}
+        ${ok.length   ? `<div class="cat-header">✅ 正常（${ok.length} 項）</div>${ok.map(rowHtml).join('')}` : ''}
+        ${!sorted.length ? '<p class="text-center text-gray-300 text-xs py-12">無資料</p>' : ''}
+    `;
+}
+
+// ── 工具 ──
+function setGas(state) { document.getElementById('gasDot').className = 'gas-dot ' + state; }
+function showToast(msg, duration = 2000) {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+</script>
+</body>
+</html>
