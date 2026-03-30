@@ -84,19 +84,28 @@
 
 <!-- ══ Tab 2: 進貨入庫 ══ -->
 <div id="tab-receive-view" class="p-4 hidden">
-    <div class="bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-        <div>
-            <div class="text-[10px] text-gray-400 font-bold tracking-widest uppercase mb-2">選擇品項</div>
-            <input type="text" id="receiveSearch" placeholder="輸入品項名稱搜尋..." oninput="renderReceiveSearch()" class="s-input">
-            <div id="receiveSearchResult" class="hidden mt-1 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm max-h-48 overflow-y-auto no-scrollbar"></div>
+    <!-- 已選品項 -->
+    <div id="selectedProductArea" class="hidden bg-[#f1f3eb] border border-[#8e9775] rounded-xl p-4 mb-4">
+        <div class="flex justify-between items-center mb-1">
+            <span id="selectedProductName" class="font-bold text-sm text-[#6d7756]"></span>
+            <button onclick="clearSelectedProduct()" class="text-[10px] text-red-400 border border-red-200 px-2 py-1 rounded-full">取消選擇</button>
         </div>
-        <div id="selectedProductArea" class="hidden bg-[#f1f3eb] border border-[#8e9775] rounded-xl p-3">
-            <div class="flex justify-between items-center">
-                <span id="selectedProductName" class="font-bold text-sm text-[#6d7756]"></span>
-                <button onclick="clearSelectedProduct()" class="text-[10px] text-red-400 border border-red-200 px-2 py-1 rounded-full">取消</button>
-            </div>
-            <div class="text-xs text-gray-400 mt-1">目前庫存：<span id="selectedProductStock" class="font-bold text-[#8e9775]">—</span>　進價：<span id="selectedProductCost" class="text-gray-500">—</span></div>
+        <div class="text-xs text-gray-400">目前庫存：<span id="selectedProductStock" class="font-bold text-[#8e9775]">—</span>　進價：<span id="selectedProductCost" class="text-gray-500">—</span></div>
+    </div>
+
+    <!-- 尚未選品項時顯示品項列表 -->
+    <div id="receiveProductPicker">
+        <div class="flex gap-2 mb-3">
+            <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
+                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
         </div>
+        <div id="receiveProductList">
+            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+        </div>
+    </div>
+
+    <!-- 選了品項後顯示輸入欄 -->
+    <div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
         <div class="grid grid-cols-2 gap-3">
             <div>
                 <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">進貨數量 *</label>
@@ -176,6 +185,7 @@ async function init() {
         document.getElementById('statusInfo').innerText = `✅ 已載入 ${rawProducts.length} 項`;
         setGas('ok');
         renderStockList();
+        renderReceiveList();
     } catch(e) {
         document.getElementById('statusInfo').innerText = '❌ API 連線錯誤';
         setGas('error');
@@ -189,6 +199,7 @@ async function refreshProducts() {
         rawProducts = await res.json();
         setGas('ok');
         renderStockList();
+        renderReceiveList();
         showToast('✅ 資料已更新');
     } catch(e) { setGas('error'); showToast('❌ 更新失敗'); }
 }
@@ -200,8 +211,7 @@ function setStore(store) {
     document.getElementById('btn-tn').classList.toggle('active', store === '台南FOCUS');
     renderStockList();
     clearSelectedProduct();
-    document.getElementById('receiveSearch').value = '';
-    document.getElementById('receiveSearchResult').classList.add('hidden');
+    renderReceiveList();
 }
 
 // ── Tab 切換 ──
@@ -245,10 +255,17 @@ function renderStockList() {
             const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
             return `<div class="inv-row">
                 <span style="font-size:13px;font-weight:bold;flex:1;">${p.name}</span>
-                <span class="stock-badge ${badge}" style="margin-right:10px;">${stock} 枝</span>
+                <span class="stock-badge ${badge}" style="margin-right:8px;">${stock} 枝</span>
+                <button onclick="openReceiveFromList(${p.id})" style="background:#fdf1e4;border:1px solid #c4a882;border-radius:8px;padding:5px 10px;font-size:11px;color:#8a5a2a;cursor:pointer;margin-right:5px;font-family:'Noto Serif TC',serif;">進貨</button>
                 <button onclick="openAdjustModal(${p.id})" style="background:#f1f3eb;border:none;border-radius:8px;padding:6px 12px;font-size:12px;color:#6d7756;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">調整</button>
             </div>`;
         }).join('')}`).join('');
+}
+
+// 從庫存列表點進貨 → 切換到進貨頁並預選品項
+function openReceiveFromList(id) {
+    switchTab('receive');
+    selectReceiveProduct(id);
 }
 
 // ── 調整 Modal ──
@@ -289,20 +306,41 @@ async function submitAdjust() {
 }
 
 // ══ Tab 2: 進貨入庫 ══
-function renderReceiveSearch() {
-    const keyword  = document.getElementById('receiveSearch').value.trim().toLowerCase();
-    const resultEl = document.getElementById('receiveSearchResult');
-    if (!keyword) { resultEl.classList.add('hidden'); return; }
-    const matches = rawProducts.filter(p => p.name.toLowerCase().includes(keyword)).slice(0, 8);
-    if (!matches.length) { resultEl.classList.add('hidden'); return; }
-    resultEl.classList.remove('hidden');
-    resultEl.innerHTML = matches.map(p => {
-        const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
-        return `<div onclick="selectReceiveProduct(${p.id})" style="padding:10px 14px;border-bottom:1px solid #f3f4f6;cursor:pointer;display:flex;justify-content:space-between;align-items:center;font-size:13px;">
-            <span>${p.name}</span>
-            <span style="font-size:11px;color:#9ca3af;">庫存 ${stock} 枝</span>
-        </div>`;
-    }).join('');
+function renderReceiveList() {
+    const keyword = (document.getElementById('receiveSearch').value || '').trim().toLowerCase();
+    const isKH    = currentStore !== '台南FOCUS';
+    const catMap  = {};
+
+    rawProducts.forEach(p => {
+        if (keyword && !p.name.toLowerCase().includes(keyword)) return;
+        const cat = p.category || '其他加購';
+        if (!catMap[cat]) catMap[cat] = [];
+        catMap[cat].push(p);
+    });
+
+    const cats = Object.keys(catMap).sort((a,b) => {
+        const ai = CAT_ORDER.indexOf(a); const bi = CAT_ORDER.indexOf(b);
+        return (ai===-1?99:ai) - (bi===-1?99:bi);
+    });
+
+    if (!cats.length) {
+        document.getElementById('receiveProductList').innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無品項</p>';
+        return;
+    }
+
+    document.getElementById('receiveProductList').innerHTML = cats.map(cat => `
+        <div class="cat-header">${cat}</div>
+        ${catMap[cat].map(p => {
+            const stock = isKH ? p.stockKH : p.stockTN;
+            const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
+            return `<div class="inv-row">
+                <div style="flex:1;">
+                    <span style="font-size:13px;font-weight:bold;">${p.name}</span>
+                    <span class="stock-badge ${badge}" style="margin-left:8px;">${stock} 枝</span>
+                </div>
+                <button onclick="selectReceiveProduct(${p.id})" style="background:#c4a882;color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">選擇</button>
+            </div>`;
+        }).join('')}`).join('');
 }
 
 function selectReceiveProduct(id) {
@@ -314,16 +352,21 @@ function selectReceiveProduct(id) {
     document.getElementById('selectedProductStock').innerText = `${stock} 枝`;
     document.getElementById('selectedProductCost').innerText  = p.cost ? `NT$ ${p.cost}` : '—';
     document.getElementById('selectedProductArea').classList.remove('hidden');
-    document.getElementById('receiveSearch').value = '';
-    document.getElementById('receiveSearchResult').classList.add('hidden');
-    document.getElementById('receiveQty').focus();
+    document.getElementById('receiveProductPicker').classList.add('hidden');
+    document.getElementById('receiveForm').classList.remove('hidden');
+    document.getElementById('receiveQty').value = '';
+    document.getElementById('receiveUnitCost').value = '';
+    document.getElementById('receiveNote').value = '';
+    setTimeout(() => document.getElementById('receiveQty').focus(), 100);
 }
 
 function clearSelectedProduct() {
     _selectedProduct = null;
     document.getElementById('selectedProductArea').classList.add('hidden');
+    document.getElementById('receiveProductPicker').classList.remove('hidden');
+    document.getElementById('receiveForm').classList.add('hidden');
     document.getElementById('receiveSearch').value = '';
-    document.getElementById('receiveSearchResult').classList.add('hidden');
+    renderReceiveList();
 }
 
 async function submitReceive() {
