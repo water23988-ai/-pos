@@ -175,6 +175,47 @@
         <div class="grid grid-cols-4 gap-3" id="tierBreakdown"></div>
     </div>
 
+    <!-- ══ Studio 統計（切到 Studio 才顯示）══ -->
+    <div id="studioSection" class="hidden space-y-4">
+        <div class="section-title">✦ Studio 訂單統計</div>
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="card" style="border-left:4px solid #c4a882;">
+                <div class="kpi-label">Studio 訂單數</div>
+                <div class="kpi-val text-[#c4a882]" id="st-orders">—</div>
+                <div class="kpi-sub" id="st-orders-sub">—</div>
+            </div>
+            <div class="card" style="border-left:4px solid #c4a882;">
+                <div class="kpi-label">Studio 總營收</div>
+                <div class="kpi-val text-[#c4a882]" id="st-revenue">—</div>
+                <div class="kpi-sub" id="st-revenue-sub">平均客單價 —</div>
+            </div>
+            <div class="card" style="border-left:4px solid #c4a882;">
+                <div class="kpi-label">鮮花訂單</div>
+                <div class="kpi-val" id="st-fresh">—</div>
+                <div class="kpi-sub" id="st-fresh-sub">營收 —</div>
+            </div>
+            <div class="card" style="border-left:4px solid #c4a882;">
+                <div class="kpi-label">乾燥 / 永生花</div>
+                <div class="kpi-val" id="st-dry">—</div>
+                <div class="kpi-sub" id="st-dry-sub">營收 —</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="card">
+                <div class="section-title">🌸 花禮種類分佈</div>
+                <div id="st-typeBreakdown" class="space-y-2"><p class="text-xs text-gray-300 text-center py-4">載入中...</p></div>
+            </div>
+            <div class="card">
+                <div class="section-title">🌿 花材類型分佈</div>
+                <div id="st-materialBreakdown" class="space-y-2"><p class="text-xs text-gray-300 text-center py-4">載入中...</p></div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="section-title">📋 Studio 訂單明細</div>
+            <div id="st-orderList"><p class="text-xs text-gray-300 text-center py-4">載入中...</p></div>
+        </div>
+    </div>
+
 </div>
 
 <!-- 設定 Modal -->
@@ -203,6 +244,7 @@
         document.getElementById('dateInput').value = today;
         document.getElementById('dateInput').addEventListener('change', loadAll);
         setStore(currentStore, false);
+        document.getElementById('studioSection').classList.toggle('hidden', currentStore !== 'Studio');
         if (!API_URL) openSettings();
         else loadAll();
     };
@@ -213,19 +255,23 @@
         document.querySelectorAll('.store-btn').forEach(b => b.classList.remove('active'));
         const btn = document.getElementById('btn-' + store);
         if (btn) btn.classList.add('active');
+        // Studio 專屬區塊
+        document.getElementById('studioSection').classList.toggle('hidden', store !== 'Studio');
         if (reload) loadAll();
     }
 
     async function loadAll() {
         const date = document.getElementById('dateInput').value;
         document.getElementById('lastUpdated').innerText = `更新中... ${new Date().toLocaleTimeString('zh-TW')}`;
-        await Promise.all([
+        const tasks = [
             loadDailyReport(date),
             loadPayBreakdown(date),
             loadWeeklyTrend(),
             loadItemRanking(date),
             loadMemberStats()
-        ]);
+        ];
+        if (currentStore === 'Studio') tasks.push(loadStudioStats(date));
+        await Promise.all(tasks);
         document.getElementById('lastUpdated').innerText = `最後更新：${new Date().toLocaleTimeString('zh-TW')}`;
     }
 
@@ -416,6 +462,116 @@
                 </div>`;
             }).join('');
         } catch(e) { console.error('memberStats error', e); }
+    }
+
+    // ── Studio 統計 ──
+    async function loadStudioStats(date) {
+        try {
+            // 拉指定日期的 Studio 交易（note 含「Studio訂單」）
+            const res  = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}&store=${enc('高雄FOCUS 13')}`);
+            const txs  = await res.json();
+            if (!Array.isArray(txs)) return;
+
+            // 只保留 Studio 訂單
+            const studioTxs = txs.filter(t => String(t.note||'').includes('Studio訂單') && !t.voided);
+
+            const total   = studioTxs.length;
+            const revenue = studioTxs.reduce((s,t) => s + (Number(t.total)||0), 0);
+            const aov     = total > 0 ? Math.round(revenue / total) : 0;
+
+            // 解析 note 欄位
+            const parseNote = (note) => {
+                const obj = {};
+                String(note||'').split('｜').forEach(seg => {
+                    const [k, v] = seg.split('：');
+                    if (k && v) obj[k.trim()] = v.trim();
+                });
+                return obj;
+            };
+
+            // 花材類型統計
+            const materialMap = { '鮮花':0, '乾燥花':0, '永生花':0, '混合':0, '未標記':0 };
+            const materialRev = { '鮮花':0, '乾燥花':0, '永生花':0, '混合':0, '未標記':0 };
+            // 花禮種類統計
+            const typeMap = {};
+            const typeRev = {};
+
+            studioTxs.forEach(t => {
+                const n   = parseNote(t.note);
+                const mat = n['花材類型'] || '未標記';
+                const typ = n['花禮'] || '未標記';
+                const rev = Number(t.total) || 0;
+                if (materialMap[mat] !== undefined) { materialMap[mat]++; materialRev[mat] += rev; }
+                else { materialMap['未標記']++; materialRev['未標記'] += rev; }
+                typeMap[typ] = (typeMap[typ] || 0) + 1;
+                typeRev[typ] = (typeRev[typ] || 0) + rev;
+            });
+
+            const freshCnt = materialMap['鮮花'] || 0;
+            const freshRev = materialRev['鮮花'] || 0;
+            const dryCnt   = (materialMap['乾燥花']||0) + (materialMap['永生花']||0) + (materialMap['混合']||0);
+            const dryRev   = (materialRev['乾燥花']||0) + (materialRev['永生花']||0) + (materialRev['混合']||0);
+
+            set('st-orders',      `${total} 筆`);
+            set('st-orders-sub',  `鮮花 ${freshCnt} · 乾燥 ${materialMap['乾燥花']||0} · 永生 ${materialMap['永生花']||0}`);
+            set('st-revenue',     `NT$ ${revenue.toLocaleString()}`);
+            set('st-revenue-sub', `平均客單價 NT$ ${aov.toLocaleString()}`);
+            set('st-fresh',       `${freshCnt} 筆`);
+            set('st-fresh-sub',   `NT$ ${freshRev.toLocaleString()}`);
+            set('st-dry',         `${dryCnt} 筆`);
+            set('st-dry-sub',     `NT$ ${dryRev.toLocaleString()}`);
+
+            // 花材類型分佈
+            const matTotal = Math.max(total, 1);
+            document.getElementById('st-materialBreakdown').innerHTML =
+                Object.entries(materialMap).filter(([,c]) => c > 0).map(([label, cnt]) => {
+                    const pct = Math.round(cnt / matTotal * 100);
+                    const rev = materialRev[label] || 0;
+                    return `<div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">${label}</span>
+                            <span class="font-bold">${cnt} 筆 · NT$ ${rev.toLocaleString()} <span class="text-gray-400">${pct}%</span></span>
+                        </div>
+                        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#c4a882;"></div></div>
+                    </div>`;
+                }).join('') || '<p class="text-xs text-gray-300 text-center py-2">無資料</p>';
+
+            // 花禮種類分佈
+            document.getElementById('st-typeBreakdown').innerHTML =
+                Object.entries(typeMap).sort((a,b)=>b[1]-a[1]).map(([label, cnt]) => {
+                    const pct = Math.round(cnt / matTotal * 100);
+                    const rev = typeRev[label] || 0;
+                    return `<div>
+                        <div class="flex justify-between text-xs mb-1">
+                            <span class="text-gray-500">${label}</span>
+                            <span class="font-bold">${cnt} 筆 · NT$ ${rev.toLocaleString()} <span class="text-gray-400">${pct}%</span></span>
+                        </div>
+                        <div class="progress-bar"><div class="progress-fill" style="width:${pct}%;background:#8e9775;"></div></div>
+                    </div>`;
+                }).join('') || '<p class="text-xs text-gray-300 text-center py-2">無資料</p>';
+
+            // 訂單明細
+            document.getElementById('st-orderList').innerHTML = studioTxs.length ?
+                studioTxs.map(t => {
+                    const n = parseNote(t.note);
+                    const timeStr = String(t.date||'').slice(0,19).replace('T',' ');
+                    return `<div style="background:#fdf8f3;border:1px solid #ede3d8;border-radius:10px;padding:10px 14px;margin-bottom:6px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                            <span style="font-weight:bold;font-size:13px;">${t.memberName||'散客'}</span>
+                            <span style="font-weight:bold;color:#c4a882;">NT$ ${Number(t.total).toLocaleString()}</span>
+                        </div>
+                        <div style="font-size:11px;color:#a09080;">
+                            ${n['花材類型']?`<span style="background:#fdf1e4;border-radius:4px;padding:1px 6px;margin-right:4px;">${n['花材類型']}</span>`:''}
+                            ${n['花禮']?`<span style="background:#f1f3eb;border-radius:4px;padding:1px 6px;margin-right:4px;">${n['花禮']}</span>`:''}
+                            ${n['色系']?`<span style="background:#f1f3eb;border-radius:4px;padding:1px 6px;margin-right:4px;">${n['色系']}</span>`:''}
+                            ${n['取件']?`<span style="color:#9ca3af;margin-right:4px;">📅 ${n['取件']}</span>`:''}
+                        </div>
+                        ${n['備註']?`<div style="font-size:11px;color:#c4b8ac;margin-top:4px;">💬 ${n['備註']}</div>`:''}
+                        <div style="font-size:10px;color:#d4c4b0;margin-top:3px;">${t.pay||''} · ${timeStr}</div>
+                    </div>`;
+                }).join('') : '<p class="text-xs text-gray-300 text-center py-4">當日無 Studio 訂單</p>';
+
+        } catch(e) { console.error('studioStats error', e); }
     }
 
     // ── 工具 ──

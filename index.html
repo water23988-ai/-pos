@@ -154,6 +154,7 @@
             <button onclick="toggleStudioTag(this,'type')" class="s-tag-btn" data-val="捧花">捧花</button>
             <button onclick="toggleStudioTag(this,'type')" class="s-tag-btn" data-val="桌花">桌花</button>
             <button onclick="toggleStudioTag(this,'type')" class="s-tag-btn" data-val="花圈">花圈</button>
+            <button onclick="toggleStudioTag(this,'type')" class="s-tag-btn" data-val="胸花">胸花</button>
             <button onclick="toggleStudioTag(this,'type')" class="s-tag-btn" data-val="其他">其他</button>
         </div>
         <label class="s-label">色系偏好</label>
@@ -167,6 +168,17 @@
         </div>
         <label class="s-label">備註 / 特殊要求</label>
         <textarea id="s-note" rows="3" placeholder="客人說的話、設計方向、包裝要求..." class="s-input" style="resize:none;"></textarea>
+    </div>
+
+    <!-- 花材類型 獨立區塊 -->
+    <div class="s-card">
+        <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">🌿 花材類型</div>
+        <div class="flex flex-wrap gap-2" id="s-material-group">
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn active" data-val="鮮花">🌸 鮮花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="乾燥花">🌾 乾燥花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="永生花">💛 永生花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="混合">✨ 混合</button>
+        </div>
     </div>
     <div class="s-card">
         <div class="flex justify-between items-center mb-3">
@@ -471,7 +483,7 @@ let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
 let productModalMode = 'pos';
 let studioItems     = [];
-let studioTags      = { type: '', color: '', pay: '現金', status: '已付' };
+let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
 let _pendingTx      = null;
 let _historyData    = [];  // 新增：暫存查詢結果
 let _currentVoidTxId = null; // 新增：待退款的交易ID // 樂觀更新暫存
@@ -1299,7 +1311,7 @@ async function confirmVoid() {
 
 // ══ Studio ══
 function toggleStudioTag(btn, group) {
-    const groupId = { type: 's-type-group', color: 's-color-group', pay: 's-pay-group', status: 's-status-group' };
+    const groupId = { type: 's-type-group', color: 's-color-group', pay: 's-pay-group', status: 's-status-group', material: 's-material-group' };
     document.querySelectorAll(`#${groupId[group]} .s-tag-btn`).forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     studioTags[group] = btn.dataset.val;
@@ -1359,7 +1371,15 @@ async function submitStudioOrder() {
     const note   = document.getElementById('s-note').value.trim();
     const budget = document.getElementById('s-budget').value;
     const cost   = studioItems.reduce((s, i) => s + (i.cost||0)*(i.qty||1), 0);
-    const noteStr = [`【Studio訂單】`, studioTags.type?`花禮：${studioTags.type}`:'', studioTags.color?`色系：${studioTags.color}`:'', pickupDate?`取件：${pickupDate} ${pickupTime}`:'', budget?`預算：NT$${budget}`:'', studioTags.status?`付款：${studioTags.status}`:'', note?`備註：${note}`:''].filter(Boolean).join('｜');
+    const noteStr = [`【Studio訂單】`,
+        studioTags.material ? `花材類型：${studioTags.material}` : '',
+        studioTags.type     ? `花禮：${studioTags.type}`         : '',
+        studioTags.color    ? `色系：${studioTags.color}`        : '',
+        pickupDate          ? `取件：${pickupDate} ${pickupTime}` : '',
+        budget              ? `預算：NT$${budget}`                : '',
+        studioTags.status   ? `付款：${studioTags.status}`       : '',
+        note                ? `備註：${note}`                     : '',
+    ].filter(Boolean).join('｜');
     const payload = { action: 'addTransaction', data: { id: 'S' + Date.now().toString().slice(-8), date: new Date().toLocaleString(), store: '高雄FOCUS 13', memberId: '', memberName: name, subtotal: total, discount: 0, total, cost: Math.round(cost), pay: studioTags.pay||'現金', earnedPoints: 0, note: noteStr, customerType: '新客', source: 'friend', items: studioItems.map(i => ({ id: i.productId||0, name: i.name, qty: i.qty||1, unitPrice: i.price||0, unitCost: i.cost||0 })) } };
     const btn = document.getElementById('s-submitBtn');
     btn.disabled = true; btn.innerText = '送出中...';
@@ -1376,10 +1396,11 @@ function resetStudioForm() {
     ['s-name','s-phone','s-note','s-budget','s-total'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('s-pickup-date').valueAsDate = new Date();
     document.getElementById('s-pickup-time').value = '';
-    studioItems = []; studioTags = { type: '', color: '', pay: '現金', status: '已付' };
+    studioItems = []; studioTags = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
     document.querySelectorAll('.s-tag-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-val="現金"]').classList.add('active');
     document.querySelector('[data-val="已付"]').classList.add('active');
+    document.querySelector('[data-val="鮮花"]').classList.add('active');
     renderStudioItems();
     document.getElementById('s-total-display').innerText = 'NT$ 0';
 }
