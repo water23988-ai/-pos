@@ -924,38 +924,30 @@ function closeHangNameModal() { document.getElementById('hangNameModal').classLi
 
 async function confirmHang() {
     const name = document.getElementById('hangNameInput').value.trim() || `掛單 ${hangOrders.length + 1}`;
-    const btn  = document.querySelector('#hangNameModal button:last-child');
-    if (btn) { btn.disabled = true; btn.innerText = '儲存中...'; }
 
+    // 先立即加入本機列表並顯示
+    const localHang = { gasId: null, name, cart: cart.map(i=>({...i})), member: currentMember };
+    hangOrders.push(localHang);
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    document.getElementById('memberResult').innerHTML = '';
+    document.getElementById('memberSearch').value = '';
+    renderCart(); updateSummary(); renderHangList(); closeHangNameModal();
+    showToast(`📌 已掛單：${name}`);
+
+    // 背景同步 GAS（不阻擋使用者操作）
     if (API_URL) {
-        setGasStatus('loading');
         try {
             const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
                 action: 'saveHangOrder',
-                data:   { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: cart.map(i=>({...i})), member: currentMember }
+                data:   { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: localHang.cart, member: localHang.member }
             })});
             const result = await res.json();
             if (result.success) {
+                localHang.gasId = result.id; // 寫入 gasId 供之後刪除用
                 setGasStatus('ok');
-                // 清空購物車
-                cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
-                document.getElementById('memberResult').innerHTML = '';
-                document.getElementById('memberSearch').value = '';
-                renderCart(); updateSummary(); closeHangNameModal();
-                showToast(`📌 已掛單：${name}`);
-                await loadHangOrders(); // 重新從 GAS 拉最新列表
-            } else {
-                setGasStatus('error');
-                alert('掛單失敗：' + (result.error || '請確認連線'));
             }
-        } catch(e) {
-            setGasStatus('error');
-            alert('掛單失敗：連線異常，請重試');
-        }
-    } else {
-        alert('請先設定 API URL');
+        } catch(e) { console.warn('掛單 GAS 同步失敗，本機保留'); }
     }
-    if (btn) { btn.disabled = false; btn.innerText = '確認掛單'; }
 }
 
 function renderHangList() {
@@ -987,28 +979,25 @@ async function recallOrder(idx) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    renderCart(); updateSummary();
+    const gasId = order.gasId;
+    hangOrders.splice(idx, 1);
+    renderCart(); updateSummary(); renderHangList();
     showToast(`📌 已叫回：${order.name}`);
-    // 從 GAS 刪除
-    if (API_URL && order.gasId) {
-        try {
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: order.gasId } }) });
-        } catch(e) {}
+    // 背景從 GAS 刪除
+    if (API_URL && gasId) {
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
     }
-    await loadHangOrders(); // 重新拉最新列表
 }
 
 async function deleteHang(idx) {
     if (!confirm(`確定刪除掛單「${hangOrders[idx].name}」？`)) return;
     const gasId = hangOrders[idx].gasId;
+    hangOrders.splice(idx, 1);
+    renderHangList();
+    // 背景從 GAS 刪除
     if (API_URL && gasId) {
-        setGasStatus('loading');
-        try {
-            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) });
-            setGasStatus('ok');
-        } catch(e) { setGasStatus('error'); }
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
     }
-    await loadHangOrders();
 }
 
 // ── 會員 ──
