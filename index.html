@@ -317,7 +317,11 @@
         <div class="space-y-3 mb-5">
             <div><label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-1">姓名 *</label><input type="text" id="newMemberName" placeholder="請輸入姓名" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-base outline-none focus:border-[#8e9775] font-bold"></div>
             <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">年齡區間（選填）</label>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">生日（選填）</label>
+                <input type="date" id="newMemberBirthday" class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">年齡區間（選填，若不願提供生日）</label>
                 <div class="flex flex-wrap gap-2" id="ageGroupBtns">
                     <button onclick="selectAgeGroup(this)" data-val="20歲以下" class="age-btn source-chip">20歲以下</button>
                     <button onclick="selectAgeGroup(this)" data-val="20-29"  class="age-btn source-chip">20-29</button>
@@ -325,7 +329,7 @@
                     <button onclick="selectAgeGroup(this)" data-val="40-49"  class="age-btn source-chip">40-49</button>
                     <button onclick="selectAgeGroup(this)" data-val="50歲以上" class="age-btn source-chip">50歲以上</button>
                 </div>
-                <input type="hidden" id="newMemberBirthday">
+                <input type="hidden" id="newMemberAgeGroup">
             </div>
         </div>
         <div class="flex gap-2">
@@ -911,38 +915,41 @@ async function reportWaste(id) {
     } catch (e) { alert('連線失敗'); setGasStatus('error'); }
 }
 
-// ── 掛單列表 Modal ──
-async function openHangListModal() {
-    document.getElementById('hangListModal').classList.add('show');
-    await refreshHangList();
+// ── 掛單（localStorage 為主，GAS 為輔）──
+const HANG_KEY = 'moment_flor_hangs';
+
+function saveHangToLocal() {
+    localStorage.setItem(HANG_KEY, JSON.stringify(hangOrders));
 }
-function closeHangListModal() {
-    document.getElementById('hangListModal').classList.remove('show');
-}
-async function refreshHangList() {
-    const el = document.getElementById('hangListModalContent');
-    el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
-    await loadHangOrders();
-    renderHangList();
+function loadHangFromLocal() {
+    try {
+        const raw = localStorage.getItem(HANG_KEY);
+        if (raw) hangOrders = JSON.parse(raw);
+    } catch(e) { hangOrders = []; }
 }
 
-// ── 掛單（GAS 跨裝置，完全以 GAS 為主）──
 async function loadHangOrders() {
+    // 先讀本機
+    loadHangFromLocal();
+    renderHangList();
+    // 背景嘗試從 GAS 同步（如果有部署新版）
     if (!API_URL) return;
     try {
         const res  = await fetch(`${API_URL}?action=getHangOrders&store=${enc(storeForGAS())}`);
         const data = await res.json();
-        if (data && data.error) return; // GAS 尚未部署，靜默略過
-        if (Array.isArray(data)) {
-            hangOrders = data.map(h => ({
-                gasId:  h.id,
-                name:   h.name,
-                cart:   Array.isArray(h.cart) ? h.cart : [],
-                member: h.member || null
-            }));
+        if (data && data.error) return; // GAS 未部署新版，靜默略過
+        if (Array.isArray(data) && data.length > 0) {
+            // 合併 GAS 資料（以 gasId 去重）
+            const localGasIds = new Set(hangOrders.map(h => h.gasId).filter(Boolean));
+            data.forEach(h => {
+                if (!localGasIds.has(h.id)) {
+                    hangOrders.push({ gasId: h.id, name: h.name, cart: h.cart||[], member: h.member||null });
+                }
+            });
+            saveHangToLocal();
             renderHangList();
         }
-    } catch(e) { console.warn('掛單載入失敗'); }
+    } catch(e) { /* 靜默失敗 */ }
 }
 
 function hangOrder() {
@@ -954,20 +961,20 @@ function closeHangNameModal() { document.getElementById('hangNameModal').classLi
 
 async function confirmHang() {
     const name = document.getElementById('hangNameInput').value.trim() || `掛單 ${hangOrders.length + 1}`;
-
-    // 先立即加入本機列表並顯示
     const localHang = { gasId: null, name, cart: cart.map(i=>({...i})), member: currentMember };
+
+    // 立即存本機
     hangOrders.push(localHang);
+    saveHangToLocal();
+
+    // 清空購物車
     cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); renderHangList(); closeHangNameModal();
     showToast(`📌 已掛單：${name}`);
-    // 如果掛單 Modal 是開著的，重新整理
-    const modal = document.getElementById('hangListModal');
-    if (modal && modal.classList.contains('show')) renderHangList();
 
-    // 背景同步 GAS（不阻擋使用者操作）
+    // 背景同步 GAS
     if (API_URL) {
         try {
             const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
@@ -975,11 +982,8 @@ async function confirmHang() {
                 data:   { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: localHang.cart, member: localHang.member }
             })});
             const result = await res.json();
-            if (result.success) {
-                localHang.gasId = result.id; // 寫入 gasId 供之後刪除用
-                setGasStatus('ok');
-            }
-        } catch(e) { console.warn('掛單 GAS 同步失敗，本機保留'); }
+            if (result.success) { localHang.gasId = result.id; saveHangToLocal(); }
+        } catch(e) { /* 靜默失敗 */ }
     }
 }
 
@@ -1018,13 +1022,13 @@ async function recallOrder(idx) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    const gasId = order.gasId;
+    const gasId   = order.gasId;
     const orderName = order.name;
     hangOrders.splice(idx, 1);
-    renderCart(); updateSummary();
-    closeHangListModal(); // 關掉 Modal 回到主頁
+    saveHangToLocal();
+    renderCart(); updateSummary(); renderHangList();
+    closeHangListModal();
     showToast(`📌 已叫回：${orderName}`);
-    // 背景從 GAS 刪除
     if (API_URL && gasId) {
         try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
     }
@@ -1034,8 +1038,8 @@ async function deleteHang(idx) {
     if (!confirm(`確定刪除掛單「${hangOrders[idx].name}」？`)) return;
     const gasId = hangOrders[idx].gasId;
     hangOrders.splice(idx, 1);
-    renderHangList(); // 立即更新 Modal 內列表
-    // 背景從 GAS 刪除
+    saveHangToLocal();
+    renderHangList();
     if (API_URL && gasId) {
         try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
     }
@@ -1056,13 +1060,38 @@ async function searchMember() {
         if (m) {
             currentMember = m;
             const tier = m.totalSpent>=30000?'👑 VIP':m.totalSpent>=10000?'🥇 金卡':m.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
-            el.innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${m.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.points} pt 累積點數</div></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
+
+            // 生日判斷（支援 yyyy-MM-dd 格式，或 yyyy-MM-dd｜年齡區間 合併格式）
+            let birthdayBadge = '';
+            const birthdayRaw = String(m.birthday || '').split('｜')[0].trim();
+            if (birthdayRaw && /^\d{4}-\d{2}-\d{2}/.test(birthdayRaw)) {
+                const todayStr  = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+                const todayMMDD = todayStr.slice(5);
+                const birthMMDD = birthdayRaw.slice(5, 10);
+                if (todayMMDD === birthMMDD) {
+                    birthdayBadge = `<div style="background:#fef9c3;border:1px solid #fde047;border-radius:10px;padding:6px 10px;margin-top:6px;font-size:12px;color:#854d0e;">🎂 今天是 ${m.name} 的生日！記得祝賀一下</div>`;
+                }
+            }
+
+            el.innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                    <div>
+                        <span style="font-weight:bold;color:#6d7756;">${m.name}</span>
+                        <span style="font-size:10px;margin-left:6px;">${tier}</span>
+                        <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${m.points} pt 累積點數</div>
+                    </div>
+                    <button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button>
+                </div>
+                ${birthdayBadge}
+            </div>`;
             updateSummary();
         } else {
             document.getElementById('newMemberPhone').value = phone;
             document.getElementById('newMemberPhoneDisplay').innerText = phone;
             document.getElementById('newMemberName').value = '';
             document.getElementById('newMemberBirthday').value = '';
+            document.getElementById('newMemberAgeGroup').value = '';
+            document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
             document.getElementById('newMemberModal').classList.add('show');
         }
     } catch (e) { setGasStatus('error'); alert('查詢失敗，請確認連線'); }
@@ -1070,15 +1099,18 @@ async function searchMember() {
 async function registerMember() {
     const name     = document.getElementById('newMemberName').value.trim();
     const phone    = document.getElementById('newMemberPhone').value.trim();
-    const birthday = document.getElementById('newMemberBirthday').value; // 現在存年齡區間
+    const birthday = document.getElementById('newMemberBirthday').value;
+    const ageGroup = document.getElementById('newMemberAgeGroup').value;
+    // 兩個都填就合併，只填一個就存那個，都沒填就空白
+    const birthdayVal = birthday && ageGroup ? `${birthday}｜${ageGroup}` : (birthday || ageGroup || '');
     if (!name) return alert('請輸入姓名');
     setGasStatus('loading');
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addMember', data: { name, phone, birthday } }) });
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addMember', data: { name, phone, birthday: birthdayVal } }) });
         const result = await res.json();
         setGasStatus('ok');
         if (result.success) {
-            currentMember = { id: result.id, name, phone, birthday, points: 0, totalSpent: 0 };
+            currentMember = { id: result.id, name, phone, birthday: birthdayVal, points: 0, totalSpent: 0 };
             closeNewMemberModal();
             document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${name}</span><span style="font-size:10px;margin-left:6px;">🥉 銅卡</span><div style="font-size:11px;color:#9ca3af;margin-top:2px;">新會員</div></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
             updateSummary(); showToast('✅ 會員建立成功！');
@@ -1096,11 +1128,12 @@ function clearMember() {
 function selectAgeGroup(btn) {
     document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
-    document.getElementById('newMemberBirthday').value = btn.dataset.val;
+    document.getElementById('newMemberAgeGroup').value = btn.dataset.val;
 }
 function closeNewMemberModal() {
     document.getElementById('newMemberModal').classList.remove('show');
     document.querySelectorAll('.age-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('newMemberAgeGroup').value = '';
     document.getElementById('newMemberBirthday').value = '';
 }
 
