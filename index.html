@@ -114,12 +114,11 @@
             <h2 class="text-xs font-bold text-gray-400 tracking-widest uppercase">🛒 結帳清單</h2>
             <div class="flex gap-2">
                 <button onclick="openProductModal()" class="text-[10px] bg-[#8e9775] text-white px-3 py-1 rounded-full">＋ 加入商品</button>
-                <button onclick="hangOrder()" class="text-[10px] text-[#8e9775] border border-[#8e9775] px-3 py-1 rounded-full">掛單</button>
+                <button onclick="openHangListModal()" class="text-[10px] text-[#8e9775] border border-[#8e9775] px-3 py-1 rounded-full">📌 掛單</button>
                 <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
             </div>
         </div>
         <div id="cartList"><p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p></div>
-        <div id="hangList" class="mt-3 space-y-2 hidden"></div>
     </section>
 </div>
 <div class="checkout-bar">
@@ -348,6 +347,22 @@
         <div id="dailyConfirmArea" class="hidden mt-4 pt-4 border-t border-gray-100">
             <button onclick="confirmDailyClose()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">✅ 確認已對帳，關帳</button>
             <p id="dailyCloseStatus" class="text-center text-xs text-gray-400 mt-2"></p>
+        </div>
+    </div>
+</div>
+
+<!-- 掛單列表 Modal -->
+<div class="modal-overlay" id="hangListModal">
+    <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
+        <div class="p-4 border-b border-gray-100 flex justify-between items-center">
+            <h3 class="font-bold text-base">📌 掛單列表</h3>
+            <button onclick="closeHangListModal()" class="text-gray-300 text-xl">✕</button>
+        </div>
+        <div id="hangListModalContent" class="overflow-y-auto flex-1 p-4 no-scrollbar">
+            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+        </div>
+        <div class="p-4 border-t border-gray-100">
+            <button onclick="hangOrder()" class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">＋ 新增掛單</button>
         </div>
     </div>
 </div>
@@ -896,6 +911,21 @@ async function reportWaste(id) {
     } catch (e) { alert('連線失敗'); setGasStatus('error'); }
 }
 
+// ── 掛單列表 Modal ──
+async function openHangListModal() {
+    document.getElementById('hangListModal').classList.add('show');
+    await refreshHangList();
+}
+function closeHangListModal() {
+    document.getElementById('hangListModal').classList.remove('show');
+}
+async function refreshHangList() {
+    const el = document.getElementById('hangListModalContent');
+    el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
+    await loadHangOrders();
+    renderHangList();
+}
+
 // ── 掛單（GAS 跨裝置，完全以 GAS 為主）──
 async function loadHangOrders() {
     if (!API_URL) return;
@@ -933,6 +963,9 @@ async function confirmHang() {
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); renderHangList(); closeHangNameModal();
     showToast(`📌 已掛單：${name}`);
+    // 如果掛單 Modal 是開著的，重新整理
+    const modal = document.getElementById('hangListModal');
+    if (modal && modal.classList.contains('show')) renderHangList();
 
     // 背景同步 GAS（不阻擋使用者操作）
     if (API_URL) {
@@ -951,24 +984,30 @@ async function confirmHang() {
 }
 
 function renderHangList() {
-    const container = document.getElementById('hangList');
-    if (!hangOrders.length) { container.classList.add('hidden'); return; }
-    container.classList.remove('hidden');
-    container.innerHTML = `<div class="text-xs font-bold text-gray-400 tracking-widest uppercase mb-2">📌 掛單列表（${hangOrders.length}）</div>` +
-        hangOrders.map((order, idx) => {
-            const total = order.cart.reduce((s,i) => s + (currentStore==='台南FOCUS'?i.priceTN:i.priceKH)*i.qty, 0);
-            return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+    const el = document.getElementById('hangListModalContent');
+    if (!el) return;
+    if (!hangOrders.length) {
+        el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">目前無掛單</p>';
+        return;
+    }
+    el.innerHTML = hangOrders.map((order, idx) => {
+        const total = order.cart.reduce((s,i) => s + (currentStore==='台南FOCUS'?i.priceTN:i.priceKH)*i.qty, 0);
+        const itemNames = order.cart.slice(0,3).map(i=>i.name).join('、') + (order.cart.length>3?`…等${order.cart.length}項`:'');
+        return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
                 <div>
-                    <span style="font-weight:bold;font-size:13px;">${order.name}</span>
+                    <span style="font-weight:bold;font-size:14px;">${order.name}</span>
                     ${order.member ? `<span style="font-size:10px;color:#8e9775;margin-left:6px;">👤 ${order.member.name}</span>` : ''}
-                    <div style="font-size:11px;color:#9ca3af;margin-top:2px;">${order.cart.length} 種 · NT$ ${total.toLocaleString()}</div>
                 </div>
-                <div style="display:flex;gap:6px;">
-                    <button onclick="recallOrder(${idx})" style="background:#8e9775;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:12px;cursor:pointer;">叫回</button>
-                    <button onclick="deleteHang(${idx})" style="background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:8px;padding:6px 8px;font-size:12px;cursor:pointer;">✕</button>
-                </div>
-            </div>`;
-        }).join('');
+                <span style="font-weight:bold;font-size:14px;color:#8e9775;">NT$ ${total.toLocaleString()}</span>
+            </div>
+            <div style="font-size:11px;color:#9ca3af;margin-bottom:10px;">${itemNames}</div>
+            <div style="display:flex;gap:8px;">
+                <button onclick="recallOrder(${idx})" style="flex:1;background:#8e9775;color:white;border:none;border-radius:10px;padding:10px;font-size:13px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">叫回結帳</button>
+                <button onclick="deleteHang(${idx})" style="background:transparent;color:#f87171;border:1px solid #fca5a5;border-radius:10px;padding:10px 14px;font-size:13px;cursor:pointer;">刪除</button>
+            </div>
+        </div>`;
+    }).join('');
 }
 
 async function recallOrder(idx) {
@@ -980,9 +1019,11 @@ async function recallOrder(idx) {
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
     const gasId = order.gasId;
+    const orderName = order.name;
     hangOrders.splice(idx, 1);
-    renderCart(); updateSummary(); renderHangList();
-    showToast(`📌 已叫回：${order.name}`);
+    renderCart(); updateSummary();
+    closeHangListModal(); // 關掉 Modal 回到主頁
+    showToast(`📌 已叫回：${orderName}`);
     // 背景從 GAS 刪除
     if (API_URL && gasId) {
         try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
@@ -993,7 +1034,7 @@ async function deleteHang(idx) {
     if (!confirm(`確定刪除掛單「${hangOrders[idx].name}」？`)) return;
     const gasId = hangOrders[idx].gasId;
     hangOrders.splice(idx, 1);
-    renderHangList();
+    renderHangList(); // 立即更新 Modal 內列表
     // 背景從 GAS 刪除
     if (API_URL && gasId) {
         try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
