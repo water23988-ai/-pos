@@ -456,6 +456,9 @@ const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加�
 function isKH()        { return currentStore !== '台南FOCUS'; }
 function storeForGAS() { return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
 
+// ── 工具 ──
+function enc(s) { return encodeURIComponent(s); }
+
 // ── Toast ──
 let _toastTimer;
 function showToast(msg, duration = 1500) {
@@ -888,14 +891,31 @@ async function reportWaste(id) {
 // ── 掛單（GAS 跨裝置版）──
 async function loadHangOrders() {
     if (!API_URL) return;
+    setGasStatus('loading');
     try {
         const res  = await fetch(`${API_URL}?action=getHangOrders&store=${enc(storeForGAS())}`);
         const data = await res.json();
+        if (data && data.error) {
+            // GAS 尚未部署新版，靜默降級到本機模式
+            console.warn('掛單 GAS 未就緒：', data.error);
+            setGasStatus('ok');
+            return;
+        }
         if (Array.isArray(data)) {
-            hangOrders = data.map(h => ({ gasId: h.id, name: h.name, cart: h.cart || [], member: h.member || null }));
+            hangOrders = data.map(h => ({
+                gasId:  h.id,
+                name:   h.name,
+                cart:   Array.isArray(h.cart)   ? h.cart   : [],
+                member: h.member || null
+            }));
             renderHangList();
         }
-    } catch(e) { console.log('掛單載入失敗'); }
+        setGasStatus('ok');
+    } catch(e) {
+        console.warn('掛單載入失敗，使用本機模式');
+        setGasStatus('error');
+        setTimeout(() => setGasStatus('ok'), 2000);
+    }
 }
 function hangOrder() {
     if (!cart.length) return alert('購物清單是空的');
@@ -1049,8 +1069,6 @@ function clearPoints() {
 
 // ── 查詢記錄 ──
 function openHistoryModal() {
-    const pw = prompt('身份認證：');
-    if (pw !== ADMIN_PASSWORD) return;
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
     document.getElementById('historyDateInput').value = today;
     document.getElementById('historyModal').classList.add('show');
