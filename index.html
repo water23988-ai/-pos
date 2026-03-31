@@ -369,12 +369,20 @@
             <h3 class="font-bold text-base">🔍 銷售紀錄</h3>
             <button onclick="closeHistoryModal()" class="text-gray-300 text-xl">✕</button>
         </div>
-        <div class="p-3 border-b border-gray-100 flex gap-2">
-            <input type="date" id="historyDateInput" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775]">
-            <button onclick="loadHistory()" class="bg-[#8e9775] text-white px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
+        <div class="p-3 border-b border-gray-100 space-y-2">
+            <div class="flex gap-2">
+                <input type="date" id="historyDateInput" class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775]">
+                <button onclick="loadHistory()" class="bg-[#8e9775] text-white px-4 py-2 rounded-xl text-xs font-bold">查詢</button>
+            </div>
+            <div class="flex gap-2">
+                <button onclick="setHistoryStore('all')"     id="hs-all" class="source-chip source-hist active" style="font-size:11px;">全部</button>
+                <button onclick="setHistoryStore('高雄FOCUS 13')" id="hs-kh"  class="source-chip source-hist" style="font-size:11px;">高雄</button>
+                <button onclick="setHistoryStore('台南FOCUS')"    id="hs-tn"  class="source-chip source-hist" style="font-size:11px;">台南</button>
+                <button onclick="setHistoryStore('Studio')"   id="hs-st"  class="source-chip source-hist" style="font-size:11px;">Studio</button>
+            </div>
         </div>
         <div id="historyList" class="overflow-y-auto flex-1 p-4 no-scrollbar">
-            <p class="text-center text-gray-300 text-xs py-8">查詢中...</p>
+            <p class="text-center text-gray-300 text-xs py-8">請選擇日期查詢</p>
         </div>
     </div>
 </div>
@@ -888,66 +896,76 @@ async function reportWaste(id) {
     } catch (e) { alert('連線失敗'); setGasStatus('error'); }
 }
 
-// ── 掛單（GAS 跨裝置版）──
+// ── 掛單（GAS 跨裝置，完全以 GAS 為主）──
 async function loadHangOrders() {
     if (!API_URL) return;
-    setGasStatus('loading');
     try {
         const res  = await fetch(`${API_URL}?action=getHangOrders&store=${enc(storeForGAS())}`);
         const data = await res.json();
-        if (data && data.error) {
-            // GAS 尚未部署新版，靜默降級到本機模式
-            console.warn('掛單 GAS 未就緒：', data.error);
-            setGasStatus('ok');
-            return;
-        }
+        if (data && data.error) return; // GAS 尚未部署，靜默略過
         if (Array.isArray(data)) {
             hangOrders = data.map(h => ({
                 gasId:  h.id,
                 name:   h.name,
-                cart:   Array.isArray(h.cart)   ? h.cart   : [],
+                cart:   Array.isArray(h.cart) ? h.cart : [],
                 member: h.member || null
             }));
             renderHangList();
         }
-        setGasStatus('ok');
-    } catch(e) {
-        console.warn('掛單載入失敗，使用本機模式');
-        setGasStatus('error');
-        setTimeout(() => setGasStatus('ok'), 2000);
-    }
+    } catch(e) { console.warn('掛單載入失敗'); }
 }
+
 function hangOrder() {
     if (!cart.length) return alert('購物清單是空的');
     document.getElementById('hangNameInput').value = '';
     document.getElementById('hangNameModal').classList.add('show');
 }
 function closeHangNameModal() { document.getElementById('hangNameModal').classList.remove('show'); }
+
 async function confirmHang() {
     const name = document.getElementById('hangNameInput').value.trim() || `掛單 ${hangOrders.length + 1}`;
-    const localHang = { gasId: null, name, cart: [...cart.map(i => ({...i}))], member: currentMember };
-    hangOrders.push(localHang);
-    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
-    document.getElementById('memberResult').innerHTML = '';
-    document.getElementById('memberSearch').value = '';
-    renderCart(); updateSummary(); closeHangNameModal(); renderHangList();
-    showToast(`📌 已掛單：${name}`);
+    const btn  = document.querySelector('#hangNameModal button:last-child');
+    if (btn) { btn.disabled = true; btn.innerText = '儲存中...'; }
+
     if (API_URL) {
+        setGasStatus('loading');
         try {
-            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveHangOrder', data: { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: localHang.cart, member: localHang.member } }) });
+            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+                action: 'saveHangOrder',
+                data:   { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: cart.map(i=>({...i})), member: currentMember }
+            })});
             const result = await res.json();
-            if (result.success) localHang.gasId = result.id;
-        } catch(e) { console.log('掛單儲存 GAS 失敗，本機保存'); }
+            if (result.success) {
+                setGasStatus('ok');
+                // 清空購物車
+                cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+                document.getElementById('memberResult').innerHTML = '';
+                document.getElementById('memberSearch').value = '';
+                renderCart(); updateSummary(); closeHangNameModal();
+                showToast(`📌 已掛單：${name}`);
+                await loadHangOrders(); // 重新從 GAS 拉最新列表
+            } else {
+                setGasStatus('error');
+                alert('掛單失敗：' + (result.error || '請確認連線'));
+            }
+        } catch(e) {
+            setGasStatus('error');
+            alert('掛單失敗：連線異常，請重試');
+        }
+    } else {
+        alert('請先設定 API URL');
     }
+    if (btn) { btn.disabled = false; btn.innerText = '確認掛單'; }
 }
+
 function renderHangList() {
     const container = document.getElementById('hangList');
     if (!hangOrders.length) { container.classList.add('hidden'); return; }
     container.classList.remove('hidden');
-    container.innerHTML = `<div class="text-xs font-bold text-gray-400 tracking-widest uppercase mb-2">📌 掛單列表</div>` +
+    container.innerHTML = `<div class="text-xs font-bold text-gray-400 tracking-widest uppercase mb-2">📌 掛單列表（${hangOrders.length}）</div>` +
         hangOrders.map((order, idx) => {
             const total = order.cart.reduce((s,i) => s + (currentStore==='台南FOCUS'?i.priceTN:i.priceKH)*i.qty, 0);
-            return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;">
+            return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:10px;padding:10px 12px;display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
                 <div>
                     <span style="font-weight:bold;font-size:13px;">${order.name}</span>
                     ${order.member ? `<span style="font-size:10px;color:#8e9775;margin-left:6px;">👤 ${order.member.name}</span>` : ''}
@@ -960,6 +978,7 @@ function renderHangList() {
             </div>`;
         }).join('');
 }
+
 async function recallOrder(idx) {
     const order = hangOrders[idx];
     if (cart.length && !confirm('目前清單有商品，叫回掛單會清空現有清單，確定嗎？')) return;
@@ -968,21 +987,28 @@ async function recallOrder(idx) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    const gasId = order.gasId;
-    hangOrders.splice(idx, 1);
-    renderCart(); updateSummary(); renderHangList();
+    renderCart(); updateSummary();
     showToast(`📌 已叫回：${order.name}`);
-    if (API_URL && gasId) {
-        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
+    // 從 GAS 刪除
+    if (API_URL && order.gasId) {
+        try {
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: order.gasId } }) });
+        } catch(e) {}
     }
+    await loadHangOrders(); // 重新拉最新列表
 }
+
 async function deleteHang(idx) {
+    if (!confirm(`確定刪除掛單「${hangOrders[idx].name}」？`)) return;
     const gasId = hangOrders[idx].gasId;
-    hangOrders.splice(idx, 1);
-    renderHangList();
     if (API_URL && gasId) {
-        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
+        setGasStatus('loading');
+        try {
+            await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) });
+            setGasStatus('ok');
+        } catch(e) { setGasStatus('error'); }
     }
+    await loadHangOrders();
 }
 
 // ── 會員 ──
@@ -1068,42 +1094,68 @@ function clearPoints() {
 }
 
 // ── 查詢記錄 ──
+// ── 查詢記錄 ──
+let _selectedHistoryStore = 'all';
+
+function setHistoryStore(store) {
+    _selectedHistoryStore = store;
+    document.querySelectorAll('.source-hist').forEach(b => b.classList.remove('active'));
+    const idMap = { 'all':'hs-all', '高雄FOCUS 13':'hs-kh', '台南FOCUS':'hs-tn', 'Studio':'hs-st' };
+    const el = document.getElementById(idMap[store]);
+    if (el) el.classList.add('active');
+    if (document.getElementById('historyDateInput').value) loadHistory();
+}
+
 function openHistoryModal() {
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
     document.getElementById('historyDateInput').value = today;
+    _selectedHistoryStore = 'all';
+    document.querySelectorAll('.source-hist').forEach(b => b.classList.remove('active'));
+    document.getElementById('hs-all').classList.add('active');
     document.getElementById('historyModal').classList.add('show');
     loadHistory();
 }
 function closeHistoryModal() { document.getElementById('historyModal').classList.remove('show'); }
 
 async function loadHistory() {
-    const date = document.getElementById('historyDateInput').value;
-    const el   = document.getElementById('historyList');
+    const date  = document.getElementById('historyDateInput').value;
+    if (!date) return;
+    const store = _selectedHistoryStore === 'all' ? '' : _selectedHistoryStore;
+    const el    = document.getElementById('historyList');
     el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">查詢中...</p>';
     setGasStatus('loading');
     try {
-        const res  = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}&store=${enc(storeForGAS())}`);
+        const storeParam = store ? `&store=${enc(store)}` : '';
+        const res  = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}${storeParam}`);
         _historyData = await res.json();
         setGasStatus('ok');
         if (!Array.isArray(_historyData) || _historyData.length === 0) {
             el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">當日無交易記錄</p>';
             return;
         }
-        el.innerHTML = _historyData.map(tx => {
-            const time   = String(tx.date || '').slice(0, 8) + String(tx.date || '').slice(10, 16);
-            const badge  = tx.voided ? '<span style="background:#fee2e2;color:#dc2626;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">已退款</span>' : '';
-            const member = tx.memberName && tx.memberName !== '散客' ? `👤 ${tx.memberName}` : '散客';
-            return `<div onclick="openTxDetail('${tx.id}')" style="background:#fafaf9;border:1px solid #f3f4f6;border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;">
-                <div style="display:flex;justify-content:space-between;align-items:center;">
-                    <span style="font-size:11px;color:#9ca3af;">${member}${badge}</span>
-                    <span style="font-weight:bold;font-size:14px;color:#8e9775;">NT$ ${Number(tx.total).toLocaleString()}</span>
-                </div>
-                <div style="font-size:10px;color:#c4b8ac;margin-top:3px;">${tx.pay || ''} · ${tx.id}</div>
-            </div>`;
-        }).join('');
+        // 計算當日合計
+        const total = _historyData.filter(t => !t.voided).reduce((s,t) => s + (t.total||0), 0);
+        el.innerHTML = `
+            <div style="background:#f1f3eb;border-radius:10px;padding:10px 14px;margin-bottom:12px;display:flex;justify-content:space-between;font-size:12px;">
+                <span style="color:#6b7280;">${_historyData.filter(t=>!t.voided).length} 筆</span>
+                <span style="font-weight:bold;color:#8e9775;">合計 NT$ ${total.toLocaleString()}</span>
+            </div>
+            ${_historyData.map(tx => {
+                const badge  = tx.voided ? '<span style="background:#fee2e2;color:#dc2626;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">已退款</span>' : '';
+                const member = tx.memberName && tx.memberName !== '散客' ? `👤 ${tx.memberName}` : '散客';
+                const storeTag = `<span style="font-size:9px;color:#c4b8ac;margin-left:4px;">${(tx.store||'').replace('FOCUS','').replace(' 13','').trim()}</span>`;
+                const timeStr = String(tx.date||'').slice(0,19).replace('T',' ');
+                return `<div onclick="openTxDetail('${tx.id}')" style="background:#fafaf9;border:1px solid #f3f4f6;border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;">
+                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                        <span style="font-size:11px;color:#9ca3af;">${member}${badge}${storeTag}</span>
+                        <span style="font-weight:bold;font-size:14px;color:${tx.voided?'#d1d5db':'#8e9775'};">NT$ ${Number(tx.total).toLocaleString()}</span>
+                    </div>
+                    <div style="font-size:10px;color:#c4b8ac;margin-top:3px;">${tx.pay||''} · ${timeStr}</div>
+                </div>`;
+            }).join('')}`;
     } catch(e) {
         setGasStatus('error');
-        el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗，請確認連線</p>';
+        el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗，請確認 GAS 已部署最新版本</p>';
     }
 }
 
