@@ -1,4 +1,5 @@
 <!DOCTYPE html>
+
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -36,6 +37,7 @@
 <div id="toast"></div>
 
 <!-- 密碼遮罩 -->
+
 <div id="lockScreen" class="fixed inset-0 bg-[#2e2926] z-50 flex items-center justify-center p-6">
     <div class="bg-white rounded-3xl p-8 w-full max-w-xs text-center">
         <div class="text-3xl mb-3">🔒</div>
@@ -48,6 +50,7 @@
 </div>
 
 <!-- Header -->
+
 <div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
     <div>
         <h1 class="text-base font-bold text-[#8e9775]">📦 拾逅花事 | 盤點系統</h1>
@@ -59,11 +62,12 @@
             <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="tab-btn active" style="padding:6px 14px;font-size:12px;">高雄</button>
             <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="tab-btn"        style="padding:6px 14px;font-size:12px;">台南</button>
         </div>
-        <a href="pos.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">← POS</a>
+        <a href="/-pos/pos.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">← POS</a>
     </div>
 </div>
 
 <!-- 分頁切換 -->
+
 <div class="p-4 pb-0 flex gap-3 overflow-x-auto no-scrollbar">
     <button onclick="switchTab('stock')"   id="tab-stock"   class="tab-btn active flex-shrink-0">📋 庫存盤點</button>
     <button onclick="switchTab('receive')" id="tab-receive" class="tab-btn flex-shrink-0">📥 進貨入庫</button>
@@ -71,6 +75,7 @@
 </div>
 
 <!-- ══ Tab 1: 庫存盤點 ══ -->
+
 <div id="tab-stock-view" class="p-4">
     <div class="flex gap-2 mb-4">
         <input type="text" id="stockSearch" placeholder="搜尋品項..." oninput="renderStockList()"
@@ -83,6 +88,7 @@
 </div>
 
 <!-- ══ Tab 2: 進貨入庫 ══ -->
+
 <div id="tab-receive-view" class="p-4 hidden">
     <!-- 已選品項 -->
     <div id="selectedProductArea" class="hidden bg-[#f1f3eb] border border-[#8e9775] rounded-xl p-4 mb-4">
@@ -93,38 +99,42 @@
         <div class="text-xs text-gray-400">目前庫存：<span id="selectedProductStock" class="font-bold text-[#8e9775]">—</span>　進價：<span id="selectedProductCost" class="text-gray-500">—</span></div>
     </div>
 
-    <!-- 尚未選品項時顯示品項列表 -->
-    <div id="receiveProductPicker">
-        <div class="flex gap-2 mb-3">
-            <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
-                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
-        </div>
-        <div id="receiveProductList">
-            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
-        </div>
+```
+<!-- 尚未選品項時顯示品項列表 -->
+<div id="receiveProductPicker">
+    <div class="flex gap-2 mb-3">
+        <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
     </div>
-
-    <!-- 選了品項後顯示輸入欄 -->
-    <div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-        <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">進貨數量 *</label>
-                <input type="number" id="receiveQty" placeholder="枝數" min="1" class="s-input">
-            </div>
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價（選填）</label>
-                <input type="number" id="receiveUnitCost" placeholder="更新成本" min="0" step="0.01" class="s-input">
-            </div>
-        </div>
-        <div>
-            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
-            <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
-        </div>
-        <button onclick="submitReceive()" class="btn-primary">✅ 確認入庫</button>
+    <div id="receiveProductList">
+        <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
     </div>
 </div>
 
+<!-- 選了品項後顯示輸入欄 -->
+<div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+    <div class="grid grid-cols-2 gap-3">
+        <div>
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">進貨數量 *</label>
+            <input type="number" id="receiveQty" placeholder="枝數" min="1" class="s-input">
+        </div>
+        <div>
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價（選填）</label>
+            <input type="number" id="receiveUnitCost" placeholder="更新成本" min="0" step="0.01" class="s-input">
+        </div>
+    </div>
+    <div>
+        <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
+        <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
+    </div>
+    <button onclick="submitReceive()" class="btn-primary">✅ 確認入庫</button>
+</div>
+```
+
+</div>
+
 <!-- ══ Tab 3: 庫存狀況 ══ -->
+
 <div id="tab-status-view" class="p-4 hidden">
     <div id="statusList">
         <p class="text-center text-gray-300 text-xs py-12">載入中...</p>
@@ -132,6 +142,7 @@
 </div>
 
 <!-- 盤點調整 Modal -->
+
 <div id="adjustModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-6">
     <div class="bg-white rounded-2xl p-6 w-full max-w-xs">
         <div class="flex justify-between items-center mb-4">
@@ -437,5 +448,6 @@ function showToast(msg, duration = 2000) {
     _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 </script>
+
 </body>
 </html>
