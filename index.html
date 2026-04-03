@@ -1,5 +1,4 @@
 <!DOCTYPE html>
-
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
@@ -35,37 +34,32 @@
         .s-tag-btn.active { border-color: #c4a882; background: #fdf1e4; color: #8a5a2a; font-weight: bold; }
         .s-item-row { display: flex; align-items: center; justify-content: space-between; background: #fdf8f3; border: 1px solid #ede3d8; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
 
-```
-    /* ── Toast 提示 ── */
-    #toast {
-        position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
-        background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px;
-        font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease;
-        pointer-events: none; white-space: nowrap;
-    }
-    #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        /* ── Toast 提示 ── */
+        #toast {
+            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
+            background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px;
+            font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease;
+            pointer-events: none; white-space: nowrap;
+        }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* ── GAS 連線狀態指示器 ── */
-    .gas-dot {
-        width: 8px; height: 8px; border-radius: 50%; display: inline-block;
-        background: #9ca3af; transition: background 0.3s;
-    }
-    .gas-dot.ok      { background: #22c55e; }
-    .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
-    .gas-dot.error   { background: #ef4444; }
-    @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-</style>
-```
-
+        /* ── GAS 連線狀態指示器 ── */
+        .gas-dot {
+            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
+            background: #9ca3af; transition: background 0.3s;
+        }
+        .gas-dot.ok      { background: #22c55e; }
+        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
+        .gas-dot.error   { background: #ef4444; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    </style>
 </head>
 <body>
 
 <!-- Toast -->
-
 <div id="toast"></div>
 
 <!-- Header -->
-
 <div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
     <div id="adminTrigger" class="select-none">
         <h1 id="pageTitle" class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
@@ -86,7 +80,6 @@
 </div>
 
 <!-- POS VIEW -->
-
 <div id="posView">
 <div class="p-4 space-y-5">
     <section>
@@ -138,7 +131,6 @@
 </div>
 
 <!-- STUDIO VIEW -->
-
 <div id="studioView" style="display:none;">
 <div class="p-4 space-y-3">
     <button onclick="switchToPOS()" class="text-sm text-[#c4a882] flex items-center gap-1 mb-1">← 返回收銀</button>
@@ -178,51 +170,48 @@
         <textarea id="s-note" rows="3" placeholder="客人說的話、設計方向、包裝要求..." class="s-input" style="resize:none;"></textarea>
     </div>
 
-```
-<!-- 花材類型 獨立區塊 -->
-<div class="s-card">
-    <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">🌿 花材類型</div>
-    <div class="flex flex-wrap gap-2" id="s-material-group">
-        <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn active" data-val="鮮花">🌸 鮮花</button>
-        <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="乾燥花">🌾 乾燥花</button>
-        <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="永生花">💛 永生花</button>
-        <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="混合">✨ 混合</button>
-    </div>
-</div>
-<div class="s-card">
-    <div class="flex justify-between items-center mb-3">
-        <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase">🌹 花材清單</div>
-        <div class="flex gap-2">
-            <button onclick="openStudioProductModal()" class="text-[10px] bg-[#c4a882] text-white px-3 py-1 rounded-full">＋ 從選單選</button>
-            <button onclick="addManualItem()" class="text-[10px] text-[#c4a882] border border-[#c4a882] px-3 py-1 rounded-full">手動輸入</button>
+    <!-- 花材類型 獨立區塊 -->
+    <div class="s-card">
+        <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">🌿 花材類型</div>
+        <div class="flex flex-wrap gap-2" id="s-material-group">
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn active" data-val="鮮花">🌸 鮮花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="乾燥花">🌾 乾燥花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="永生花">💛 永生花</button>
+            <button onclick="toggleStudioTag(this,'material')" class="s-tag-btn" data-val="混合">✨ 混合</button>
         </div>
     </div>
-    <div id="s-itemList"><p class="text-center text-[#d4c4b0] text-xs py-4">尚未加入花材</p></div>
-</div>
-<div class="s-card">
-    <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">💰 金額</div>
-    <div class="grid grid-cols-2 gap-3 mb-3">
-        <div><label class="s-label">花材成本（自動計算）</label><div class="s-input bg-gray-50 text-gray-400" id="s-cost-display" style="border-style:dashed;">NT$ 0</div></div>
-        <div><label class="s-label">預算</label><input type="number" id="s-budget" placeholder="客人預算" class="s-input"></div>
+    <div class="s-card">
+        <div class="flex justify-between items-center mb-3">
+            <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase">🌹 花材清單</div>
+            <div class="flex gap-2">
+                <button onclick="openStudioProductModal()" class="text-[10px] bg-[#c4a882] text-white px-3 py-1 rounded-full">＋ 從選單選</button>
+                <button onclick="addManualItem()" class="text-[10px] text-[#c4a882] border border-[#c4a882] px-3 py-1 rounded-full">手動輸入</button>
+            </div>
+        </div>
+        <div id="s-itemList"><p class="text-center text-[#d4c4b0] text-xs py-4">尚未加入花材</p></div>
     </div>
-    <div><label class="s-label">實際售價 *（直接輸入總價）</label><input type="number" id="s-total" placeholder="實際收款金額" class="s-input" style="font-size:20px;font-weight:bold;text-align:center;" oninput="updateStudioTotal()"></div>
-</div>
-<div class="s-card">
-    <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">💳 付款</div>
-    <div class="flex flex-wrap gap-2 mb-3" id="s-pay-group">
-        <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn active" data-val="現金">現金</button>
-        <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="LINEPAY">LINE Pay</button>
-        <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="匯款">匯款</button>
-        <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="刷卡">刷卡</button>
+    <div class="s-card">
+        <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">💰 金額</div>
+        <div class="grid grid-cols-2 gap-3 mb-3">
+            <div><label class="s-label">花材成本（自動計算）</label><div class="s-input bg-gray-50 text-gray-400" id="s-cost-display" style="border-style:dashed;">NT$ 0</div></div>
+            <div><label class="s-label">預算</label><input type="number" id="s-budget" placeholder="客人預算" class="s-input"></div>
+        </div>
+        <div><label class="s-label">實際售價 *（直接輸入總價）</label><input type="number" id="s-total" placeholder="實際收款金額" class="s-input" style="font-size:20px;font-weight:bold;text-align:center;" oninput="updateStudioTotal()"></div>
     </div>
-    <div class="flex flex-wrap gap-2" id="s-status-group">
-        <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn active" data-val="已付">✅ 已付清</button>
-        <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn" data-val="訂金">💰 已付訂金</button>
-        <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn" data-val="未付">⏳ 尚未付款</button>
+    <div class="s-card">
+        <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">💳 付款</div>
+        <div class="flex flex-wrap gap-2 mb-3" id="s-pay-group">
+            <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn active" data-val="現金">現金</button>
+            <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="LINEPAY">LINE Pay</button>
+            <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="匯款">匯款</button>
+            <button onclick="toggleStudioTag(this,'pay')" class="s-tag-btn" data-val="刷卡">刷卡</button>
+        </div>
+        <div class="flex flex-wrap gap-2" id="s-status-group">
+            <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn active" data-val="已付">✅ 已付清</button>
+            <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn" data-val="訂金">💰 已付訂金</button>
+            <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn" data-val="未付">⏳ 尚未付款</button>
+        </div>
     </div>
-</div>
-```
-
 </div>
 <div class="studio-bar">
     <div class="flex flex-col">
@@ -234,7 +223,6 @@
 </div>
 
 <!-- 確認結帳 Modal -->
-
 <div class="modal-overlay" id="checkoutModal">
     <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
         <div class="p-5 border-b border-gray-100">
@@ -280,7 +268,6 @@
 </div>
 
 <!-- 商品選單 Modal -->
-
 <div class="modal-overlay" id="productModal">
     <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:88vh;display:flex;flex-direction:column;">
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -301,7 +288,6 @@
 </div>
 
 <!-- 折扣 Modal -->
-
 <div class="modal-overlay" id="discountModal">
     <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
         <h3 class="font-bold text-base mb-4">折扣設定</h3>
@@ -331,7 +317,6 @@
 </div>
 
 <!-- 新增會員 Modal -->
-
 <div class="modal-overlay" id="newMemberModal">
     <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
         <div class="flex justify-between items-center mb-2"><h3 class="font-bold text-base">✦ 新增會員</h3><button onclick="closeNewMemberModal()" class="text-gray-300 text-xl">✕</button></div>
@@ -367,7 +352,6 @@
 </div>
 
 <!-- 日結對帳 Modal -->
-
 <div class="modal-overlay" id="dailyModal">
     <div class="bg-white p-6 rounded-3xl w-full max-w-sm mx-4" style="max-height:85vh;overflow-y:auto;">
         <div class="flex justify-between items-center mb-4">
@@ -384,7 +368,6 @@
 </div>
 
 <!-- 掛單列表 Modal -->
-
 <div class="modal-overlay" id="hangListModal">
     <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -401,7 +384,6 @@
 </div>
 
 <!-- 掛單命名 Modal -->
-
 <div class="modal-overlay" id="hangNameModal">
     <div class="bg-white p-6 rounded-3xl w-full max-w-xs mx-4">
         <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-base">掛單</h3><button onclick="closeHangNameModal()" class="text-gray-300 text-xl">✕</button></div>
@@ -412,7 +394,6 @@
 </div>
 
 <!-- 查詢記錄 Modal -->
-
 <div class="modal-overlay" id="historyModal">
     <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:88vh;display:flex;flex-direction:column;">
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -438,7 +419,6 @@
 </div>
 
 <!-- 交易明細 Modal -->
-
 <div class="modal-overlay" id="txDetailModal">
     <div class="bg-white rounded-3xl w-full max-w-sm mx-4 overflow-hidden" style="max-height:85vh;display:flex;flex-direction:column;">
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
@@ -455,7 +435,6 @@
 </div>
 
 <!-- API 設定 Modal -->
-
 <div class="modal-overlay" id="apiModal">
     <div class="bg-white p-6 rounded-3xl w-full max-w-sm mx-4">
         <div class="flex justify-between items-center mb-4"><h3 class="font-bold text-base text-[#8e9775]">⚙ 連線設定</h3><button onclick="closeApiSettings()" class="text-gray-300 text-xl">✕</button></div>
@@ -466,7 +445,6 @@
 </div>
 
 <!-- 後台 Modal -->
-
 <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-6">
     <div class="bg-white p-6 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6"><h3 class="font-bold text-lg text-[#8e9775]">老闆專屬後台</h3><button onclick="closeSettings()" class="text-gray-300 text-xl">✕</button></div>
@@ -1537,6 +1515,5 @@ async function getDailyReportAdmin() {
     } catch (e) { setGasStatus('error'); el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">無法讀取報表</p>'; }
 }
 </script>
-
 </body>
 </html>
