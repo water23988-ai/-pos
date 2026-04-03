@@ -40,7 +40,7 @@
     #toast {
         position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
         background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px;
-        font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease;
+        font-size: 13px; z-index: 9999; opacity: 0; transition: all 0.25s ease;
         pointer-events: none; white-space: nowrap;
     }
     #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -504,6 +504,7 @@ let discountFixed   = 0;
 let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
 let productModalMode = 'pos';
+let _recalledHangGasId = null; // 記錄叫回的掛單 gasId，結帳成功後刪除
 let studioItems     = [];
 let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
 let _pendingTx      = null;
@@ -905,6 +906,11 @@ async function confirmCheckout() {
         if (result.success) {
             setGasStatus('ok');
             fetchProducts(); // 背景更新庫存
+            // 結帳成功後刪除叫回的掛單
+            if (_recalledHangGasId && API_URL) {
+                try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: _recalledHangGasId } }) }); } catch(e) {}
+                _recalledHangGasId = null;
+            }
         } else {
             // 失敗：還原購物車
             setGasStatus('error');
@@ -985,21 +991,20 @@ async function refreshHangList() {
 }
 
 async function loadHangOrders() {
-    // 先讀本機
     loadHangFromLocal();
+    // 過濾只顯示當前門市的掛單
+    hangOrders = hangOrders.filter(h => !h.store || h.store === storeForGAS());
     renderHangList();
-    // 背景嘗試從 GAS 同步（如果有部署新版）
     if (!API_URL) return;
     try {
         const res  = await fetch(`${API_URL}?action=getHangOrders&store=${enc(storeForGAS())}`);
         const data = await res.json();
-        if (data && data.error) return; // GAS 未部署新版，靜默略過
+        if (data && data.error) return;
         if (Array.isArray(data) && data.length > 0) {
-            // 合併 GAS 資料（以 gasId 去重）
             const localGasIds = new Set(hangOrders.map(h => h.gasId).filter(Boolean));
             data.forEach(h => {
                 if (!localGasIds.has(h.id)) {
-                    hangOrders.push({ gasId: h.id, name: h.name, cart: h.cart||[], member: h.member||null });
+                    hangOrders.push({ gasId: h.id, name: h.name, store: h.store || storeForGAS(), cart: h.cart||[], member: h.member||null });
                 }
             });
             saveHangToLocal();
@@ -1017,7 +1022,7 @@ function closeHangNameModal() { document.getElementById('hangNameModal').classLi
 
 async function confirmHang() {
     const name = document.getElementById('hangNameInput').value.trim() || `掛單 ${hangOrders.length + 1}`;
-    const localHang = { gasId: null, name, cart: cart.map(i=>({...i})), member: currentMember };
+    const localHang = { gasId: null, name, store: storeForGAS(), cart: cart.map(i=>({...i})), member: currentMember };
 
     // 立即存本機
     hangOrders.push(localHang);
@@ -1074,20 +1079,17 @@ async function recallOrder(idx) {
     const order = hangOrders[idx];
     if (cart.length && !confirm('目前清單有商品，叫回掛單會清空現有清單，確定嗎？')) return;
     cart = order.cart.map(i => ({...i})); currentMember = order.member;
+    _recalledHangGasId = order.gasId || null; // 記住，結帳成功後刪除
     if (currentMember) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    const gasId   = order.gasId;
     const orderName = order.name;
     hangOrders.splice(idx, 1);
     saveHangToLocal();
     renderCart(); updateSummary(); renderHangList();
     closeHangListModal();
     showToast(`📌 已叫回：${orderName}`);
-    if (API_URL && gasId) {
-        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
-    }
 }
 
 async function deleteHang(idx) {
