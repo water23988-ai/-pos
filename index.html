@@ -520,6 +520,12 @@ function storeForGAS() { return currentStore === 'Studio' ? '高雄FOCUS 13' : c
 
 // ── 工具 ──
 function enc(s) { return encodeURIComponent(s); }
+function taipeiNow() {
+    return new Intl.DateTimeFormat('zh-TW', {
+        timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+    }).format(new Date()).replace(/\//g, '-');
+}
 
 // ── Toast ──
 let _toastTimer;
@@ -872,7 +878,7 @@ async function confirmCheckout() {
         action: 'addTransaction',
         data: {
             id: 'T' + Date.now().toString().slice(-8),
-            date: new Date().toLocaleString(),
+            date: taipeiNow(),
             store: storeForGAS(),
             memberId: currentMember ? currentMember.id : '',
             memberName: currentMember ? currentMember.name : '散客',
@@ -1040,7 +1046,7 @@ async function confirmHang() {
         try {
             const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
                 action: 'saveHangOrder',
-                data:   { name, store: storeForGAS(), createdAt: new Date().toLocaleString(), cart: localHang.cart, member: localHang.member }
+                data:   { name, store: storeForGAS(), createdAt: taipeiNow(), cart: localHang.cart, member: localHang.member }
             })});
             const result = await res.json();
             if (result.success) { localHang.gasId = result.id; saveHangToLocal(); }
@@ -1426,7 +1432,7 @@ async function submitStudioOrder() {
         studioTags.status   ? `付款：${studioTags.status}`       : '',
         note                ? `備註：${note}`                     : '',
     ].filter(Boolean).join('｜');
-    const payload = { action: 'addTransaction', data: { id: 'S' + Date.now().toString().slice(-8), date: new Date().toLocaleString(), store: '高雄FOCUS 13', memberId: '', memberName: name, subtotal: total, discount: 0, total, cost: Math.round(cost), pay: studioTags.pay||'現金', earnedPoints: 0, note: noteStr, customerType: '新客', source: 'friend', items: studioItems.map(i => ({ id: i.productId||0, name: i.name, qty: i.qty||1, unitPrice: i.price||0, unitCost: i.cost||0 })) } };
+    const payload = { action: 'addTransaction', data: { id: 'S' + Date.now().toString().slice(-8), date: taipeiNow(), store: '高雄FOCUS 13', memberId: '', memberName: name, subtotal: total, discount: 0, total, cost: Math.round(cost), pay: studioTags.pay||'現金', earnedPoints: 0, note: noteStr, customerType: '新客', source: 'friend', items: studioItems.map(i => ({ id: i.productId||0, name: i.name, qty: i.qty||1, unitPrice: i.price||0, unitCost: i.cost||0 })) } };
     const btn = document.getElementById('s-submitBtn');
     btn.disabled = true; btn.innerText = '送出中...';
     setGasStatus('loading');
@@ -1505,7 +1511,7 @@ async function confirmDailyClose() {
     const store = currentView === 'studio' ? '高雄FOCUS 13' : storeForGAS();
     setGasStatus('loading');
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'dailyClose', data: { date, store, closedAt: new Date().toLocaleString() } }) });
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'dailyClose', data: { date, store, closedAt: taipeiNow() } }) });
         const result = await res.json();
         setGasStatus('ok');
         document.getElementById('dailyCloseStatus').innerText = `✅ 已關帳 ${new Date().toLocaleTimeString('zh-TW')}`;
