@@ -36,19 +36,6 @@
 
 <div id="toast"></div>
 
-<!-- 密碼遮罩 -->
-
-<div id="lockScreen" class="fixed inset-0 bg-[#2e2926] z-50 flex items-center justify-center p-6">
-    <div class="bg-white rounded-3xl p-8 w-full max-w-xs text-center">
-        <div class="text-3xl mb-3">🔒</div>
-        <h2 class="font-bold text-lg text-[#8e9775] mb-2">盤點系統</h2>
-        <p class="text-xs text-gray-400 mb-5">請輸入管理密碼</p>
-        <input type="password" id="lockInput" placeholder="密碼"
-            class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 text-center text-xl outline-none focus:border-[#8e9775] mb-4">
-        <button onclick="unlockScreen()" class="btn-primary">確認</button>
-    </div>
-</div>
-
 <!-- Header -->
 
 <div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
@@ -62,7 +49,7 @@
             <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="tab-btn active" style="padding:6px 14px;font-size:12px;">高雄</button>
             <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="tab-btn"        style="padding:6px 14px;font-size:12px;">台南</button>
         </div>
-        <a href="/-pos/pos.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">← POS</a>
+        <a id="posLink" href="#" onclick="goToPOS()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">← POS</a>
     </div>
 </div>
 
@@ -71,7 +58,7 @@
 <div class="p-4 pb-0 flex gap-3 overflow-x-auto no-scrollbar">
     <button onclick="switchTab('stock')"   id="tab-stock"   class="tab-btn active flex-shrink-0">📋 庫存盤點</button>
     <button onclick="switchTab('receive')" id="tab-receive" class="tab-btn flex-shrink-0">📥 進貨入庫</button>
-    <button onclick="switchTab('status')"  id="tab-status"  class="tab-btn flex-shrink-0">📊 庫存狀況</button>
+    <button onclick="switchTab('status')"  id="tab-status"  class="tab-btn flex-shrink-0">📜 盤點記錄</button>
 </div>
 
 <!-- ══ Tab 1: 庫存盤點 ══ -->
@@ -169,23 +156,14 @@ let _adjustProduct   = null;
 let _selectedProduct = null;
 let _toastTimer;
 
-// ── 密碼解鎖 ──
-function unlockScreen() {
-    const val = document.getElementById('lockInput').value;
-    if (val === ADMIN_PASSWORD) {
-        document.getElementById('lockScreen').style.display = 'none';
-        if (!API_URL) {
-            API_URL = prompt('請輸入 API URL：') || '';
-            if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
-        }
-        init();
-    } else {
-        document.getElementById('lockInput').value = '';
-        document.getElementById('lockInput').style.borderColor = '#ef4444';
-        setTimeout(() => document.getElementById('lockInput').style.borderColor = '', 1000);
+// ── 直接初始化（不需要密碼）──
+window.onload = () => {
+    if (!API_URL) {
+        API_URL = prompt('請輸入 API URL：') || '';
+        if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
     }
-}
-document.getElementById('lockInput').addEventListener('keydown', e => { if (e.key === 'Enter') unlockScreen(); });
+    init();
+};
 
 // ── 初始化 ──
 async function init() {
@@ -231,7 +209,7 @@ function switchTab(tab) {
         document.getElementById(`tab-${t}-view`).classList.toggle('hidden', t !== tab);
         document.getElementById(`tab-${t}`).classList.toggle('active', t === tab);
     });
-    if (tab === 'status') renderStatusList();
+    if (tab === 'status') loadHistoryLog();
 }
 
 // ══ Tab 1: 庫存盤點 ══
@@ -408,37 +386,47 @@ async function submitReceive() {
     } catch(e) { setGas('error'); alert('連線失敗'); }
 }
 
-// ══ Tab 3: 庫存狀況 ══
-function renderStatusList() {
-    const isKH = currentStore !== '台南FOCUS';
-    const sorted = [...rawProducts].sort((a,b) => {
-        const sa = isKH ? a.stockKH : a.stockTN;
-        const sb = isKH ? b.stockKH : b.stockTN;
-        return sa - sb;
-    });
+// ══ Tab 3: 盤點記錄 ══
+async function loadHistoryLog() {
+    const el = document.getElementById('statusList');
+    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">載入中...</p>';
+    setGas('loading');
+    try {
+        const res  = await fetch(`${API_URL}?action=getInventoryLog&store=${encodeURIComponent(currentStore)}`);
+        const data = await res.json();
+        setGas('ok');
 
-    const zero = sorted.filter(p => (isKH ? p.stockKH : p.stockTN) <= 0);
-    const low  = sorted.filter(p => { const s = isKH ? p.stockKH : p.stockTN; return s > 0 && s <= 3; });
-    const ok   = sorted.filter(p => (isKH ? p.stockKH : p.stockTN) > 3);
+        if (!Array.isArray(data) || data.length === 0) {
+            el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">尚無盤點記錄</p>';
+            return;
+        }
 
-    const rowHtml = (p) => {
-        const stock = isKH ? p.stockKH : p.stockTN;
-        const badge = stock > 3 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
-        return `<div class="inv-row">
-            <span style="font-size:13px;flex:1;">${p.name}</span>
-            <span class="stock-badge ${badge}">${stock} 枝</span>
-        </div>`;
-    };
-
-    document.getElementById('statusList').innerHTML = `
-        ${zero.length ? `<div class="cat-header" style="color:#dc2626;">⚠️ 已售罄（${zero.length} 項）</div>${zero.map(rowHtml).join('')}` : ''}
-        ${low.length  ? `<div class="cat-header" style="color:#ca8a04;">⚡ 低庫存 ≤3（${low.length} 項）</div>${low.map(rowHtml).join('')}`  : ''}
-        ${ok.length   ? `<div class="cat-header">✅ 正常（${ok.length} 項）</div>${ok.map(rowHtml).join('')}` : ''}
-        ${!sorted.length ? '<p class="text-center text-gray-300 text-xs py-12">無資料</p>' : ''}
-    `;
+        el.innerHTML = data.map(row => {
+            const diffColor = row.diff > 0 ? '#16a34a' : row.diff < 0 ? '#dc2626' : '#9ca3af';
+            const diffStr   = row.diff > 0 ? `+${row.diff}` : String(row.diff);
+            return `<div class="inv-row">
+                <div style="flex:1;">
+                    <div style="font-size:13px;font-weight:bold;">${row.name}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:2px;">${row.time} · ${row.note || '盤點調整'}</div>
+                </div>
+                <div style="text-align:right;">
+                    <div style="font-size:12px;color:#9ca3af;">${row.oldQty} → ${row.newQty}</div>
+                    <div style="font-size:13px;font-weight:bold;color:${diffColor};">${diffStr} 枝</div>
+                </div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        setGas('error');
+        el.innerHTML = '<p class="text-center text-red-300 text-xs py-12">載入失敗，請確認 GAS 已更新</p>';
+    }
 }
 
 // ── 工具 ──
+function goToPOS() {
+    // 取當前路徑的目錄，換成 pos.html
+    const base = window.location.href.replace(/\/[^\/]*$/, '');
+    window.location.href = base + '/pos.html';
+}
 function setGas(state) { document.getElementById('gasDot').className = 'gas-dot ' + state; }
 function showToast(msg, duration = 2000) {
     const el = document.getElementById('toast');
