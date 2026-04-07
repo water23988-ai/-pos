@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾逅花事 | 商品管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        * { font-family: 'Noto Serif TC', serif; }
+        body { background: #fcfbf9; color: #4a4a4a; }
+        input, button, select, textarea { font-family: 'Noto Serif TC', serif; }
+
+        .tab-btn { padding: 8px 20px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; font-size: 13px; cursor: pointer; transition: all 0.2s; }
+        .tab-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
+
+        .s-input { width: 100%; border: 2px solid #e8ddd0; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; background: white; transition: border-color 0.2s; }
+        .s-input:focus { border-color: #8e9775; }
+        .s-label { font-size: 10px; color: #9ca3af; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+
+        .btn-primary   { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; font-family: 'Noto Serif TC', serif; }
+        .btn-primary:active { opacity: 0.8; }
+        .btn-danger    { background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: 'Noto Serif TC', serif; }
+        .btn-edit      { background: #f1f3eb; color: #6d7756; border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: 'Noto Serif TC', serif; }
+
+        .prod-row { display: flex; align-items: center; background: #fafaf9; border: 1px solid #f3f4f6; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; gap: 8px; }
+        .cat-badge { font-size: 10px; background: #f1f3eb; color: #6d7756; border-radius: 20px; padding: 2px 8px; white-space: nowrap; }
+        .price-tag { font-size: 12px; color: #9ca3af; }
+        .stock-ok   { background: #dcfce7; color: #16a34a; }
+        .stock-low  { background: #fef9c3; color: #ca8a04; }
+        .stock-zero { background: #fee2e2; color: #dc2626; }
+        .stock-badge { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+
+        .cat-header { font-size: 10px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 4px 4px; }
+
+        .gas-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #9ca3af; }
+        .gas-dot.ok      { background: #22c55e; }
+        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
+        .gas-dot.error   { background: #ef4444; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease; pointer-events: none; white-space: nowrap; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 300; align-items: center; justify-content: center; padding: 20px; }
+        .modal-overlay.show { display: flex; }
+        .modal-box { background: white; border-radius: 24px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+<div id="toast"></div>
+
+<!-- Header -->
+<div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <div>
+        <h1 class="text-base font-bold text-[#8e9775]">🌸 拾逅花事 | 商品管理</h1>
+        <p id="statusInfo" class="text-[10px] text-gray-400 italic">連接中...</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <span class="gas-dot" id="gasDot"></span>
+        <nav class="flex gap-1 text-[11px]">
+            <a href="index.html"     class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">POS</a>
+            <a href="inventory.html" class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">庫存</a>
+            <a href="dashboard.html" class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">後台</a>
+        </nav>
+    </div>
+</div>
+
+<!-- 工具列 -->
+<div class="p-4 flex gap-3 items-center">
+    <input type="text" id="searchInput" placeholder="搜尋商品名稱..." oninput="renderList()"
+        class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+    <select id="catFilter" onchange="renderList()"
+        class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775] bg-white">
+        <option value="">全部類別</option>
+        <option>主花</option>
+        <option>配花</option>
+        <option>葉材</option>
+        <option>花束</option>
+        <option>花瓶</option>
+        <option>其他加購</option>
+    </select>
+    <button onclick="openAddModal()"
+        class="flex-shrink-0 bg-[#8e9775] text-white border-none rounded-xl px-4 py-2 text-sm font-bold cursor-pointer">
+        ＋ 新增
+    </button>
+</div>
+
+<!-- 商品列表 -->
+<div class="px-4 pb-24" id="productList">
+    <p class="text-center text-gray-300 text-xs py-16">載入中...</p>
+</div>
+
+<!-- ══ 新增 / 編輯 Modal ══ -->
+<div class="modal-overlay" id="editModal">
+    <div class="modal-box">
+        <div class="flex justify-between items-center mb-5">
+            <h3 class="font-bold text-base" id="modalTitle">新增商品</h3>
+            <button onclick="closeModal()" class="text-gray-300 text-xl leading-none">✕</button>
+        </div>
+
+        <input type="hidden" id="editId">
+
+        <div class="space-y-4">
+            <div>
+                <label class="s-label">商品名稱 *</label>
+                <input type="text" id="editName" placeholder="例：玫瑰（紅）" class="s-input">
+            </div>
+            <div>
+                <label class="s-label">類別</label>
+                <select id="editCategory" class="s-input">
+                    <option>主花</option>
+                    <option>配花</option>
+                    <option>葉材</option>
+                    <option>花束</option>
+                    <option>花瓶</option>
+                    <option>其他加購</option>
+                </select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="s-label">售價（NT$）</label>
+                    <input type="number" id="editPrice" placeholder="0" min="0" class="s-input">
+                </div>
+                <div>
+                    <label class="s-label">進價成本（NT$）</label>
+                    <input type="number" id="editCost" placeholder="0" min="0" class="s-input">
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="s-label">高雄庫存（枝）</label>
+                    <input type="number" id="editStockKH" placeholder="0" min="0" class="s-input">
+                </div>
+                <div>
+                    <label class="s-label">台南庫存（枝）</label>
+                    <input type="number" id="editStockTN" placeholder="0" min="0" class="s-input">
+                </div>
+            </div>
+        </div>
+
+        <div class="mt-5 space-y-2">
+            <button onclick="submitProduct()" class="btn-primary" id="saveBtn">儲存商品</button>
+            <button onclick="closeModal()" style="background:none;border:none;width:100%;padding:10px;font-size:13px;color:#9ca3af;cursor:pointer;font-family:'Noto Serif TC',serif;">取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- ══ 刪除確認 Modal ══ -->
+<div class="modal-overlay" id="deleteModal">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-xs">
+        <h3 class="font-bold text-base mb-2">刪除商品</h3>
+        <p class="text-sm text-gray-500 mb-5">確定要刪除「<span id="deleteProductName" class="font-bold text-[#4a4a4a]"></span>」嗎？此操作無法復原。</p>
+        <div class="flex gap-3">
+            <button onclick="closeDeleteModal()" class="flex-1 border border-gray-200 rounded-xl py-3 text-sm cursor-pointer bg-white">取消</button>
+            <button onclick="confirmDelete()" class="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-bold cursor-pointer border-none">確認刪除</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let API_URL     = localStorage.getItem('moment_flor_api') || '';
+let rawProducts = [];
+let _deleteId   = null;
+let _toastTimer;
+
+const CAT_ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
+
+// ── 初始化 ──
+window.onload = () => {
+    if (!API_URL) {
+        API_URL = prompt('請輸入 API URL（GAS 部署網址）：') || '';
+        if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
+    }
+    loadProducts();
+};
+
+async function loadProducts() {
+    setGas('loading');
+    try {
+        const res = await fetch(`${API_URL}?action=getProducts`);
+        rawProducts = await res.json();
+        setGas('ok');
+        document.getElementById('statusInfo').innerText = `✅ 共 ${rawProducts.length} 項商品`;
+        renderList();
+    } catch(e) {
+        setGas('error');
+        document.getElementById('statusInfo').innerText = '❌ 連線失敗';
+        document.getElementById('productList').innerHTML = '<p class="text-center text-red-300 text-xs py-16">無法連線，請確認 API URL</p>';
+    }
+}
+
+// ── 渲染列表 ──
+function renderList() {
+    const keyword = (document.getElementById('searchInput').value || '').trim().toLowerCase();
+    const catF    = document.getElementById('catFilter').value;
+
+    const catMap = {};
+    rawProducts.forEach(p => {
+        if (keyword && !p.name.toLowerCase().includes(keyword)) return;
+        const cat = p.category || '其他加購';
+        if (catF && cat !== catF) return;
+        if (!catMap[cat]) catMap[cat] = [];
+        catMap[cat].push(p);
+    });
+
+    const cats = Object.keys(catMap).sort((a,b) => {
+        const ai = CAT_ORDER.indexOf(a), bi = CAT_ORDER.indexOf(b);
+        return (ai===-1?99:ai) - (bi===-1?99:bi);
+    });
+
+    if (!cats.length) {
+        document.getElementById('productList').innerHTML = '<p class="text-center text-gray-300 text-xs py-16">查無商品</p>';
+        return;
+    }
+
+    document.getElementById('productList').innerHTML = cats.map(cat => `
+        <div class="cat-header">${cat}</div>
+        ${catMap[cat].map(p => {
+            const khClass = p.stockKH > 5 ? 'stock-ok' : p.stockKH > 0 ? 'stock-low' : 'stock-zero';
+            const tnClass = p.stockTN > 5 ? 'stock-ok' : p.stockTN > 0 ? 'stock-low' : 'stock-zero';
+            return `
+            <div class="prod-row">
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:14px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
+                    <div class="flex items-center gap-2 mt-1 flex-wrap">
+                        <span class="price-tag">售 NT$${p.price || 0} ／ 進 NT$${p.cost || 0}</span>
+                    </div>
+                    <div class="flex items-center gap-2 mt-1">
+                        <span class="stock-badge ${khClass}">高雄 ${p.stockKH}</span>
+                        <span class="stock-badge ${tnClass}">台南 ${p.stockTN}</span>
+                    </div>
+                </div>
+                <div class="flex flex-col gap-1 flex-shrink-0">
+                    <button class="btn-edit" onclick="openEditModal(${p.id})">編輯</button>
+                    <button class="btn-danger" onclick="openDeleteModal(${p.id})">刪除</button>
+                </div>
+            </div>`;
+        }).join('')}
+    `).join('');
+}
+
+// ── 新增 Modal ──
+function openAddModal() {
+    document.getElementById('modalTitle').innerText = '新增商品';
+    document.getElementById('saveBtn').innerText    = '新增商品';
+    document.getElementById('editId').value       = '';
+    document.getElementById('editName').value     = '';
+    document.getElementById('editCategory').value = '主花';
+    document.getElementById('editPrice').value    = '';
+    document.getElementById('editCost').value     = '';
+    document.getElementById('editStockKH').value  = '0';
+    document.getElementById('editStockTN').value  = '0';
+    document.getElementById('editModal').classList.add('show');
+    setTimeout(() => document.getElementById('editName').focus(), 100);
+}
+
+// ── 編輯 Modal ──
+function openEditModal(id) {
+    const p = rawProducts.find(x => Number(x.id) === Number(id));
+    if (!p) return;
+    document.getElementById('modalTitle').innerText = '編輯商品';
+    document.getElementById('saveBtn').innerText    = '儲存修改';
+    document.getElementById('editId').value       = p.id;
+    document.getElementById('editName').value     = p.name;
+    document.getElementById('editCategory').value = p.category || '主花';
+    document.getElementById('editPrice').value    = p.price  || 0;
+    document.getElementById('editCost').value     = p.cost   || 0;
+    document.getElementById('editStockKH').value  = p.stockKH || 0;
+    document.getElementById('editStockTN').value  = p.stockTN || 0;
+    document.getElementById('editModal').classList.add('show');
+}
+
+function closeModal() {
+    document.getElementById('editModal').classList.remove('show');
+}
+
+// ── 儲存（新增 or 編輯）──
+async function submitProduct() {
+    const id       = document.getElementById('editId').value;
+    const name     = document.getElementById('editName').value.trim();
+    const category = document.getElementById('editCategory').value;
+    const price    = parseFloat(document.getElementById('editPrice').value)   || 0;
+    const cost     = parseFloat(document.getElementById('editCost').value)    || 0;
+    const stockKH  = parseInt(document.getElementById('editStockKH').value)   || 0;
+    const stockTN  = parseInt(document.getElementById('editStockTN').value)   || 0;
+
+    if (!name) { alert('請輸入商品名稱'); return; }
+
+    const isEdit = !!id;
+    const action = isEdit ? 'updateProduct' : 'addProduct';
+    const data   = isEdit
+        ? { id: Number(id), name, category, price, cost, stockKH, stockTN }
+        : { name, category, price, cost, stockKH, stockTN };
+
+    const btn = document.getElementById('saveBtn');
+    btn.disabled = true;
+    btn.innerText = '儲存中...';
+    setGas('loading');
+
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, data }) });
+        const result = await res.json();
+        if (result.success) {
+            if (isEdit) {
+                const p = rawProducts.find(x => Number(x.id) === Number(id));
+                if (p) Object.assign(p, { name, category, price, cost, stockKH, stockTN });
+            } else {
+                rawProducts.push({ id: result.id, name, category, price, cost, stockKH, stockTN });
+            }
+            setGas('ok');
+            closeModal();
+            renderList();
+            showToast(isEdit ? `✅ 已更新：${name}` : `✅ 已新增：${name}`);
+        } else {
+            setGas('error');
+            alert('儲存失敗：' + (result.error || ''));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗');
+    } finally {
+        btn.disabled = false;
+        btn.innerText = isEdit ? '儲存修改' : '新增商品';
+    }
+}
+
+// ── 刪除 Modal ──
+function openDeleteModal(id) {
+    const p = rawProducts.find(x => Number(x.id) === Number(id));
+    if (!p) return;
+    _deleteId = id;
+    document.getElementById('deleteProductName').innerText = p.name;
+    document.getElementById('deleteModal').classList.add('show');
+}
+function closeDeleteModal() {
+    document.getElementById('deleteModal').classList.remove('show');
+    _deleteId = null;
+}
+async function confirmDelete() {
+    if (!_deleteId) return;
+    const p = rawProducts.find(x => Number(x.id) === Number(_deleteId));
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id: _deleteId } }) });
+        const result = await res.json();
+        if (result.success) {
+            rawProducts = rawProducts.filter(x => Number(x.id) !== Number(_deleteId));
+            setGas('ok');
+            closeDeleteModal();
+            renderList();
+            document.getElementById('statusInfo').innerText = `✅ 共 ${rawProducts.length} 項商品`;
+            showToast(`🗑 已刪除：${p ? p.name : ''}`);
+        } else {
+            setGas('error');
+            alert('刪除失敗：' + (result.error || ''));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗');
+    }
+}
+
+// ── 工具 ──
+function setGas(state) { document.getElementById('gasDot').className = 'gas-dot ' + state; }
+function showToast(msg, duration = 2500) {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+}
+
+// 點擊 Modal 背景關閉
+document.getElementById('editModal').addEventListener('click', function(e) {
+    if (e.target === this) closeModal();
+});
+document.getElementById('deleteModal').addEventListener('click', function(e) {
+    if (e.target === this) closeDeleteModal();
+});
+</script>
+
+</body>
+</html>
