@@ -171,6 +171,8 @@ const CAT_ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
 
 // ── 初始化 ──
 window.onload = () => {
+    const pw = prompt('請輸入管理密碼：');
+    if (pw !== '8282') { document.body.innerHTML = '<p style="text-align:center;padding:60px;color:#9ca3af;">🔒 權限不足</p>'; return; }
     if (!API_URL) {
         API_URL = prompt('請輸入 API URL（GAS 部署網址）：') || '';
         if (API_URL) localStorage.setItem('moment_flor_api', API_URL);

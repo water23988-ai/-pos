@@ -86,9 +86,10 @@
 <div class="p-4 space-y-5">
     <section>
         <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📍 營運據點</h2>
-        <div class="grid grid-cols-3 gap-3">
+        <div class="grid grid-cols-2 gap-3">
             <button onclick="setStore('台南FOCUS')"    class="btn-action store-btn">台南FOCUS</button>
             <button onclick="setStore('高雄FOCUS 13')" class="btn-action store-btn">高雄FOCUS 13</button>
+            <button onclick="setStore('誠品生活台南')" class="btn-action store-btn">誠品台南</button>
             <button onclick="switchToStudio()" class="btn-action" style="border-color:#c4a882;color:#8a6a42;background:#fdf8f3;">✦ Studio</button>
         </div>
     </section>
@@ -495,16 +496,23 @@ const ADMIN_PASSWORD = '1234';
 const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
 const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加購'];
 
-function isKH()        { return currentStore !== '台南FOCUS'; }
-function storeForGAS() { return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
+function isKH()           { return currentStore === '高雄FOCUS 13' || currentStore === 'Studio'; }
+function getStoreStock(p) {
+    if (currentStore === '台南FOCUS')   return Number(p.stockTN)  || 0;
+    if (currentStore === '誠品生活台南') return Number(p.stockES) || 0;
+    return Number(p.stockKH) || 0;
+}
+function storeForGAS()    { return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
 
 // ── 工具 ──
 function enc(s) { return encodeURIComponent(s); }
 function taipeiNow() {
-    return new Intl.DateTimeFormat('zh-TW', {
+    const parts = new Intl.DateTimeFormat('en-CA', {
         timeZone: 'Asia/Taipei', year: 'numeric', month: '2-digit', day: '2-digit',
         hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
-    }).format(new Date()).replace(/\//g, '-');
+    }).formatToParts(new Date());
+    const g = t => parts.find(p => p.type === t)?.value ?? '00';
+    return `${g('year')}-${g('month')}-${g('day')}T${g('hour')}:${g('minute')}:${g('second')}`;
 }
 
 // ── Toast ──
@@ -583,6 +591,7 @@ function setStore(val) {
     document.querySelectorAll('.store-btn').forEach(b => b.classList.toggle('active', b.innerText.trim() === val));
     updateSummary();
     if (rawProducts.length > 0) renderModalCategories();
+    loadHangOrders(); // 切換據點時重新載入該據點的掛單
 }
 function setPayment(val) {
     selectedPayment = val;
@@ -658,7 +667,7 @@ function openModalProducts(cat) {
     const list = rawProducts.filter(p => (p.category || '其他加購') === cat);
     document.getElementById('modalProductGrid').innerHTML = list.map(p => {
         const price   = isKH() ? p.priceKH : p.priceTN;
-        const stock   = isKH() ? p.stockKH : p.stockTN;
+        const stock   = getStoreStock(p);
         const soldout = stock <= 0;
         if (soldout) {
             return `<div style="background:#f3f4f6;border:2px solid #e5e7eb;border-radius:12px;padding:12px 10px;">
@@ -848,9 +857,9 @@ async function confirmCheckout() {
     const earnedPts   = currentMember ? Math.floor(total / 100) : 0;
 
     // 庫存警示
-    const low = cart.filter(i => i.qty > (isKH() ? (i.stockKH||0) : (i.stockTN||0)));
+    const low = cart.filter(i => i.qty > getStoreStock(i));
     if (low.length) {
-        const msg = low.map(i => { const s = isKH()?(i.stockKH||0):(i.stockTN||0); return `・${i.name}（庫存 ${s}，結帳 ${i.qty}）`; }).join('\n');
+        const msg = low.map(i => `・${i.name}（庫存 ${getStoreStock(i)}，結帳 ${i.qty}）`).join('\n');
         if (!confirm(`以下品項庫存不足：\n\n${msg}\n\n是否仍要繼續？`)) return;
     }
 
@@ -872,43 +881,38 @@ async function confirmCheckout() {
         }
     };
 
-    // ── 樂觀更新：前台立即顯示成功 ──
-    closeCheckoutModal();
-    showToast(`✨ 結帳成功 NT$ ${total.toLocaleString()}`, 2500);
-    _pendingTx = payload;
-
-    const prevCart   = [...cart];
-    const prevMember = currentMember;
-    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
-    document.getElementById('memberResult').innerHTML = '';
-    document.getElementById('memberSearch').value = '';
-    renderCart(); updateSummary(); closeProducts();
-
-    // 背景送出 GAS
+    // ── 等待 GAS 確認後才清空（防止重複結帳）──
+    const confirmBtn = document.getElementById('confirmBtn');
+    confirmBtn.disabled = true;
+    confirmBtn.innerText = '送出中...';
     setGasStatus('loading');
+
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
         const result = await res.json();
         if (result.success) {
             setGasStatus('ok');
-            fetchProducts(); // 背景更新庫存
-            // 結帳成功後刪除叫回的掛單
+            closeCheckoutModal();
+            showToast(`✨ 結帳成功 NT$ ${total.toLocaleString()}`, 2500);
+            cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+            document.getElementById('memberResult').innerHTML = '';
+            document.getElementById('memberSearch').value = '';
+            renderCart(); updateSummary(); closeProducts();
+            fetchProducts();
             if (_recalledHangGasId && API_URL) {
                 try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: _recalledHangGasId } }) }); } catch(e) {}
                 _recalledHangGasId = null;
             }
         } else {
-            // 失敗：還原購物車
             setGasStatus('error');
-            cart = prevCart; currentMember = prevMember;
-            renderCart(); updateSummary();
-            showToast('❌ 送出失敗，資料已還原', 3000);
+            showToast('❌ 送出失敗：' + (result.error || '請稍後重試'), 3000);
         }
     } catch (e) {
         setGasStatus('error');
-        cart = prevCart; currentMember = prevMember;
-        renderCart(); updateSummary();
-        showToast('❌ 連線失敗，資料已還原', 3000);
+        showToast('❌ 連線失敗，請確認網路後重試', 3000);
+    } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.innerText = '確認收款';
     }
 }
 

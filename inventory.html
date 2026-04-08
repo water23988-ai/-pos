@@ -48,6 +48,7 @@
         <div class="flex gap-1">
             <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="tab-btn active" style="padding:6px 14px;font-size:12px;">高雄</button>
             <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="tab-btn"        style="padding:6px 14px;font-size:12px;">台南</button>
+            <button onclick="setStore('誠品生活台南')" id="btn-es" class="tab-btn"        style="padding:6px 14px;font-size:12px;">誠品</button>
         </div>
         <nav class="flex gap-1">
             <a href="index.html"    class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">POS</a>
@@ -155,6 +156,11 @@
 const ADMIN_PASSWORD = '1234';
 let API_URL          = localStorage.getItem('moment_flor_api') || '';
 let currentStore     = '高雄FOCUS 13';
+function getStoreStock(p) {
+    if (currentStore === '台南FOCUS')   return Number(p.stockTN)  || 0;
+    if (currentStore === '誠品生活台南') return Number(p.stockES) || 0;
+    return Number(p.stockKH) || 0;
+}
 let rawProducts      = [];
 let _adjustProduct   = null;
 let _selectedProduct = null;
@@ -202,6 +208,7 @@ function setStore(store) {
     currentStore = store;
     document.getElementById('btn-kh').classList.toggle('active', store === '高雄FOCUS 13');
     document.getElementById('btn-tn').classList.toggle('active', store === '台南FOCUS');
+    document.getElementById('btn-es').classList.toggle('active', store === '誠品生活台南');
     renderStockList();
     clearSelectedProduct();
     renderReceiveList();
@@ -244,10 +251,14 @@ function renderStockList() {
     document.getElementById('stockList').innerHTML = cats.map(cat => `
         <div class="cat-header">${cat}</div>
         ${catMap[cat].map(p => {
-            const stock = isKH ? p.stockKH : p.stockTN;
+            const stock = getStoreStock(p);
             const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
+            const costStr = p.cost ? `NT$${p.cost}` : '—';
             return `<div class="inv-row">
-                <span style="font-size:13px;font-weight:bold;flex:1;">${p.name}</span>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:13px;font-weight:bold;">${p.name}</div>
+                    <div style="font-size:10px;color:#9ca3af;margin-top:2px;">進價 ${costStr}</div>
+                </div>
                 <span class="stock-badge ${badge}" style="margin-right:8px;">${stock} 枝</span>
                 <button onclick="openReceiveFromList(${p.id})" style="background:#fdf1e4;border:1px solid #c4a882;border-radius:8px;padding:5px 10px;font-size:11px;color:#8a5a2a;cursor:pointer;margin-right:5px;font-family:'Noto Serif TC',serif;">進貨</button>
                 <button onclick="openAdjustModal(${p.id})" style="background:#f1f3eb;border:none;border-radius:8px;padding:6px 12px;font-size:12px;color:#6d7756;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">調整</button>
@@ -266,7 +277,7 @@ function openAdjustModal(id) {
     const p = rawProducts.find(x => Number(x.id) === Number(id));
     if (!p) return;
     _adjustProduct = p;
-    const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
+    const stock = getStoreStock(p);
     document.getElementById('adjustTitle').innerText = `調整：${p.name}`;
     document.getElementById('adjustCurrentStock').innerText = `${stock} 枝`;
     document.getElementById('adjustQtyInput').value = stock;
@@ -324,7 +335,7 @@ function renderReceiveList() {
     document.getElementById('receiveProductList').innerHTML = cats.map(cat => `
         <div class="cat-header">${cat}</div>
         ${catMap[cat].map(p => {
-            const stock = isKH ? p.stockKH : p.stockTN;
+            const stock = getStoreStock(p);
             const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
             return `<div class="inv-row">
                 <div style="flex:1;">
@@ -340,7 +351,7 @@ function selectReceiveProduct(id) {
     const p = rawProducts.find(x => Number(x.id) === Number(id));
     if (!p) return;
     _selectedProduct = p;
-    const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
+    const stock = getStoreStock(p);
     document.getElementById('selectedProductName').innerText  = p.name;
     document.getElementById('selectedProductStock').innerText = `${stock} 枝`;
     document.getElementById('selectedProductCost').innerText  = p.cost ? `NT$ ${p.cost}` : '—';

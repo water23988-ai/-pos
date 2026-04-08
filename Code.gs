@@ -38,7 +38,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES']);
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -150,6 +150,7 @@ function getProducts() {
     cost    : Number(r.cost)    || 0,
     stockKH : Number(r.stockKH) || 0,
     stockTN : Number(r.stockTN) || 0,
+    stockES : Number(r.stockES) || 0,
   }));
 }
 
@@ -167,6 +168,7 @@ function addProduct(data) {
     Number(data.cost)    || 0,
     Number(data.stockKH) || 0,
     Number(data.stockTN) || 0,
+    Number(data.stockES) || 0,
   ]);
   return { success: true, id };
 }
@@ -187,6 +189,7 @@ function updateProduct(data) {
       if (data.cost     !== undefined) set('cost',     Number(data.cost));
       if (data.stockKH  !== undefined) set('stockKH',  Number(data.stockKH));
       if (data.stockTN  !== undefined) set('stockTN',  Number(data.stockTN));
+      if (data.stockES  !== undefined) set('stockES',  Number(data.stockES));
       return { success: true };
     }
   }
@@ -216,7 +219,7 @@ function updateStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -248,7 +251,7 @@ function receiveStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -354,7 +357,7 @@ function updateStockDelta(id, store, delta, note) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = store === '台南FOCUS' ? headers.indexOf('stockTN') : store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(id)) {

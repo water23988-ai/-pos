@@ -46,6 +46,7 @@
             <div class="flex gap-2">
                 <button onclick="setStore('高雄FOCUS 13')" class="store-btn active" id="btn-高雄FOCUS 13">高雄</button>
                 <button onclick="setStore('台南FOCUS')"    class="store-btn"        id="btn-台南FOCUS">台南</button>
+                <button onclick="setStore('誠品生活台南')" class="store-btn"        id="btn-誠品生活台南">誠品</button>
                 <button onclick="setStore('Studio')"       class="store-btn"        id="btn-Studio" style="border-color:#c4a882;color:#8a6a42;">Studio</button>
             </div>
             <!-- 導覽 -->
@@ -246,6 +247,8 @@
 
     // ── 初始化 ──
     window.onload = () => {
+        const pw = prompt('請輸入管理密碼：');
+        if (pw !== '8282') { document.body.innerHTML = '<p style="text-align:center;padding:60px;color:#9ca3af;">🔒 權限不足</p>'; return; }
         const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
         document.getElementById('dateInput').value = today;
         document.getElementById('dateInput').addEventListener('change', loadAll);
