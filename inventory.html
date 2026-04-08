@@ -81,46 +81,83 @@
 <!-- ══ Tab 2: 進貨入庫 ══ -->
 
 <div id="tab-receive-view" class="p-4 hidden">
-    <!-- 已選品項 -->
+
+    <!-- 已選品項資訊列 -->
     <div id="selectedProductArea" class="hidden bg-[#f1f3eb] border border-[#8e9775] rounded-xl p-4 mb-4">
-        <div class="flex justify-between items-center mb-1">
+        <div class="flex justify-between items-center mb-2">
             <span id="selectedProductName" class="font-bold text-sm text-[#6d7756]"></span>
-            <button onclick="clearSelectedProduct()" class="text-[10px] text-red-400 border border-red-200 px-2 py-1 rounded-full">取消選擇</button>
+            <button onclick="clearSelectedProduct()" class="text-[10px] text-red-400 border border-red-200 px-2 py-1 rounded-full">取消</button>
         </div>
-        <div class="text-xs text-gray-400">目前庫存：<span id="selectedProductStock" class="font-bold text-[#8e9775]">—</span>　進價：<span id="selectedProductCost" class="text-gray-500">—</span></div>
+        <!-- 三店庫存快覽 -->
+        <div class="grid grid-cols-3 gap-2 text-center text-xs">
+            <div class="bg-white rounded-lg py-2">
+                <div class="text-gray-400 mb-0.5">高雄</div>
+                <div class="font-bold text-[#8e9775]" id="rStock-kh">—</div>
+            </div>
+            <div class="bg-white rounded-lg py-2">
+                <div class="text-gray-400 mb-0.5">台南</div>
+                <div class="font-bold text-[#8e9775]" id="rStock-tn">—</div>
+            </div>
+            <div class="bg-white rounded-lg py-2">
+                <div class="text-gray-400 mb-0.5">誠品</div>
+                <div class="font-bold text-[#8e9775]" id="rStock-es">—</div>
+            </div>
+        </div>
     </div>
 
-```
-<!-- 尚未選品項時顯示品項列表 -->
-<div id="receiveProductPicker">
-    <div class="flex gap-2 mb-3">
-        <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
-            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+    <!-- 品項搜尋列表 -->
+    <div id="receiveProductPicker">
+        <div class="flex gap-2 mb-3">
+            <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
+                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+        </div>
+        <div id="receiveProductList">
+            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+        </div>
     </div>
-    <div id="receiveProductList">
-        <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
-    </div>
-</div>
 
-<!-- 選了品項後顯示輸入欄 -->
-<div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
-    <div class="grid grid-cols-2 gap-3">
-        <div>
-            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">進貨數量 *</label>
-            <input type="number" id="receiveQty" placeholder="枝數" min="1" class="s-input">
+    <!-- 進貨表單：多店分配 -->
+    <div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
+
+        <!-- 進價 & 自動售價 -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價 *</label>
+                <input type="number" id="receiveUnitCost" placeholder="NT$" min="0" step="1"
+                    oninput="updateAutoPrice()" class="s-input">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">建議售價（×4）</label>
+                <div id="autoPriceDisplay" class="s-input bg-gray-50 text-[#8e9775] font-bold" style="border-style:dashed;">—</div>
+            </div>
         </div>
+
+        <!-- 三店進貨分配 -->
         <div>
-            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價（選填）</label>
-            <input type="number" id="receiveUnitCost" placeholder="更新成本" min="0" step="0.01" class="s-input">
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">各店進貨數量（枝）</label>
+            <div class="grid grid-cols-3 gap-3">
+                <div>
+                    <div class="text-[10px] text-center text-gray-400 mb-1">高雄</div>
+                    <input type="number" id="receiveQtyKH" placeholder="0" min="0" class="s-input text-center">
+                </div>
+                <div>
+                    <div class="text-[10px] text-center text-gray-400 mb-1">台南</div>
+                    <input type="number" id="receiveQtyTN" placeholder="0" min="0" class="s-input text-center">
+                </div>
+                <div>
+                    <div class="text-[10px] text-center text-gray-400 mb-1">誠品</div>
+                    <input type="number" id="receiveQtyES" placeholder="0" min="0" class="s-input text-center">
+                </div>
+            </div>
+            <div id="receiveTotalHint" class="text-center text-xs text-gray-400 mt-2">合計：0 枝</div>
         </div>
+
+        <div>
+            <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
+            <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
+        </div>
+        <button onclick="submitReceive()" class="btn-primary" id="receiveSubmitBtn">✅ 確認入庫</button>
     </div>
-    <div>
-        <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
-        <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
-    </div>
-    <button onclick="submitReceive()" class="btn-primary">✅ 確認入庫</button>
-</div>
-```
 
 </div>
 
@@ -340,17 +377,41 @@ function selectReceiveProduct(id) {
     const p = rawProducts.find(x => Number(x.id) === Number(id));
     if (!p) return;
     _selectedProduct = p;
-    const stock = currentStore !== '台南FOCUS' ? p.stockKH : p.stockTN;
-    document.getElementById('selectedProductName').innerText  = p.name;
-    document.getElementById('selectedProductStock').innerText = `${stock} 枝`;
-    document.getElementById('selectedProductCost').innerText  = p.cost ? `NT$ ${p.cost}` : '—';
+    // 更新三店庫存快覽
+    document.getElementById('selectedProductName').innerText = p.name;
+    document.getElementById('rStock-kh').innerText = `${Number(p.stockKH)||0} 枝`;
+    document.getElementById('rStock-tn').innerText = `${Number(p.stockTN)||0} 枝`;
+    document.getElementById('rStock-es').innerText = `${Number(p.stockES)||0} 枝`;
     document.getElementById('selectedProductArea').classList.remove('hidden');
     document.getElementById('receiveProductPicker').classList.add('hidden');
     document.getElementById('receiveForm').classList.remove('hidden');
-    document.getElementById('receiveQty').value = '';
-    document.getElementById('receiveUnitCost').value = '';
+    // 填入現有進價
+    document.getElementById('receiveUnitCost').value = p.cost || '';
+    document.getElementById('receiveQtyKH').value = '';
+    document.getElementById('receiveQtyTN').value = '';
+    document.getElementById('receiveQtyES').value = '';
     document.getElementById('receiveNote').value = '';
-    setTimeout(() => document.getElementById('receiveQty').focus(), 100);
+    updateAutoPrice();
+    setupQtyListeners();
+    setTimeout(() => document.getElementById('receiveUnitCost').focus(), 100);
+}
+
+function updateAutoPrice() {
+    const cost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
+    const auto = cost > 0 ? `NT$ ${cost * 4}` : '—';
+    document.getElementById('autoPriceDisplay').innerText = auto;
+}
+
+function setupQtyListeners() {
+    ['receiveQtyKH','receiveQtyTN','receiveQtyES'].forEach(id => {
+        const el = document.getElementById(id);
+        el.oninput = () => {
+            const total = (parseInt(document.getElementById('receiveQtyKH').value)||0)
+                        + (parseInt(document.getElementById('receiveQtyTN').value)||0)
+                        + (parseInt(document.getElementById('receiveQtyES').value)||0);
+            document.getElementById('receiveTotalHint').innerText = `合計：${total} 枝`;
+        };
+    });
 }
 
 function clearSelectedProduct() {
@@ -364,30 +425,58 @@ function clearSelectedProduct() {
 
 async function submitReceive() {
     if (!_selectedProduct) return alert('請先選擇品項');
-    const qty      = parseInt(document.getElementById('receiveQty').value);
     const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
-    const note     = document.getElementById('receiveNote').value.trim() || '進貨入庫';
-    if (isNaN(qty) || qty <= 0) return alert('請輸入進貨數量');
+    const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
+    const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
+    const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
+    const note    = document.getElementById('receiveNote').value.trim() || '進貨入庫';
+    const total   = qtyKH + qtyTN + qtyES;
+    if (total <= 0) return alert('至少一個據點需填入進貨數量');
+
+    const btn = document.getElementById('receiveSubmitBtn');
+    btn.disabled = true; btn.innerText = '入庫中...';
     setGas('loading');
-    try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'receiveStock', data: { id: _selectedProduct.id, store: currentStore, qty, unitCost, note } }) });
-        const result = await res.json();
-        if (result.success) {
-            const p = rawProducts.find(x => Number(x.id) === Number(_selectedProduct.id));
-            if (p) {
-                if (currentStore !== '台南FOCUS') p.stockKH = result.newStock;
-                else p.stockTN = result.newStock;
-                if (unitCost > 0) p.cost = unitCost;
+
+    const stores = [
+        { store: '高雄FOCUS 13', qty: qtyKH, key: 'stockKH' },
+        { store: '台南FOCUS',    qty: qtyTN, key: 'stockTN' },
+        { store: '誠品生活台南', qty: qtyES, key: 'stockES' },
+    ].filter(s => s.qty > 0);
+
+    // 依序送出（避免 GAS 並發衝突）
+    let successCount = 0;
+    const p = rawProducts.find(x => Number(x.id) === Number(_selectedProduct.id));
+    for (const s of stores) {
+        try {
+            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'receiveStock', data: { id: _selectedProduct.id, store: s.store, qty: s.qty, unitCost, note } }) });
+            const result = await res.json();
+            if (result.success) {
+                successCount++;
+                if (p) p[s.key] = result.newStock;
+                // 更新三店快覽
+                const idMap = { stockKH:'rStock-kh', stockTN:'rStock-tn', stockES:'rStock-es' };
+                const el = document.getElementById(idMap[s.key]);
+                if (el) el.innerText = `${result.newStock} 枝`;
             }
-            setGas('ok');
-            showToast(`✅ ${_selectedProduct.name} 入庫 +${qty} 枝 → 共 ${result.newStock} 枝`, 3000);
-            document.getElementById('receiveQty').value = '';
-            document.getElementById('receiveUnitCost').value = '';
-            document.getElementById('receiveNote').value = '';
-            // 更新顯示的庫存
-            document.getElementById('selectedProductStock').innerText = `${result.newStock} 枝`;
-        } else { setGas('error'); alert('入庫失敗：' + (result.error || '')); }
-    } catch(e) { setGas('error'); alert('連線失敗'); }
+        } catch(e) { /* 繼續其他店 */ }
+    }
+
+    // 更新售價
+    if (unitCost > 0 && p) {
+        p.cost  = unitCost;
+        p.price = unitCost * 4;
+        // 同步更新 GAS 商品售價
+        fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data: { id: _selectedProduct.id, cost: unitCost, price: unitCost * 4 } }) }).catch(()=>{});
+    }
+
+    setGas(successCount === stores.length ? 'ok' : 'error');
+    showToast(`✅ 入庫完成：共 ${total} 枝 分配至 ${successCount} 間店`, 3000);
+    document.getElementById('receiveQtyKH').value = '';
+    document.getElementById('receiveQtyTN').value = '';
+    document.getElementById('receiveQtyES').value = '';
+    document.getElementById('receiveNote').value  = '';
+    document.getElementById('receiveTotalHint').innerText = '合計：0 枝';
+    btn.disabled = false; btn.innerText = '✅ 確認入庫';
 }
 
 // ══ Tab 3: 盤點記錄 ══

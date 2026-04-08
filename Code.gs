@@ -38,7 +38,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES']);
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -73,8 +73,15 @@ function doGet(e) {
       case 'getMembers':      return jsonOut(getMembers());
       case 'getInventoryLog': return jsonOut(getInventoryLog(e.parameter.store));
       case 'getHangOrders':   return jsonOut(getHangOrders(e.parameter.store));
-      case 'getSalesReport':  return jsonOut(getSalesReport(e.parameter.store, e.parameter.from, e.parameter.to));
-      default:                return jsonOut({ error: 'Unknown GET action: ' + action });
+      case 'getSalesReport':        return jsonOut(getSalesReport(e.parameter.store, e.parameter.from, e.parameter.to));
+      case 'getDailyReport':        return jsonOut(getDailyReport(e.parameter.store, e.parameter.date));
+      case 'getPayBreakdown':       return jsonOut(getPayBreakdown(e.parameter.store, e.parameter.date));
+      case 'getWeeklyTrend':        return jsonOut(getWeeklyTrend(e.parameter.store));
+      case 'getItemRanking':        return jsonOut(getItemRanking(e.parameter.store, e.parameter.date));
+      case 'getMemberStats':        return jsonOut(getMemberStats());
+      case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
+      case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
+      default:                      return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
     return jsonOut({ error: err.message });
@@ -150,6 +157,7 @@ function getProducts() {
     cost    : Number(r.cost)    || 0,
     stockKH : Number(r.stockKH) || 0,
     stockTN : Number(r.stockTN) || 0,
+    stockES : Number(r.stockES) || 0,
   }));
 }
 
@@ -167,6 +175,7 @@ function addProduct(data) {
     Number(data.cost)    || 0,
     Number(data.stockKH) || 0,
     Number(data.stockTN) || 0,
+    Number(data.stockES) || 0,
   ]);
   return { success: true, id };
 }
@@ -187,6 +196,7 @@ function updateProduct(data) {
       if (data.cost     !== undefined) set('cost',     Number(data.cost));
       if (data.stockKH  !== undefined) set('stockKH',  Number(data.stockKH));
       if (data.stockTN  !== undefined) set('stockTN',  Number(data.stockTN));
+      if (data.stockES  !== undefined) set('stockES',  Number(data.stockES));
       return { success: true };
     }
   }
@@ -216,7 +226,7 @@ function updateStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -248,7 +258,7 @@ function receiveStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -329,13 +339,7 @@ function addTransaction(data) {
   if (data.items && data.items.length) {
     data.items.forEach(item => {
       if (item.id && Number(item.id) > 0 && item.qty > 0) {
-        updateStock({
-          id   : item.id,
-          store: data.store,
-          qty  : null, // 將在下方計算
-          note : `銷售扣庫：${data.id}`,
-          _delta: -item.qty, // 使用 delta 模式
-        });
+        updateStockDelta(item.id, data.store, -item.qty, `銷售扣庫：${txId}`);
       }
     });
   }
@@ -354,7 +358,7 @@ function updateStockDelta(id, store, delta, note) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = store === '台南FOCUS' ? headers.indexOf('stockTN') : headers.indexOf('stockKH');
+  const storeCol = store === '台南FOCUS' ? headers.indexOf('stockTN') : store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(id)) {
@@ -407,6 +411,254 @@ function getSalesReport(store, from, to) {
     payBreakdown,
     transactions: filtered.slice(-100).reverse(),
   };
+}
+
+// ══════════════════════════════════════════════════════
+//  分析報表
+// ══════════════════════════════════════════════════════
+
+function dateRange_(date, tz) {
+  // Returns { from, to } for a given 'YYYY-MM-DD' string in Taipei time
+  const base = date || Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const from = new Date(base + 'T00:00:00+08:00');
+  const to   = new Date(base + 'T23:59:59+08:00');
+  return { from, to };
+}
+
+function storeFilter_(store) {
+  // 高雄 includes Studio orders stored under the same store name
+  if (store === '高雄FOCUS 13') return r => r.store === '高雄FOCUS 13' || r.store === 'Studio';
+  if (store) return r => r.store === store;
+  return () => true;
+}
+
+function getDailyReport(store, date) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const { from, to } = dateRange_(date);
+
+  const filt = storeFilter_(store);
+  const todayTxs = rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && d >= from && d <= to;
+  });
+
+  // Same weekday last week
+  const lwFrom = new Date(from); lwFrom.setDate(lwFrom.getDate() - 7);
+  const lwTo   = new Date(to);   lwTo.setDate(lwTo.getDate() - 7);
+  const lwTxs  = rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && d >= lwFrom && d <= lwTo;
+  });
+
+  const compute = txs => ({
+    revenue  : txs.reduce((s,r) => s + (Number(r.total)||0), 0),
+    cost     : txs.reduce((s,r) => s + (Number(r.cost)||0),  0),
+    profit   : txs.reduce((s,r) => s + (Number(r.total)||0) - (Number(r.cost)||0), 0),
+    customers: txs.length,
+  });
+
+  const sourceBreakdown = {};
+  let newCount = 0, memberCount = 0;
+  todayTxs.forEach(r => {
+    if (r.source) sourceBreakdown[r.source] = (sourceBreakdown[r.source]||0) + 1;
+    if (r.customerType === '新客') newCount++;
+    if (r.memberId) memberCount++;
+  });
+
+  // Waste cost from inventory log
+  const prodMap = {};
+  sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
+    prodMap[Number(r.id)] = Number(r.cost)||0;
+  });
+  const totalWasteCost = sheetToObjects(getSheet(SH.INV_LOG))
+    .filter(r => r.type === 'waste' && !isNaN(new Date(r.time)) && new Date(r.time) >= from && new Date(r.time) <= to)
+    .reduce((s,r) => s + (prodMap[Number(r.productId)]||0) * Math.abs(Number(r.diff)||0), 0);
+
+  return { ...compute(todayTxs), lastWeek: compute(lwTxs), sourceBreakdown, newCount, memberCount, totalWasteCost };
+}
+
+function getPayBreakdown(store, date) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const { from, to } = dateRange_(date);
+  const filt = storeFilter_(store);
+
+  const result = {};
+  rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && d >= from && d <= to;
+  }).forEach(r => {
+    const pay = r.pay || '其他';
+    result[pay] = (result[pay]||0) + (Number(r.total)||0);
+  });
+  return result;
+}
+
+function getWeeklyTrend(store) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const filt = storeFilter_(store);
+  const now  = new Date();
+  const result = [];
+
+  for (let w = 3; w >= 0; w--) {
+    const dow = now.getDay() || 7; // 1=Mon
+    const weekStart = new Date(now);
+    weekStart.setDate(now.getDate() - dow + 1 - w * 7);
+    weekStart.setHours(0,0,0,0);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    weekEnd.setHours(23,59,59,999);
+
+    const txs      = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && d >= weekStart && d <= weekEnd; });
+    const revenue  = txs.reduce((s,r) => s + (Number(r.total)||0), 0);
+    const cost     = txs.reduce((s,r) => s + (Number(r.cost)||0),  0);
+    const label    = `${weekStart.getMonth()+1}/${weekStart.getDate()}`;
+    result.push({ label, revenue, cost, profit: revenue - cost, customers: txs.length });
+  }
+  return result;
+}
+
+function getItemRanking(store, date) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const filt = storeFilter_(store);
+
+  // Use current month (month-to-date)
+  const base = date ? new Date(date + 'T00:00:00+08:00') : new Date();
+  const from = new Date(base.getFullYear(), base.getMonth(), 1);
+  const to   = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
+
+  const prodMap = {};
+  sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
+    prodMap[Number(r.id)] = { cost: Number(r.cost)||0, name: r.name };
+  });
+
+  const itemMap = {};
+  rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && d >= from && d <= to; })
+    .forEach(tx => {
+      const items = safeJson(tx.items, []);
+      items.forEach(item => {
+        const key = String(item.id || item.name);
+        if (!itemMap[key]) {
+          itemMap[key] = { name: item.name || (prodMap[Number(item.id)] ? prodMap[Number(item.id)].name : key), qty: 0, sales: 0, cost: 0, waste: 0 };
+        }
+        const qty  = Number(item.qty)   || 0;
+        const price= Number(item.price) || 0;
+        const uc   = prodMap[Number(item.id)] ? prodMap[Number(item.id)].cost : 0;
+        itemMap[key].qty   += qty;
+        itemMap[key].sales += price * qty;
+        itemMap[key].cost  += uc * qty;
+      });
+    });
+
+  return Object.values(itemMap).map(it => {
+    const profit    = it.sales - it.cost;
+    const margin    = it.sales > 0 ? Math.round(profit / it.sales * 100) : 0;
+    const wasteRate = (it.qty + it.waste) > 0 ? Math.round(it.waste / (it.qty + it.waste) * 100) : 0;
+    return { name: it.name, qty: it.qty, sales: Math.round(it.sales), cost: Math.round(it.cost), profit: Math.round(profit), margin, waste: it.waste, wasteRate };
+  }).sort((a,b) => b.sales - a.sales);
+}
+
+function getMemberStats() {
+  const rows = sheetToObjects(getSheet(SH.MEMBERS));
+  const now  = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const tiers = { '銅卡': 0, '銀卡': 0, '金卡': 0, 'VIP': 0 };
+  rows.forEach(r => {
+    const spend = Number(r.totalSpend)  || 0;
+    const pts   = Number(r.totalPoints) || 0;
+    if (spend >= 50000 || pts >= 500)      tiers['VIP']++;
+    else if (spend >= 20000 || pts >= 200) tiers['金卡']++;
+    else if (spend >= 5000  || pts >= 50)  tiers['銀卡']++;
+    else                                   tiers['銅卡']++;
+  });
+
+  return {
+    total: rows.length,
+    newThisMonth: rows.filter(r => r.createdAt && new Date(r.createdAt) >= monthStart).length,
+    tiers,
+  };
+}
+
+function getTransactionHistory(store, date) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const filt = storeFilter_(store);
+
+  let filtered = rows.filter(r => filt(r));
+  if (date) {
+    const { from, to } = dateRange_(date);
+    filtered = filtered.filter(r => { const d = new Date(r.date); return !isNaN(d) && d >= from && d <= to; });
+  }
+
+  return filtered.reverse().slice(0, 200).map(r => ({
+    id        : r.id,
+    date      : r.date,
+    store     : r.store,
+    memberName: r.memberName,
+    total     : Number(r.total) || 0,
+    cost      : Number(r.cost)  || 0,
+    pay       : r.pay,
+    note      : r.note,
+    items     : safeJson(r.items, []),
+  }));
+}
+
+function getAllStoresReport(period) {
+  // period: 'thisWeek' | 'lastWeek' | 'thisMonth' | 'lastMonth'
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const now  = new Date();
+  let from, to;
+
+  if (period === 'lastMonth') {
+    const m = now.getMonth() === 0 ? 11 : now.getMonth() - 1;
+    const y = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
+    from = new Date(y, m, 1);
+    to   = new Date(y, m + 1, 0, 23, 59, 59);
+  } else if (period === 'thisMonth') {
+    from = new Date(now.getFullYear(), now.getMonth(), 1);
+    to   = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+  } else if (period === 'lastWeek') {
+    const dow = now.getDay() || 7;
+    from = new Date(now); from.setDate(now.getDate() - dow - 6); from.setHours(0,0,0,0);
+    to   = new Date(from); to.setDate(from.getDate() + 6); to.setHours(23,59,59,999);
+  } else { // thisWeek
+    const dow = now.getDay() || 7;
+    from = new Date(now); from.setDate(now.getDate() - dow + 1); from.setHours(0,0,0,0);
+    to   = new Date(now); to.setHours(23,59,59,999);
+  }
+
+  const filtered = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && d >= from && d <= to; });
+
+  const storeList = [
+    { label: '高雄FOCUS 13', keys: ['高雄FOCUS 13', 'Studio'] },
+    { label: '台南FOCUS',    keys: ['台南FOCUS'] },
+    { label: '誠品生活台南', keys: ['誠品生活台南'] },
+  ];
+
+  const result = storeList.map(s => {
+    const txs      = filtered.filter(r => s.keys.includes(r.store));
+    const revenue  = txs.reduce((sum,r) => sum + (Number(r.total)||0), 0);
+    const cost     = txs.reduce((sum,r) => sum + (Number(r.cost)||0),  0);
+    const profit   = revenue - cost;
+    const margin   = revenue > 0 ? Math.round(profit / revenue * 100) : 0;
+    return { store: s.label, revenue, cost, profit, margin, customers: txs.length };
+  });
+
+  const totRev = result.reduce((s,r) => s + r.revenue, 0);
+  const totCost= result.reduce((s,r) => s + r.cost,    0);
+  const totPro = totRev - totCost;
+  result.push({
+    store: '合計', revenue: totRev, cost: totCost, profit: totPro,
+    margin: totRev > 0 ? Math.round(totPro / totRev * 100) : 0,
+    customers: result.reduce((s,r) => s + r.customers, 0),
+  });
+
+  return { stores: result, from: from.toISOString(), to: to.toISOString() };
 }
 
 // ══════════════════════════════════════════════════════
