@@ -881,39 +881,30 @@ async function confirmCheckout() {
         }
     };
 
-    // ── 等待 GAS 確認後才清空（防止重複結帳）──
+    // ── 即時清空購物車（樂觀更新），背景同步 GAS ──
     const confirmBtn = document.getElementById('confirmBtn');
     confirmBtn.disabled = true;
-    confirmBtn.innerText = '送出中...';
-    setGasStatus('loading');
-
-    try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
-        const result = await res.json();
-        if (result.success) {
-            setGasStatus('ok');
-            closeCheckoutModal();
-            showToast(`✨ 結帳成功 NT$ ${total.toLocaleString()}`, 2500);
-            cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
-            document.getElementById('memberResult').innerHTML = '';
-            document.getElementById('memberSearch').value = '';
-            renderCart(); updateSummary(); closeProducts();
-            fetchProducts();
-            if (_recalledHangGasId && API_URL) {
-                try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: _recalledHangGasId } }) }); } catch(e) {}
-                _recalledHangGasId = null;
-            }
-        } else {
-            setGasStatus('error');
-            showToast('❌ 送出失敗：' + (result.error || '請稍後重試'), 3000);
-        }
-    } catch (e) {
-        setGasStatus('error');
-        showToast('❌ 連線失敗，請確認網路後重試', 3000);
-    } finally {
-        confirmBtn.disabled = false;
-        confirmBtn.innerText = '確認收款';
+    closeCheckoutModal();
+    showToast(`✨ 結帳成功 NT$ ${total.toLocaleString()}`, 2500);
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    document.getElementById('memberResult').innerHTML = '';
+    document.getElementById('memberSearch').value = '';
+    renderCart(); updateSummary(); closeProducts();
+    if (_recalledHangGasId && API_URL) {
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: _recalledHangGasId } }) }); } catch(e) {}
+        _recalledHangGasId = null;
     }
+    confirmBtn.disabled = false;
+
+    // 背景送出 GAS（GAS 端會以 id 去重，重試不會重複寫入）
+    setGasStatus('loading');
+    fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) })
+        .then(r => r.json())
+        .then(result => {
+            if (result.success) { setGasStatus('ok'); fetchProducts(); }
+            else { setGasStatus('error'); showToast('⚠️ 資料同步失敗，請通知店長確認', 4000); }
+        })
+        .catch(() => { setGasStatus('error'); showToast('⚠️ 網路異常，資料可能未同步', 4000); });
 }
 
 // ── 補庫存 ──

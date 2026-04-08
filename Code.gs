@@ -308,10 +308,17 @@ function getInventoryLog(store) {
 //  交易（結帳）
 // ══════════════════════════════════════════════════════
 function addTransaction(data) {
-  // data: { id, date, store, memberId, memberName, subtotal, discount, total, cost, pay, earnedPoints, note, customerType, source, items }
-  const sh = getSheet(SH.TRANSACTIONS);
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const txId = data.id || newId('T');
+
+  // 去重：同一 ID 已存在則直接回傳成功，防止網路重試造成重複寫入
+  if (sh.getLastRow() >= 2) {
+    const ids = sh.getRange(2, 1, sh.getLastRow() - 1, 1).getValues().flat();
+    if (ids.includes(txId)) return { success: true, duplicate: true };
+  }
+
   sh.appendRow([
-    data.id           || newId('T'),
+    txId,
     data.date         || taipeiNow(),
     data.store        || '',
     data.memberId     || '',
