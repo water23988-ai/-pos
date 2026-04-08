@@ -120,6 +120,11 @@
                 <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
             </div>
         </div>
+        <!-- 掛回橫幅：叫回掛單後未結帳時顯示 -->
+        <div id="recallBanner" style="display:none;background:#f1f3eb;border:1px solid #c6cdb5;border-radius:12px;padding:8px 14px;margin-bottom:10px;display:none;align-items:center;justify-content:space-between;gap:8px;">
+            <span style="font-size:12px;color:#6d7756;">📌 已叫回：<strong id="recallBannerName"></strong></span>
+            <button onclick="putBackHang()" style="background:#8e9775;color:white;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">掛回同名</button>
+        </div>
         <div id="cartList"><p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p></div>
     </section>
 </div>
@@ -484,7 +489,8 @@ let discountFixed   = 0;
 let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
 let productModalMode = 'pos';
-let _recalledHangGasId = null; // 記錄叫回的掛單 gasId，結帳成功後刪除
+let _recalledHangGasId = null; // 保留舊變數（現已於叫回時立刻清除，結帳不再使用）
+let _recalledHangName  = null; // 記錄叫回的掛單名稱，供「掛回同名」使用
 let studioItems     = [];
 let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
 let _pendingTx      = null;
@@ -712,7 +718,43 @@ function updateCartQty(id, delta) {
     renderCart();
 }
 function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); renderCart(); }
-function clearCart() { cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; renderCart(); }
+function clearCart() {
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0;
+    _recalledHangName = null; _recalledHangGasId = null;
+    hideRecallBanner();
+    renderCart();
+}
+function showRecallBanner(name) {
+    _recalledHangName = name;
+    const el = document.getElementById('recallBanner');
+    document.getElementById('recallBannerName').innerText = name;
+    el.style.display = 'flex';
+}
+function hideRecallBanner() {
+    document.getElementById('recallBanner').style.display = 'none';
+    _recalledHangName = null;
+}
+async function putBackHang() {
+    if (!cart.length) { hideRecallBanner(); return; }
+    const name = _recalledHangName || `掛單 ${hangOrders.length + 1}`;
+    const localHang = { gasId: null, name, store: storeForGAS(), cart: cart.map(i=>({...i})), member: currentMember };
+    hangOrders.push(localHang);
+    saveHangToLocal(); renderHangList();
+    // 清空購物車
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    document.getElementById('memberResult').innerHTML = '';
+    document.getElementById('memberSearch').value = '';
+    hideRecallBanner(); renderCart(); updateSummary();
+    showToast(`📌 已掛回：${name}`);
+    // 背景同步 GAS
+    if (API_URL) {
+        try {
+            const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveHangOrder', data: { name, store: storeForGAS(), createdAt: taipeiNow(), cart: localHang.cart, member: localHang.member } }) });
+            const result = await res.json();
+            if (result.success) { localHang.gasId = result.id; saveHangToLocal(); }
+        } catch(e) {}
+    }
+}
 function getItemPrice(item) { return isKH() ? item.priceKH : item.priceTN; }
 function getSubtotal()      { return cart.reduce((s, i) => s + getItemPrice(i) * i.qty, 0); }
 function getItemDiscount() {
@@ -880,6 +922,7 @@ async function confirmCheckout() {
     const prevCart   = [...cart];
     const prevMember = currentMember;
     cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    _recalledHangName = null; hideRecallBanner();
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); closeProducts();
@@ -1064,18 +1107,24 @@ function renderHangList() {
 async function recallOrder(idx) {
     const order = hangOrders[idx];
     if (cart.length && !confirm('目前清單有商品，叫回掛單會清空現有清單，確定嗎？')) return;
+    const gasId     = order.gasId || null;
+    const orderName = order.name;
     cart = order.cart.map(i => ({...i})); currentMember = order.member;
-    _recalledHangGasId = order.gasId || null; // 記住，結帳成功後刪除
+    _recalledHangGasId = null; // 立刻清除（不再靠結帳刪除）
     if (currentMember) {
         const tier = currentMember.totalSpent>=30000?'👑 VIP':currentMember.totalSpent>=10000?'🥇 金卡':currentMember.totalSpent>=3000?'🥈 銀卡':'🥉 銅卡';
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
-    const orderName = order.name;
     hangOrders.splice(idx, 1);
     saveHangToLocal();
     renderCart(); updateSummary(); renderHangList();
     closeHangListModal();
+    showRecallBanner(orderName);
     showToast(`📌 已叫回：${orderName}`);
+    // ✅ 立刻刪除雲端掛單，防止掛回時產生重複
+    if (API_URL && gasId) {
+        try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
+    }
 }
 
 async function deleteHang(idx) {

@@ -156,7 +156,19 @@
             <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">備註（選填）</label>
             <input type="text" id="receiveNote" placeholder="進貨廠商、批次..." class="s-input">
         </div>
-        <button onclick="submitReceive()" class="btn-primary" id="receiveSubmitBtn">✅ 確認入庫</button>
+        <div class="flex gap-3">
+            <button onclick="addToBatch()" class="btn-primary flex-1">＋ 加入清單</button>
+            <button onclick="submitReceive()" class="btn-primary flex-1" id="receiveSubmitBtn" style="background:#6b9080;">✅ 僅此項入庫</button>
+        </div>
+    </div>
+
+    <!-- 批次清單 -->
+    <div id="batchPanel" class="hidden mt-4">
+        <div class="flex justify-between items-center mb-2">
+            <div class="text-[10px] font-bold text-gray-400 tracking-widest uppercase">📦 待入庫清單</div>
+            <button onclick="submitBatch()" id="batchSubmitBtn" class="text-xs bg-[#8e9775] text-white px-4 py-2 rounded-xl font-bold">全部送出</button>
+        </div>
+        <div id="batchList" class="space-y-2"></div>
     </div>
 
 </div>
@@ -195,6 +207,7 @@ let currentStore     = '高雄FOCUS 13';
 let rawProducts      = [];
 let _adjustProduct   = null;
 let _selectedProduct = null;
+let _batchItems      = [];   // 批次進貨清單
 let _toastTimer;
 
 // ── 直接初始化（不需要密碼）──
@@ -476,7 +489,97 @@ async function submitReceive() {
     document.getElementById('receiveQtyES').value = '';
     document.getElementById('receiveNote').value  = '';
     document.getElementById('receiveTotalHint').innerText = '合計：0 枝';
-    btn.disabled = false; btn.innerText = '✅ 確認入庫';
+    btn.disabled = false; btn.innerText = '✅ 僅此項入庫';
+}
+
+// ── 批次進貨 ──
+function addToBatch() {
+    if (!_selectedProduct) return alert('請先選擇品項');
+    const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
+    const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
+    const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
+    const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
+    const note    = document.getElementById('receiveNote').value.trim() || '進貨入庫';
+    if (qtyKH + qtyTN + qtyES <= 0) return alert('至少一個據點需填入進貨數量');
+
+    _batchItems.push({ product: _selectedProduct, unitCost, qtyKH, qtyTN, qtyES, note });
+    renderBatchList();
+
+    // 清空欄位，回到選品（不清空進價，方便連續進同批花）
+    document.getElementById('receiveQtyKH').value = '';
+    document.getElementById('receiveQtyTN').value = '';
+    document.getElementById('receiveQtyES').value = '';
+    document.getElementById('receiveNote').value  = '';
+    document.getElementById('receiveTotalHint').innerText = '合計：0 枝';
+    clearSelectedProduct();
+    showToast(`✅ 已加入：${_selectedProduct ? _selectedProduct.name : ''}`);
+}
+
+function renderBatchList() {
+    const panel = document.getElementById('batchPanel');
+    const list  = document.getElementById('batchList');
+    if (!_batchItems.length) { panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    list.innerHTML = _batchItems.map((item, i) => {
+        const parts = [];
+        if (item.qtyKH > 0) parts.push(`高雄×${item.qtyKH}`);
+        if (item.qtyTN > 0) parts.push(`台南×${item.qtyTN}`);
+        if (item.qtyES > 0) parts.push(`誠品×${item.qtyES}`);
+        return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <span style="font-weight:bold;font-size:13px;">${item.product.name}</span>
+                <span style="font-size:11px;color:#9ca3af;margin-left:8px;">${parts.join(' · ')}</span>
+                ${item.unitCost > 0 ? `<span style="font-size:10px;color:#c4a882;margin-left:6px;">進價 NT$${item.unitCost} → 售 NT$${item.unitCost*4}</span>` : ''}
+            </div>
+            <button onclick="removeBatchItem(${i})" style="color:#f87171;background:none;border:none;font-size:18px;cursor:pointer;line-height:1;">×</button>
+        </div>`;
+    }).join('');
+}
+
+function removeBatchItem(i) {
+    _batchItems.splice(i, 1);
+    renderBatchList();
+}
+
+async function submitBatch() {
+    if (!_batchItems.length) return;
+    const btn = document.getElementById('batchSubmitBtn');
+    btn.disabled = true; btn.innerText = '送出中...';
+    setGas('loading');
+
+    let totalOk = 0;
+    for (const item of _batchItems) {
+        const stores = [
+            { store: '高雄FOCUS 13', qty: item.qtyKH, key: 'stockKH' },
+            { store: '台南FOCUS',    qty: item.qtyTN, key: 'stockTN' },
+            { store: '誠品生活台南', qty: item.qtyES, key: 'stockES' },
+        ].filter(s => s.qty > 0);
+
+        let ok = true;
+        for (const s of stores) {
+            try {
+                const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'receiveStock', data: { id: item.product.id, store: s.store, qty: s.qty, unitCost: item.unitCost, note: item.note } }) });
+                const r   = await res.json();
+                if (r.success) {
+                    const p = rawProducts.find(x => Number(x.id) === Number(item.product.id));
+                    if (p) p[s.key] = r.newStock;
+                }
+            } catch(e) { ok = false; }
+        }
+        // 更新售價
+        if (item.unitCost > 0) {
+            fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data: { id: item.product.id, cost: item.unitCost, price: item.unitCost * 4 } }) }).catch(()=>{});
+            const p = rawProducts.find(x => Number(x.id) === Number(item.product.id));
+            if (p) { p.cost = item.unitCost; p.price = item.unitCost * 4; }
+        }
+        if (ok) totalOk++;
+    }
+
+    setGas(totalOk === _batchItems.length ? 'ok' : 'error');
+    showToast(`✅ 批次入庫完成：${totalOk}/${_batchItems.length} 種花材`, 3000);
+    _batchItems = [];
+    renderBatchList();
+    btn.disabled = false; btn.innerText = '全部送出';
 }
 
 // ══ Tab 3: 盤點記錄 ══
