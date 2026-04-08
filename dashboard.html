@@ -182,6 +182,36 @@
         <div class="grid grid-cols-4 gap-3" id="tierBreakdown"></div>
     </div>
 
+    <!-- ══ 週報 / 月報 — 各店比較 ══ -->
+    <div>
+        <div class="section-title">📅 週報 / 月報 — 各店純毛利比較</div>
+        <div class="flex gap-2 mb-4 flex-wrap">
+            <button onclick="setPeriod('thisWeek')"  id="pd-thisWeek"  class="store-btn active">本週</button>
+            <button onclick="setPeriod('lastWeek')"  id="pd-lastWeek"  class="store-btn">上週</button>
+            <button onclick="setPeriod('thisMonth')" id="pd-thisMonth" class="store-btn">本月</button>
+            <button onclick="setPeriod('lastMonth')" id="pd-lastMonth" class="store-btn">上月</button>
+        </div>
+        <div class="card overflow-x-auto">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="text-[10px] text-gray-400 border-b border-gray-100">
+                        <th class="text-left py-2 font-bold pl-1">門市</th>
+                        <th class="text-right py-2 font-bold">營收</th>
+                        <th class="text-right py-2 font-bold">花材成本</th>
+                        <th class="text-right py-2 font-bold">純毛利</th>
+                        <th class="text-right py-2 font-bold">毛利率</th>
+                        <th class="text-right py-2 font-bold">來客數</th>
+                        <th class="text-right py-2 font-bold">客單價</th>
+                    </tr>
+                </thead>
+                <tbody id="storeReportTable">
+                    <tr><td colspan="7" class="text-center text-gray-300 py-8 text-xs">載入中...</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <div id="periodLabel" class="text-[10px] text-gray-300 mt-2 text-right"></div>
+    </div>
+
     <!-- ══ Studio 統計（切到 Studio 才顯示）══ -->
     <div id="studioSection" class="hidden space-y-4">
         <div class="section-title">✦ Studio 訂單統計</div>
@@ -239,10 +269,11 @@
 </div>
 
 <script>
-    let API_URL     = localStorage.getItem('moment_flor_api') || '';
+    let API_URL      = localStorage.getItem('moment_flor_api') || '';
     let currentStore = localStorage.getItem('dashboard_store') || '高雄FOCUS 13';
-    let itemData    = [];
-    let currentSort = 'sales';
+    let itemData     = [];
+    let currentSort  = 'sales';
+    let currentPeriod = 'thisWeek';
     let trendChart, customerChart;
 
     // ── 初始化 ──
@@ -277,7 +308,8 @@
             loadPayBreakdown(date),
             loadWeeklyTrend(),
             loadItemRanking(date),
-            loadMemberStats()
+            loadMemberStats(),
+            loadAllStoresReport()
         ];
         if (currentStore === 'Studio') tasks.push(loadStudioStats(date));
         await Promise.all(tasks);
@@ -581,6 +613,51 @@
                 }).join('') : '<p class="text-xs text-gray-300 text-center py-4">當日無 Studio 訂單</p>';
 
         } catch(e) { console.error('studioStats error', e); }
+    }
+
+    // ── 週報/月報 ──
+    function setPeriod(period) {
+        currentPeriod = period;
+        document.querySelectorAll('[id^="pd-"]').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById('pd-' + period);
+        if (btn) btn.classList.add('active');
+        loadAllStoresReport();
+    }
+
+    async function loadAllStoresReport() {
+        try {
+            const res  = await fetch(`${API_URL}?action=getAllStoresReport&period=${currentPeriod}`);
+            const data = await res.json();
+            if (!data || data.error || !data.stores) return;
+
+            const storeColors = {
+                '高雄FOCUS 13': '#8e9775',
+                '台南FOCUS':    '#6b9080',
+                '誠品生活台南': '#a07070',
+                '合計':         '#4a4a4a',
+            };
+
+            document.getElementById('storeReportTable').innerHTML = data.stores.map(row => {
+                const aov    = row.customers > 0 ? Math.round(row.revenue / row.customers) : 0;
+                const isTotal = row.store === '合計';
+                const color  = storeColors[row.store] || '#4a4a4a';
+                const marginCls = row.margin >= 50 ? 'text-green-600 font-bold' : row.margin >= 30 ? 'text-yellow-500' : 'text-red-400';
+                return `<tr class="${isTotal ? 'border-t-2 border-gray-200 bg-gray-50 font-bold' : 'border-b border-gray-50 hover:bg-gray-50'} text-xs">
+                    <td class="py-3 pl-1 font-medium" style="color:${color}">${row.store}</td>
+                    <td class="text-right py-3">NT$ ${row.revenue.toLocaleString()}</td>
+                    <td class="text-right py-3 text-gray-400">NT$ ${row.cost.toLocaleString()}</td>
+                    <td class="text-right py-3 text-green-600 font-bold">NT$ ${row.profit.toLocaleString()}</td>
+                    <td class="text-right py-3 ${marginCls}">${row.margin}%</td>
+                    <td class="text-right py-3">${row.customers} 人</td>
+                    <td class="text-right py-3 text-gray-400">NT$ ${aov.toLocaleString()}</td>
+                </tr>`;
+            }).join('');
+
+            if (data.from && data.to) {
+                const fmt = d => new Date(d).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' });
+                document.getElementById('periodLabel').innerText = `資料區間：${fmt(data.from)} — ${fmt(data.to)}`;
+            }
+        } catch(e) { console.error('allStoresReport error', e); }
     }
 
     // ── 工具 ──
