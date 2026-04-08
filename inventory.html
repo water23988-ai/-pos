@@ -253,11 +253,9 @@ function renderStockList() {
         ${catMap[cat].map(p => {
             const stock = getStoreStock(p);
             const badge = stock > 5 ? 'stock-ok' : stock > 0 ? 'stock-low' : 'stock-zero';
-            const costStr = p.cost ? `NT$${p.cost}` : '—';
             return `<div class="inv-row">
                 <div style="flex:1;min-width:0;">
                     <div style="font-size:13px;font-weight:bold;">${p.name}</div>
-                    <div style="font-size:10px;color:#9ca3af;margin-top:2px;">進價 ${costStr}</div>
                 </div>
                 <span class="stock-badge ${badge}" style="margin-right:8px;">${stock} 枝</span>
                 <button onclick="openReceiveFromList(${p.id})" style="background:#fdf1e4;border:1px solid #c4a882;border-radius:8px;padding:5px 10px;font-size:11px;color:#8a5a2a;cursor:pointer;margin-right:5px;font-family:'Noto Serif TC',serif;">進貨</button>

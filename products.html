@@ -130,7 +130,7 @@
                     <input type="number" id="editCost" placeholder="0" min="0" class="s-input">
                 </div>
             </div>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="grid grid-cols-3 gap-3">
                 <div>
                     <label class="s-label">高雄庫存（枝）</label>
                     <input type="number" id="editStockKH" placeholder="0" min="0" class="s-input">
@@ -138,6 +138,10 @@
                 <div>
                     <label class="s-label">台南庫存（枝）</label>
                     <input type="number" id="editStockTN" placeholder="0" min="0" class="s-input">
+                </div>
+                <div>
+                    <label class="s-label">誠品庫存（枝）</label>
+                    <input type="number" id="editStockES" placeholder="0" min="0" class="s-input">
                 </div>
             </div>
         </div>
@@ -256,6 +260,7 @@ function openAddModal() {
     document.getElementById('editCost').value     = '';
     document.getElementById('editStockKH').value  = '0';
     document.getElementById('editStockTN').value  = '0';
+    document.getElementById('editStockES').value  = '0';
     document.getElementById('editModal').classList.add('show');
     setTimeout(() => document.getElementById('editName').focus(), 100);
 }
@@ -273,6 +278,7 @@ function openEditModal(id) {
     document.getElementById('editCost').value     = p.cost   || 0;
     document.getElementById('editStockKH').value  = p.stockKH || 0;
     document.getElementById('editStockTN').value  = p.stockTN || 0;
+    document.getElementById('editStockES').value  = p.stockES || 0;
     document.getElementById('editModal').classList.add('show');
 }
 
@@ -289,14 +295,15 @@ async function submitProduct() {
     const cost     = parseFloat(document.getElementById('editCost').value)    || 0;
     const stockKH  = parseInt(document.getElementById('editStockKH').value)   || 0;
     const stockTN  = parseInt(document.getElementById('editStockTN').value)   || 0;
+    const stockES  = parseInt(document.getElementById('editStockES').value)   || 0;
 
     if (!name) { alert('請輸入商品名稱'); return; }
 
     const isEdit = !!id;
     const action = isEdit ? 'updateProduct' : 'addProduct';
     const data   = isEdit
-        ? { id: Number(id), name, category, price, cost, stockKH, stockTN }
-        : { name, category, price, cost, stockKH, stockTN };
+        ? { id: Number(id), name, category, price, cost, stockKH, stockTN, stockES }
+        : { name, category, price, cost, stockKH, stockTN, stockES };
 
     const btn = document.getElementById('saveBtn');
     btn.disabled = true;
@@ -311,7 +318,7 @@ async function submitProduct() {
                 const p = rawProducts.find(x => Number(x.id) === Number(id));
                 if (p) Object.assign(p, { name, category, price, cost, stockKH, stockTN });
             } else {
-                rawProducts.push({ id: result.id, name, category, price, cost, stockKH, stockTN });
+                rawProducts.push({ id: result.id, name, category, price, cost, stockKH, stockTN, stockES });
             }
             setGas('ok');
             closeModal();
