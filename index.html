@@ -113,13 +113,18 @@
         <div id="memberResult"></div>
     </section>
     <section>
-        <div class="flex justify-between items-center mb-3">
+        <div class="flex justify-between items-center mb-2">
             <h2 class="text-xs font-bold text-gray-400 tracking-widest uppercase">🛒 結帳清單</h2>
             <div class="flex gap-2">
                 <button onclick="openProductModal()" class="text-[10px] bg-[#8e9775] text-white px-3 py-1 rounded-full">＋ 加入商品</button>
                 <button onclick="openHangListModal()" class="text-[10px] text-[#8e9775] border border-[#8e9775] px-3 py-1 rounded-full">📌 掛單</button>
                 <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
             </div>
+        </div>
+        <!-- 叫回掛單後顯示的「掛回」提示列 -->
+        <div id="recallBanner" class="hidden mb-3 flex items-center justify-between bg-[#fdf8f0] border border-[#c4a882] rounded-xl px-3 py-2">
+            <span id="recallBannerName" class="text-xs text-[#8a5a2a] font-bold"></span>
+            <button onclick="putBackHang()" class="text-[11px] bg-[#c4a882] text-white border-none rounded-lg px-3 py-1 font-bold cursor-pointer" style="font-family:'Noto Serif TC',serif;">📌 掛回同名</button>
         </div>
         <div id="cartList"><p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p></div>
     </section>
@@ -485,7 +490,8 @@ let discountFixed   = 0;
 let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
 let productModalMode = 'pos';
-let _recalledHangGasId = null; // 記錄叫回的掛單 gasId，結帳成功後刪除
+let _recalledHangGasId  = null; // 結帳成功後刪除雲端掛單
+let _recalledHangName   = null; // 叫回的掛單名稱，供「掛回」功能使用
 let studioItems     = [];
 let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
 let _pendingTx      = null;
@@ -721,7 +727,7 @@ function updateCartQty(id, delta) {
     renderCart();
 }
 function removeFromCart(id) { cart = cart.filter(c => String(c.id) !== String(id)); renderCart(); }
-function clearCart() { cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; renderCart(); }
+function clearCart() { cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; _recalledHangName = null; hideRecallBanner(); renderCart(); }
 function getItemPrice(item) { return isKH() ? item.priceKH : item.priceTN; }
 function getSubtotal()      { return cart.reduce((s, i) => s + getItemPrice(i) * i.qty, 0); }
 function getItemDiscount() {
@@ -887,6 +893,7 @@ async function confirmCheckout() {
     closeCheckoutModal();
     showToast(`✨ 結帳成功 NT$ ${total.toLocaleString()}`, 2500);
     cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    _recalledHangName = null; hideRecallBanner();
     document.getElementById('memberResult').innerHTML = '';
     document.getElementById('memberSearch').value = '';
     renderCart(); updateSummary(); closeProducts();
@@ -1066,11 +1073,46 @@ async function recallOrder(idx) {
         document.getElementById('memberResult').innerHTML = `<div style="background:#f1f3eb;border:1px solid #8e9775;border-radius:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;"><div><span style="font-weight:bold;color:#6d7756;">${currentMember.name}</span><span style="font-size:10px;margin-left:6px;">${tier}</span></div><button onclick="clearMember()" style="font-size:11px;color:#f87171;background:none;border:none;cursor:pointer;">取消</button></div>`;
     }
     const orderName = order.name;
+    _recalledHangName = orderName;
     hangOrders.splice(idx, 1);
     saveHangToLocal();
     renderCart(); updateSummary(); renderHangList();
     closeHangListModal();
+    showRecallBanner(orderName);
     showToast(`📌 已叫回：${orderName}`);
+}
+
+function showRecallBanner(name) {
+    document.getElementById('recallBannerName').innerText = `叫回中：${name}`;
+    document.getElementById('recallBanner').classList.remove('hidden');
+}
+function hideRecallBanner() {
+    document.getElementById('recallBanner').classList.add('hidden');
+}
+async function putBackHang() {
+    if (!cart.length) { showToast('購物車是空的'); return; }
+    const name = _recalledHangName || `掛單 ${hangOrders.length + 1}`;
+    const localHang = { gasId: null, name, store: storeForGAS(), cart: cart.map(i=>({...i})), member: currentMember };
+    hangOrders.push(localHang);
+    saveHangToLocal();
+    cart = []; discountRate = 0; discountFixed = 0; pointsRedeemed = 0; currentMember = null;
+    _recalledHangName = null; hideRecallBanner();
+    document.getElementById('memberResult').innerHTML = '';
+    document.getElementById('memberSearch').value = '';
+    renderCart(); updateSummary(); renderHangList();
+    showToast(`📌 已掛回：${name}`);
+    // 背景同步雲端（先刪舊的，再存新的）
+    if (API_URL) {
+        if (_recalledHangGasId) {
+            try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: _recalledHangGasId } }) }); } catch(e) {}
+            _recalledHangGasId = null;
+        }
+        try {
+            const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'saveHangOrder', data: { name, store: storeForGAS(), createdAt: taipeiNow(), cart: localHang.cart, member: localHang.member } }) });
+            const result = await res.json();
+            if (result.success) { localHang.gasId = result.id; saveHangToLocal(); }
+        } catch(e) {}
+    }
 }
 
 async function deleteHang(idx) {
