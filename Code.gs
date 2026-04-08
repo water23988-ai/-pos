@@ -81,6 +81,7 @@ function doGet(e) {
       case 'getMemberStats':        return jsonOut(getMemberStats());
       case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
+      case 'getFlowerLibrary':      return jsonOut(getFlowerLibrary());
       default:                      return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -770,6 +771,119 @@ function deleteHangOrder(data) {
     }
   }
   return { success: false, error: '找不到掛單' };
+}
+
+// ══════════════════════════════════════════════════════
+//  花材資料庫
+// ══════════════════════════════════════════════════════
+
+/**
+ * 讀取「花材資料庫」工作表
+ * 格式：第1列為花材大類標題，往下每格為該類的品種名稱
+ * 回傳：[{ name, category }, ...]
+ */
+function getFlowerLibrary() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('花材資料庫');
+  if (!sh) return [];
+
+  const vals = sh.getDataRange().getValues();
+  if (vals.length === 0) return [];
+
+  const headers = vals[0]; // 第 1 列：類別名稱
+  const result  = [];
+
+  for (let col = 0; col < headers.length; col++) {
+    const category = String(headers[col] || '').trim();
+    if (!category) continue;
+    for (let row = 1; row < vals.length; row++) {
+      const name = String(vals[row][col] || '').trim();
+      if (name) result.push({ name, category });
+    }
+  }
+
+  return result;
+}
+
+// ══════════════════════════════════════════════════════
+//  一次性資料遷移工具（在 Apps Script 手動執行）
+// ══════════════════════════════════════════════════════
+
+/**
+ * 將舊格式 Products 工作表遷移為新系統格式
+ * 舊格式：第1-2列為摘要，第3列為標題（編號/品項名稱/顏色/廠商/進價…）
+ * 新格式：第1列標題 = id|name|category|price|cost|stockKH|stockTN|stockES
+ *
+ * 執行前會自動備份至 Products_BAK
+ */
+function migrateProductsToNewFormat() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('Products');
+  if (!sh) { Logger.log('❌ 找不到 Products 工作表'); return; }
+
+  const allVals = sh.getDataRange().getValues();
+
+  // ── 備份 ──
+  let bak = ss.getSheetByName('Products_BAK');
+  if (!bak) bak = ss.insertSheet('Products_BAK');
+  else bak.clearContents();
+  bak.getRange(1, 1, allVals.length, allVals[0].length).setValues(allVals);
+  Logger.log('✅ 備份至 Products_BAK 完成');
+
+  // ── 解析舊資料（第3列=index 2 為標題，第4列起=index 3 為資料）──
+  // 欄位對應（0-indexed）：
+  //   A(0)=編號  B(1)=品項名稱  C(2)=顏色/品種  D(3)=廠商
+  //   E(4)=進價  I(8)=草支售價  J(9)=高雄分配  K(10)=高雄建議  L(11)=高雄實際
+  //   O(14)=台南分配  T(19)=類別
+  const products = [];
+  let autoId = 1;
+
+  for (let i = 3; i < allVals.length; i++) {
+    const r     = allVals[i];
+    const nameB = String(r[1] || '').trim();
+    const nameC = String(r[2] || '').trim();
+    if (!nameB && !nameC) continue; // 空列跳過
+
+    const name    = (nameB && nameC) ? `${nameB} ${nameC}` : (nameB || nameC);
+    const id      = Number(r[0]) || autoId++;
+    const cost    = Number(r[4])  || 0;
+    const priceI  = Number(r[8])  || 0;  // 草支售價
+    const priceL  = Number(r[11]) || 0;  // 高雄實際售價
+    const price   = Math.round(priceL || priceI || cost * 4);
+    const stockKH = Math.max(0, Math.round(Number(r[9])  || 0));
+    const stockTN = Math.max(0, Math.round(Number(r[14]) || 0));
+    const cat     = String(r[19] || '').trim() || '其他加購';
+
+    products.push([id, name, cat, price, cost, stockKH, stockTN, 0]);
+  }
+
+  // ── 清空並寫入新格式 ──
+  sh.clearContents();
+  sh.getRange(1, 1, 1, 8).setValues([['id','name','category','price','cost','stockKH','stockTN','stockES']]);
+  if (products.length > 0) {
+    sh.getRange(2, 1, products.length, 8).setValues(products);
+  }
+
+  const msg = `✅ 遷移完成：共 ${products.length} 筆商品。備份在 Products_BAK。`;
+  Logger.log(msg);
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
+ * 在 Transactions 工作表補上 items 欄位（若尚未存在）
+ */
+function fixTransactionsSheet() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('Transactions');
+  if (!sh || sh.getLastRow() < 1) { Logger.log('❌ 找不到 Transactions'); return; }
+
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (headers.includes('items')) { Logger.log('✅ items 欄位已存在，無需處理'); return; }
+
+  const nextCol = sh.getLastColumn() + 1;
+  sh.getRange(1, nextCol).setValue('items');
+  Logger.log(`✅ 已在第 ${nextCol} 欄新增 items 欄位`);
+  SpreadsheetApp.getUi().alert('已新增 items 欄位到 Transactions 工作表！');
 }
 
 // ══════════════════════════════════════════════════════

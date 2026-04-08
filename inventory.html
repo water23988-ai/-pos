@@ -108,12 +108,30 @@
 
     <!-- 品項搜尋列表 -->
     <div id="receiveProductPicker">
-        <div class="flex gap-2 mb-3">
-            <input type="text" id="receiveSearch" placeholder="搜尋品項..." oninput="renderReceiveList()"
-                class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+        <!-- Tab 切換 -->
+        <div class="flex gap-1 mb-3 bg-gray-100 rounded-xl p-1">
+            <button onclick="setPickerTab('products')" id="ptab-products"
+                class="flex-1 text-xs py-2 rounded-lg bg-white font-bold shadow-sm text-[#6d7756] transition">商品庫</button>
+            <button onclick="setPickerTab('library')" id="ptab-library"
+                class="flex-1 text-xs py-2 rounded-lg text-gray-400 transition">🌸 花材資料庫</button>
         </div>
-        <div id="receiveProductList">
-            <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+
+        <!-- 商品庫 Tab -->
+        <div id="productsPickerTab">
+            <input type="text" id="receiveSearch" placeholder="搜尋品項名稱..." oninput="renderReceiveList()"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775] mb-2">
+            <div id="receiveProductList">
+                <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+            </div>
+        </div>
+
+        <!-- 花材資料庫 Tab -->
+        <div id="libraryPickerTab" class="hidden">
+            <input type="text" id="librarySearch" placeholder="搜尋花材名稱或類別..." oninput="renderLibraryList()"
+                class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775] mb-2">
+            <div id="libraryList">
+                <p class="text-center text-gray-300 text-xs py-8">點此載入花材資料庫...</p>
+            </div>
         </div>
     </div>
 
@@ -214,6 +232,8 @@ let rawProducts      = [];
 let _adjustProduct   = null;
 let _selectedProduct = null;
 let _batchItems      = [];   // 批次進貨清單
+let _flowerLibrary   = [];   // 花材資料庫快取
+let _pickerTab       = 'products';
 let _toastTimer;
 
 // ── 直接初始化（不需要密碼）──
@@ -358,6 +378,104 @@ async function submitAdjust() {
 }
 
 // ══ Tab 2: 進貨入庫 ══
+// ── 進貨選品 Tab 切換 ──
+function setPickerTab(tab) {
+    _pickerTab = tab;
+    const isP = tab === 'products';
+    document.getElementById('productsPickerTab').classList.toggle('hidden', !isP);
+    document.getElementById('libraryPickerTab').classList.toggle('hidden', isP);
+    document.getElementById('ptab-products').className = `flex-1 text-xs py-2 rounded-lg transition ${isP ? 'bg-white font-bold shadow-sm text-[#6d7756]' : 'text-gray-400'}`;
+    document.getElementById('ptab-library').className  = `flex-1 text-xs py-2 rounded-lg transition ${!isP ? 'bg-white font-bold shadow-sm text-[#6d7756]' : 'text-gray-400'}`;
+    if (!isP && _flowerLibrary.length === 0) loadFlowerLibrary();
+}
+
+// ── 花材資料庫 ──
+async function loadFlowerLibrary() {
+    const el = document.getElementById('libraryList');
+    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">載入花材資料庫...</p>';
+    try {
+        const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
+        _flowerLibrary = await res.json();
+        if (!Array.isArray(_flowerLibrary)) _flowerLibrary = [];
+        renderLibraryList();
+    } catch(e) {
+        el.innerHTML = '<p class="text-center text-red-300 text-xs py-8">載入失敗，請確認 API 設定</p>';
+    }
+}
+
+function renderLibraryList() {
+    const kw  = (document.getElementById('librarySearch')?.value || '').trim().toLowerCase();
+    const el  = document.getElementById('libraryList');
+    let items = _flowerLibrary;
+    if (kw) items = items.filter(x => x.name.toLowerCase().includes(kw) || (x.category||'').toLowerCase().includes(kw));
+
+    if (!items.length) {
+        el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無花材</p>';
+        return;
+    }
+
+    // 分類群組
+    const catMap = {};
+    items.forEach(x => {
+        const c = x.category || '其他';
+        if (!catMap[c]) catMap[c] = [];
+        catMap[c].push(x.name);
+    });
+
+    el.innerHTML = Object.entries(catMap).map(([cat, names]) => `
+        <div class="cat-header">${cat}</div>
+        ${names.map(name => {
+            const existing = rawProducts.find(p => p.name === name || p.name.startsWith(name));
+            const inBatch  = _batchItems.some(b => b.product.name === name || (existing && b.product.id === existing?.id));
+            return `<div class="inv-row">
+                <div style="flex:1;">
+                    <span style="font-size:13px;font-weight:bold;">${name}</span>
+                    ${existing
+                        ? `<span class="stock-badge stock-ok" style="margin-left:6px;">商品庫 ✓</span>`
+                        : `<span class="stock-badge stock-zero" style="margin-left:6px;">未建立</span>`}
+                    ${inBatch ? `<span class="stock-badge" style="margin-left:4px;background:#fef3c7;color:#92400e;">已加入清單</span>` : ''}
+                </div>
+                <button onclick="selectFromLibrary(${JSON.stringify(name)}, ${JSON.stringify(cat)})"
+                    style="background:${existing?'#8e9775':'#c4a882'};color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">
+                    ${existing ? '選擇進貨' : '＋建立'}
+                </button>
+            </div>`;
+        }).join('')}
+    `).join('');
+}
+
+async function selectFromLibrary(name, category) {
+    // 若已在商品庫，直接進入進貨表單
+    const existing = rawProducts.find(p => p.name === name || p.name.startsWith(name));
+    if (existing) {
+        setPickerTab('products');
+        selectReceiveProduct(existing.id);
+        return;
+    }
+
+    // 尚未建立：快速建立商品
+    const costStr = prompt(`「${name}」尚未在商品庫。\n請輸入進價（NT$），系統將自動建立商品：`, '');
+    if (costStr === null) return; // 取消
+    const cost  = parseFloat(costStr) || 0;
+    const price = Math.round(cost * 4);
+
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addProduct', data: { name, category, price, cost, stockKH: 0, stockTN: 0, stockES: 0 } }) });
+        const result = await res.json();
+        if (result.success) {
+            const newProd = { id: result.id, name, category, price, cost, stockKH: 0, stockTN: 0, stockES: 0 };
+            rawProducts.push(newProd);
+            setGas('ok');
+            showToast(`✅ 已建立：${name}，進入進貨`);
+            setPickerTab('products');
+            selectReceiveProduct(result.id);
+        } else {
+            setGas('error'); showToast('❌ 建立失敗');
+        }
+    } catch(e) { setGas('error'); showToast('❌ 連線失敗'); }
+}
+
 function renderReceiveList() {
     const keyword = (document.getElementById('receiveSearch').value || '').trim().toLowerCase();
     const isKH    = currentStore !== '台南FOCUS';
@@ -511,17 +629,20 @@ function addToBatch() {
     const note    = document.getElementById('receiveNote').value.trim() || '進貨入庫';
     if (qtyKH + qtyTN + qtyES <= 0) return alert('至少一個據點需填入進貨數量');
 
+    const addedName = _selectedProduct ? _selectedProduct.name : '';
     _batchItems.push({ product: _selectedProduct, unitCost, qtyKH, qtyTN, qtyES, note });
     renderBatchList();
 
-    // 清空欄位，回到選品（不清空進價，方便連續進同批花）
+    // 清空欄位，回到選品
     document.getElementById('receiveQtyKH').value = '';
     document.getElementById('receiveQtyTN').value = '';
     document.getElementById('receiveQtyES').value = '';
     document.getElementById('receiveNote').value  = '';
     document.getElementById('receiveTotalHint').innerText = '合計：0 枝';
     clearSelectedProduct();
-    showToast(`✅ 已加入：${_selectedProduct ? _selectedProduct.name : ''}`);
+    // 若花材資料庫 tab 開著，刷新 badge 狀態
+    if (_pickerTab === 'library') renderLibraryList();
+    showToast(`✅ 已加入：${addedName}`);
 }
 
 function renderBatchList() {
