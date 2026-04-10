@@ -112,8 +112,9 @@ function doPost(e) {
       case 'updateMemberPoints': return jsonOut(updateMemberPoints(data));
       // 掛單
       case 'saveHangOrder':   return jsonOut(saveHangOrder(data));
-      case 'deleteHangOrder': return jsonOut(deleteHangOrder(data));
-      case 'logPriceHistory': return jsonOut(logPriceHistory(data));
+      case 'deleteHangOrder':      return jsonOut(deleteHangOrder(data));
+      case 'logPriceHistory':      return jsonOut(logPriceHistory(data));
+      case 'addFlowerToLibrary':   return jsonOut(addFlowerToLibrary(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -786,6 +787,38 @@ function deleteHangOrder(data) {
 // ══════════════════════════════════════════════════════
 //  花材資料庫
 // ══════════════════════════════════════════════════════
+
+function addFlowerToLibrary(data) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const sh = ss.getSheetByName('花材資料庫');
+  if (!sh) return { success: false, error: '找不到花材資料庫工作表' };
+
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0]; // 第 1 列：類別名稱
+
+  // 找到對應類別的欄位
+  let colIdx = -1;
+  for (let i = 0; i < headers.length; i++) {
+    if (String(headers[i]).trim() === String(data.category).trim()) { colIdx = i; break; }
+  }
+
+  if (colIdx === -1) {
+    // 類別不存在 → 新增一欄
+    colIdx = headers.length;
+    sh.getRange(1, colIdx + 1).setValue(data.category);
+    // 重新讀取 vals
+    sh.getRange(1, colIdx + 1).setValue(data.category);
+  }
+
+  // 找到該欄第一個空白列（從第 2 列開始）
+  let rowIdx = 1;
+  while (rowIdx < vals.length && String(vals[rowIdx][colIdx] || '').trim() !== '') {
+    rowIdx++;
+  }
+
+  sh.getRange(rowIdx + 1, colIdx + 1).setValue(data.name);
+  return { success: true };
+}
 
 /**
  * 讀取「花材資料庫」工作表

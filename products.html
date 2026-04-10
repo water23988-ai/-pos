@@ -475,31 +475,93 @@ function clearWkSelection() {
     renderWkLibraryList();
 }
 
+let _wkExpandedCat = null;
+
 function renderWkLibraryList() {
     const kw  = (document.getElementById('wkLibrarySearch')?.value || '').trim().toLowerCase();
     const el  = document.getElementById('wkLibraryList');
     let items = _wkLibrary;
     if (kw) items = items.filter(x => x.name.toLowerCase().includes(kw) || (x.category||'').toLowerCase().includes(kw));
-    if (!items.length) { el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無花材</p>'; return; }
+    if (!items.length) {
+        el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無花材</p>';
+        return;
+    }
 
+    // 分類
     const catMap = {};
     items.forEach(x => { const c = x.category||'其他'; if (!catMap[c]) catMap[c]=[]; catMap[c].push(x.name); });
 
-    el.innerHTML = Object.entries(catMap).map(([cat, names]) => `
-        <div class="cat-header">${cat}</div>
-        ${names.map(name => {
-            const sel    = _wkSelected.has(name);
-            const exists = rawProducts.find(p => p.name === name);
-            return `<div class="inv-row" onclick="toggleWkItem(${JSON.stringify(name)},${JSON.stringify(cat)})"
-                style="cursor:pointer;background:${sel?'#f1f3eb':'white'};border-left:3px solid ${sel?'#8e9775':'transparent'};padding-left:10px;display:flex;align-items:center;padding:10px 10px 10px 10px;border-radius:10px;border:1px solid #f3f4f6;margin-bottom:6px;">
-                <div style="margin-right:10px;font-size:18px;color:${sel?'#8e9775':'#d1d5db'};">${sel?'✓':'○'}</div>
-                <div style="flex:1;">
-                    <span style="font-size:13px;font-weight:${sel?'bold':'normal'};">${name}</span>
-                    ${exists ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;margin-left:6px;">已在商品庫</span>` : ''}
+    const selectedTotal = _wkSelected.size;
+    el.innerHTML = Object.entries(catMap).map(([cat, names]) => {
+        const selCount   = names.filter(n => _wkSelected.has(n)).length;
+        const isExpanded = _wkExpandedCat === cat || kw;
+        return `
+        <div style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
+            <div onclick="toggleWkCat(${JSON.stringify(cat)})"
+                style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:${selCount>0?'#f1f3eb':'#fafaf9'};cursor:pointer;">
+                <span style="font-weight:bold;font-size:13px;color:${selCount>0?'#6d7756':'#4a4a4a'};">${cat}</span>
+                <div style="display:flex;align-items:center;gap:8px;">
+                    ${selCount > 0 ? `<span style="font-size:11px;background:#8e9775;color:white;border-radius:10px;padding:2px 8px;">已選 ${selCount}</span>` : ''}
+                    <span style="font-size:16px;color:#9ca3af;">${isExpanded ? '▲' : '▼'}</span>
                 </div>
-            </div>`;
-        }).join('')}
-    `).join('');
+            </div>
+            ${isExpanded ? `<div style="border-top:1px solid #f3f4f6;padding:8px;">
+                ${names.map(name => {
+                    const sel    = _wkSelected.has(name);
+                    const exists = rawProducts.find(p => p.name === name);
+                    return `<div onclick="event.stopPropagation();toggleWkItem(${JSON.stringify(name)},${JSON.stringify(cat)})"
+                        style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;background:${sel?'#f1f3eb':'white'};margin-bottom:4px;">
+                        <span style="font-size:18px;color:${sel?'#8e9775':'#d1d5db'};margin-right:10px;">${sel?'✓':'○'}</span>
+                        <span style="font-size:13px;font-weight:${sel?'bold':'normal'};flex:1;">${name}</span>
+                        ${exists ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:8px;padding:2px 7px;">在庫</span>` : ''}
+                    </div>`;
+                }).join('')}
+                <div onclick="openAddFlowerModal(${JSON.stringify(cat)})"
+                    style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;color:#8e9775;border:1px dashed #c6cdb5;margin-top:4px;font-size:12px;">
+                    ＋ 新增花材到「${cat}」
+                </div>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleWkCat(cat) {
+    _wkExpandedCat = _wkExpandedCat === cat ? null : cat;
+    renderWkLibraryList();
+}
+
+function openAddFlowerModal(cat) {
+    document.getElementById('newFlowerCat').value = cat || '';
+    document.getElementById('newFlowerName').value = '';
+    document.getElementById('addFlowerModal').classList.remove('hidden');
+    setTimeout(() => document.getElementById('newFlowerName').focus(), 100);
+}
+function closeAddFlowerModal() {
+    document.getElementById('addFlowerModal').classList.add('hidden');
+}
+async function submitAddFlower() {
+    const name = document.getElementById('newFlowerName').value.trim();
+    const cat  = document.getElementById('newFlowerCat').value.trim() || '其他';
+    if (!name) return alert('請輸入花材名稱');
+    setGas('loading');
+    try {
+        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addFlowerToLibrary', data: { name, category: cat } }) });
+        const r   = await res.json();
+        if (r.success) {
+            _wkLibrary.push({ name, category: cat });
+            _wkExpandedCat = cat;
+            closeAddFlowerModal();
+            renderWkLibraryList();
+            showToast(`✅ 已新增：${name}`);
+            setGas('ok');
+        } else {
+            setGas('error');
+            alert('新增失敗：' + (r.error || ''));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗');
+    }
 }
 
 // ══ 本週進花精靈 Modal ══
@@ -717,6 +779,27 @@ function filterPriceHistory() {
       <button onclick="submitWkImport()" id="wkImportBtn"
         class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">✅ 全部入庫</button>
     </div>
+  </div>
+</div>
+
+<!-- ══ 新增花材 Modal ══ -->
+<div id="addFlowerModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[400] flex items-center justify-center p-6">
+  <div class="bg-white rounded-2xl w-full max-w-xs shadow-2xl p-6">
+    <div class="flex justify-between items-center mb-4">
+      <h3 class="font-bold text-base">新增花材</h3>
+      <button onclick="closeAddFlowerModal()" class="text-gray-300 text-xl leading-none">✕</button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="s-label">花材名稱 *</label>
+        <input type="text" id="newFlowerName" placeholder="例：繡球花（藍）" class="s-input">
+      </div>
+      <div>
+        <label class="s-label">類別</label>
+        <input type="text" id="newFlowerCat" placeholder="主花 / 配花 / 葉材…" class="s-input">
+      </div>
+    </div>
+    <button onclick="submitAddFlower()" class="btn-primary mt-4">新增到資料庫</button>
   </div>
 </div>
 
