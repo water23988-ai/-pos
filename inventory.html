@@ -147,12 +147,24 @@
     <!-- 進貨表單：多店分配 -->
     <div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
 
-        <!-- 進價 & 自動售價 -->
+        <!-- 把價 & 枝數 -->
         <div class="grid grid-cols-2 gap-3">
             <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支進價 *</label>
-                <input type="number" id="receiveUnitCost" placeholder="NT$" min="0" step="1"
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">把價 *</label>
+                <input type="number" id="receiveBundlePrice" placeholder="NT$/把" min="0" step="1"
                     oninput="updateAutoPrice()" class="s-input">
+            </div>
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">枝數/把 *</label>
+                <input type="number" id="receiveStems" placeholder="枝" min="1" step="1"
+                    oninput="updateAutoPrice()" class="s-input">
+            </div>
+        </div>
+        <!-- 單支成本 & 建議售價 -->
+        <div class="grid grid-cols-2 gap-3">
+            <div>
+                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支成本</label>
+                <div id="unitCostDisplay" class="s-input bg-gray-50 text-gray-500 font-bold" style="border-style:dashed;">—</div>
             </div>
             <div>
                 <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">建議售價（×4）</label>
@@ -478,15 +490,16 @@ function openWeeklyImport() {
     const rows  = document.getElementById('weeklyImportRows');
 
     rows.innerHTML = [..._librarySelected.entries()].map(([name, cat]) => {
-        const existing = rawProducts.find(p => p.name === name);
-        const cost = existing ? existing.cost : '';
         return `<div class="weekly-row grid items-center gap-1" data-name="${name}" data-cat="${cat}"
-            style="grid-template-columns:1fr 70px 55px 42px 42px 42px;border-bottom:1px solid #f3f4f6;padding-bottom:6px;">
-            <div style="font-size:12px;font-weight:bold;color:#4a4a4a;">${name}</div>
-            <input type="number" class="cost-input border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full"
-                placeholder="NT$" min="0" value="${cost}"
-                oninput="updateRowPrice(this)">
-            <div class="price-display text-xs text-center text-[#8e9775] font-bold">${cost ? 'NT$'+(cost*4) : '—'}</div>
+            style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px;border-bottom:1px solid #f3f4f6;padding-bottom:6px;">
+            <div style="font-size:12px;font-weight:bold;color:#4a4a4a;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
+            <input type="number" class="bundle-input border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full"
+                placeholder="NT$" min="0"
+                oninput="updateRowCalc(this)">
+            <input type="number" class="stems-input border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full"
+                placeholder="枝" min="1" value="10"
+                oninput="updateRowCalc(this)">
+            <div class="price-display text-xs text-center text-[#8e9775] font-bold">—</div>
             <input type="number" class="qty-kh border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
             <input type="number" class="qty-tn border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
             <input type="number" class="qty-es border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
@@ -497,20 +510,24 @@ function openWeeklyImport() {
     modal.classList.remove('hidden');
 }
 
-function updateRowPrice(costEl) {
-    const cost  = parseFloat(costEl.value) || 0;
-    const row   = costEl.closest('.weekly-row');
-    const priceEl = row.querySelector('.price-display');
-    priceEl.innerText = cost > 0 ? `NT$ ${cost * 4}` : '—';
+function updateRowCalc(el) {
+    const row    = el.closest('.weekly-row');
+    const bundle = parseFloat(row.querySelector('.bundle-input').value) || 0;
+    const stems  = parseFloat(row.querySelector('.stems-input').value) || 1;
+    const cost   = bundle > 0 ? bundle / stems : 0;
+    const price  = cost > 0 ? Math.round(cost * 4) : 0;
+    row.querySelector('.price-display').innerText = price > 0 ? `NT$ ${price}` : '—';
     updateWeeklyHint();
 }
 
 function applyBulkCost() {
-    const bulk = parseFloat(document.getElementById('bulkCostInput').value) || 0;
-    if (!bulk) return;
-    document.querySelectorAll('.weekly-row .cost-input').forEach(el => {
-        el.value = bulk;
-        updateRowPrice(el);
+    const bulkBundle = parseFloat(document.getElementById('bulkCostInput').value) || 0;
+    const bulkStems  = parseFloat(document.getElementById('bulkStemsInput').value) || 0;
+    if (!bulkBundle && !bulkStems) return;
+    document.querySelectorAll('.weekly-row').forEach(row => {
+        if (bulkBundle) row.querySelector('.bundle-input').value = bulkBundle;
+        if (bulkStems)  row.querySelector('.stems-input').value  = bulkStems;
+        updateRowCalc(row.querySelector('.bundle-input'));
     });
 }
 
@@ -531,14 +548,19 @@ function closeWeeklyImport() {
 
 async function submitWeeklyImport() {
     const rows = [...document.querySelectorAll('.weekly-row')];
-    const items = rows.map(row => ({
-        name    : row.dataset.name,
-        category: row.dataset.cat,
-        cost    : parseFloat(row.querySelector('.cost-input').value) || 0,
-        qtyKH   : parseInt(row.querySelector('.qty-kh').value) || 0,
-        qtyTN   : parseInt(row.querySelector('.qty-tn').value) || 0,
-        qtyES   : parseInt(row.querySelector('.qty-es').value) || 0,
-    })).filter(x => x.qtyKH + x.qtyTN + x.qtyES > 0);
+    const items = rows.map(row => {
+        const bundle = parseFloat(row.querySelector('.bundle-input').value) || 0;
+        const stems  = parseFloat(row.querySelector('.stems-input').value) || 1;
+        const cost   = bundle > 0 ? Math.round((bundle / stems) * 10) / 10 : 0;
+        return {
+            name    : row.dataset.name,
+            category: row.dataset.cat,
+            cost,
+            qtyKH   : parseInt(row.querySelector('.qty-kh').value) || 0,
+            qtyTN   : parseInt(row.querySelector('.qty-tn').value) || 0,
+            qtyES   : parseInt(row.querySelector('.qty-es').value) || 0,
+        };
+    }).filter(x => x.qtyKH + x.qtyTN + x.qtyES > 0);
 
     if (!items.length) return alert('至少一種花材需填入進貨數量');
 
@@ -646,21 +668,25 @@ function selectReceiveProduct(id) {
     document.getElementById('selectedProductArea').classList.remove('hidden');
     document.getElementById('receiveProductPicker').classList.add('hidden');
     document.getElementById('receiveForm').classList.remove('hidden');
-    // 填入現有進價
-    document.getElementById('receiveUnitCost').value = p.cost || '';
+    // 清空把價/枝數（每週進價不同，讓使用者重新填）
+    document.getElementById('receiveBundlePrice').value = '';
+    document.getElementById('receiveStems').value = '';
+    document.getElementById('unitCostDisplay').innerText  = p.cost ? `上次 NT$ ${p.cost}` : '—';
+    document.getElementById('autoPriceDisplay').innerText = p.price ? `上次 NT$ ${p.price}` : '—';
     document.getElementById('receiveQtyKH').value = '';
     document.getElementById('receiveQtyTN').value = '';
     document.getElementById('receiveQtyES').value = '';
     document.getElementById('receiveNote').value = '';
-    updateAutoPrice();
     setupQtyListeners();
-    setTimeout(() => document.getElementById('receiveUnitCost').focus(), 100);
+    setTimeout(() => document.getElementById('receiveBundlePrice').focus(), 100);
 }
 
 function updateAutoPrice() {
-    const cost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
-    const auto = cost > 0 ? `NT$ ${cost * 4}` : '—';
-    document.getElementById('autoPriceDisplay').innerText = auto;
+    const bundle = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
+    const stems  = parseFloat(document.getElementById('receiveStems').value) || 1;
+    const cost   = bundle > 0 ? Math.round((bundle / stems) * 10) / 10 : 0;
+    document.getElementById('unitCostDisplay').innerText  = cost > 0 ? `NT$ ${cost.toFixed(1)}` : '—';
+    document.getElementById('autoPriceDisplay').innerText = cost > 0 ? `NT$ ${Math.round(cost * 4)}` : '—';
 }
 
 function setupQtyListeners() {
@@ -686,7 +712,9 @@ function clearSelectedProduct() {
 
 async function submitReceive() {
     if (!_selectedProduct) return alert('請先選擇品項');
-    const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
+    const bundlePrice = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
+    const stems       = parseFloat(document.getElementById('receiveStems').value) || 1;
+    const unitCost    = bundlePrice > 0 ? Math.round((bundlePrice / stems) * 10) / 10 : 0;
     const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
     const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
     const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
@@ -743,7 +771,9 @@ async function submitReceive() {
 // ── 批次進貨 ──
 function addToBatch() {
     if (!_selectedProduct) return alert('請先選擇品項');
-    const unitCost = parseFloat(document.getElementById('receiveUnitCost').value) || 0;
+    const bundlePrice = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
+    const stems       = parseFloat(document.getElementById('receiveStems').value) || 1;
+    const unitCost    = bundlePrice > 0 ? Math.round((bundlePrice / stems) * 10) / 10 : 0;
     const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
     const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
     const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
@@ -897,20 +927,23 @@ function showToast(msg, duration = 2000) {
       <button onclick="closeWeeklyImport()" class="text-gray-300 text-2xl leading-none">✕</button>
     </div>
 
-    <!-- 批次套用進價 -->
+    <!-- 批次套用把價 & 枝數 -->
     <div class="px-5 py-3 bg-[#fafaf9] border-b border-gray-100 flex gap-2 items-center">
-      <span class="text-xs text-gray-500 whitespace-nowrap">批次套用進價</span>
-      <input type="number" id="bulkCostInput" placeholder="NT$/枝" min="0" step="1"
-        class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#8e9775]">
-      <button onclick="applyBulkCost()" class="bg-[#c4a882] text-white text-xs font-bold px-4 py-1.5 rounded-lg whitespace-nowrap">套用全部</button>
+      <span class="text-xs text-gray-500 whitespace-nowrap">批次套用</span>
+      <input type="number" id="bulkCostInput" placeholder="把價 NT$" min="0" step="1"
+        class="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
+      <input type="number" id="bulkStemsInput" placeholder="枝數" min="1" step="1"
+        class="w-16 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
+      <button onclick="applyBulkCost()" class="bg-[#c4a882] text-white text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">套用</button>
     </div>
 
     <!-- 花材明細表 -->
     <div class="px-5 py-3">
       <!-- 欄位標題 -->
-      <div class="grid text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2 pr-2" style="grid-template-columns:1fr 70px 55px 42px 42px 42px">
+      <div class="grid text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2 pr-2" style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px">
         <div>花材名稱</div>
-        <div class="text-center">進價(NT$)</div>
+        <div class="text-center">把價</div>
+        <div class="text-center">枝</div>
         <div class="text-center">售價×4</div>
         <div class="text-center">高雄</div>
         <div class="text-center">台南</div>
