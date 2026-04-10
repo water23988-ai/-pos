@@ -14,7 +14,7 @@
 //       存取權限 → 所有人（匿名）
 //  6. 複製部署 URL，貼入前端 API 設定欄位
 
-const SPREADSHEET_ID = 'YOUR_SPREADSHEET_ID_HERE'; // ← 填入你的試算表 ID
+const SPREADSHEET_ID = '1BQjkFe1pl7OYxvnZLoItVWZjYFnqBZalbwJPLPKMw4w';
 
 // ── 工作表名稱 ──
 const SH = {
