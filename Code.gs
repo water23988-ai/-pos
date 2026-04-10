@@ -953,6 +953,82 @@ function migrateFromOldSpreadsheet() {
 }
 
 /**
+ * 從舊試算表重新建立 Products 工作表（清除後重建，正確欄位對應）
+ * 舊格式：前幾列為摘要，某列為標題行（含「品項名稱」），其後為資料
+ * 新格式：id | name | category | price | cost | stockKH | stockTN | stockES
+ *
+ * 執行此函式即可修復「商品名稱/價格不見」問題
+ */
+function cleanRebuildProducts() {
+  const OLD_ID = '17_tJXE_uXjLTwIzwxRIxjY0bvLFr0Cmmt241EbT29_w';
+  const ss     = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const oldSS  = SpreadsheetApp.openById(OLD_ID);
+
+  const oldSh = oldSS.getSheetByName('Products');
+  if (!oldSh) { Logger.log('❌ 舊試算表找不到 Products'); return; }
+
+  const allVals = oldSh.getDataRange().getValues();
+
+  // ── 找標題行（含「品項名稱」的那列）──
+  let headerRow = -1;
+  for (let i = 0; i < allVals.length; i++) {
+    if (allVals[i].some(c => String(c).includes('品項名稱'))) { headerRow = i; break; }
+  }
+  if (headerRow === -1) {
+    Logger.log('⚠️ 找不到含「品項名稱」的標題行，嘗試從第3列開始');
+    headerRow = 2; // 預設第3列（0-indexed=2）為標題
+  }
+
+  // ── 欄位對應（依舊格式）──
+  // A=編號 B=品項名稱 C=顏色/品種 D=廠商 E=進價
+  // I=草支售價 J=高雄分配 L=高雄實際售價 O=台南分配 T=類別
+  const products = [];
+  let autoId = 1;
+
+  for (let i = headerRow + 1; i < allVals.length; i++) {
+    const r     = allVals[i];
+    const nameB = String(r[1] || '').trim();
+    const nameC = String(r[2] || '').trim();
+    if (!nameB && !nameC) continue;
+
+    const name    = (nameB && nameC) ? `${nameB} ${nameC}` : (nameB || nameC);
+    const id      = Number(r[0]) || autoId++;
+    const cost    = Number(r[4])  || 0;
+    const priceI  = Number(r[8])  || 0;
+    const priceL  = Number(r[11]) || 0;
+    const price   = Math.round(priceL || priceI || (cost > 0 ? cost * 4 : 0));
+    const stockKH = Math.max(0, Math.round(Number(r[9])  || 0));
+    const stockTN = Math.max(0, Math.round(Number(r[14]) || 0));
+    const cat     = String(r[19] || '').trim() || '其他加購';
+
+    products.push([id, name, cat, price, cost, stockKH, stockTN, 0]);
+  }
+
+  // ── 備份現有 Products ──
+  const sh = ss.getSheetByName('Products');
+  if (sh && sh.getLastRow() > 0) {
+    let bak = ss.getSheetByName('Products_BAK');
+    if (!bak) bak = ss.insertSheet('Products_BAK');
+    else bak.clearContents();
+    const cur = sh.getDataRange().getValues();
+    bak.getRange(1, 1, cur.length, cur[0].length).setValues(cur);
+    Logger.log('✅ 現有資料已備份至 Products_BAK');
+  }
+
+  // ── 清空並寫入新格式 ──
+  const newSh = sh || ss.insertSheet('Products');
+  newSh.clearContents();
+  newSh.getRange(1, 1, 1, 8).setValues([['id','name','category','price','cost','stockKH','stockTN','stockES']]);
+  if (products.length > 0) {
+    newSh.getRange(2, 1, products.length, 8).setValues(products);
+  }
+
+  const msg = `✅ 重建完成：共 ${products.length} 筆商品（從舊試算表讀取）。舊資料備份在 Products_BAK。`;
+  Logger.log(msg);
+  SpreadsheetApp.getUi().alert(msg);
+}
+
+/**
  * 將舊格式 Products 工作表遷移為新系統格式
  * 舊格式：第1-2列為摘要，第3列為標題（編號/品項名稱/顏色/廠商/進價…）
  * 新格式：第1列標題 = id|name|category|price|cost|stockKH|stockTN|stockES
@@ -973,26 +1049,28 @@ function migrateProductsToNewFormat() {
   bak.getRange(1, 1, allVals.length, allVals[0].length).setValues(allVals);
   Logger.log('✅ 備份至 Products_BAK 完成');
 
-  // ── 解析舊資料（第3列=index 2 為標題，第4列起=index 3 為資料）──
-  // 欄位對應（0-indexed）：
-  //   A(0)=編號  B(1)=品項名稱  C(2)=顏色/品種  D(3)=廠商
-  //   E(4)=進價  I(8)=草支售價  J(9)=高雄分配  K(10)=高雄建議  L(11)=高雄實際
-  //   O(14)=台南分配  T(19)=類別
+  // ── 找到標題行（含「品項名稱」）或預設第3列 ──
+  let headerRow = 2; // 0-indexed，預設第3列
+  for (let i = 0; i < Math.min(5, allVals.length); i++) {
+    if (allVals[i].some(c => String(c).includes('品項名稱'))) { headerRow = i; break; }
+  }
+
+  // ── 欄位對應（0-indexed）──
   const products = [];
   let autoId = 1;
 
-  for (let i = 3; i < allVals.length; i++) {
+  for (let i = headerRow + 1; i < allVals.length; i++) {
     const r     = allVals[i];
     const nameB = String(r[1] || '').trim();
     const nameC = String(r[2] || '').trim();
-    if (!nameB && !nameC) continue; // 空列跳過
+    if (!nameB && !nameC) continue;
 
     const name    = (nameB && nameC) ? `${nameB} ${nameC}` : (nameB || nameC);
     const id      = Number(r[0]) || autoId++;
     const cost    = Number(r[4])  || 0;
-    const priceI  = Number(r[8])  || 0;  // 草支售價
-    const priceL  = Number(r[11]) || 0;  // 高雄實際售價
-    const price   = Math.round(priceL || priceI || cost * 4);
+    const priceI  = Number(r[8])  || 0;
+    const priceL  = Number(r[11]) || 0;
+    const price   = Math.round(priceL || priceI || (cost > 0 ? cost * 4 : 0));
     const stockKH = Math.max(0, Math.round(Number(r[9])  || 0));
     const stockTN = Math.max(0, Math.round(Number(r[14]) || 0));
     const cat     = String(r[19] || '').trim() || '其他加購';

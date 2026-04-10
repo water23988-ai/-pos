@@ -244,7 +244,7 @@ function renderList() {
 
     const catMap = {};
     rawProducts.forEach(p => {
-        if (keyword && !p.name.toLowerCase().includes(keyword)) return;
+        if (keyword && !(p.name||'').toLowerCase().includes(keyword)) return;
         const cat = p.category || '其他加購';
         if (catF && cat !== catF) return;
         if (!catMap[cat]) catMap[cat] = [];
@@ -497,7 +497,7 @@ function renderWkLibraryList() {
         const isExpanded = _wkExpandedCat === cat || kw;
         return `
         <div style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
-            <div onclick="toggleWkCat(${JSON.stringify(cat)})"
+            <div data-cat="${cat.replace(/"/g,'&quot;')}" onclick="toggleWkCat(this.dataset.cat)"
                 style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:${selCount>0?'#f1f3eb':'#fafaf9'};cursor:pointer;">
                 <span style="font-weight:bold;font-size:13px;color:${selCount>0?'#6d7756':'#4a4a4a'};">${cat}</span>
                 <div style="display:flex;align-items:center;gap:8px;">
@@ -509,14 +509,14 @@ function renderWkLibraryList() {
                 ${names.map(name => {
                     const sel    = _wkSelected.has(name);
                     const exists = rawProducts.find(p => p.name === name);
-                    return `<div onclick="event.stopPropagation();toggleWkItem(${JSON.stringify(name)},${JSON.stringify(cat)})"
+                    return `<div data-name="${name.replace(/"/g,'&quot;')}" data-cat="${cat.replace(/"/g,'&quot;')}" onclick="event.stopPropagation();toggleWkItem(this.dataset.name,this.dataset.cat)"
                         style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;background:${sel?'#f1f3eb':'white'};margin-bottom:4px;">
                         <span style="font-size:18px;color:${sel?'#8e9775':'#d1d5db'};margin-right:10px;">${sel?'✓':'○'}</span>
                         <span style="font-size:13px;font-weight:${sel?'bold':'normal'};flex:1;">${name}</span>
                         ${exists ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:8px;padding:2px 7px;">在庫</span>` : ''}
                     </div>`;
                 }).join('')}
-                <div onclick="openAddFlowerModal(${JSON.stringify(cat)})"
+                <div data-cat="${cat.replace(/"/g,'&quot;')}" onclick="openAddFlowerModal(this.dataset.cat)"
                     style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;color:#8e9775;border:1px dashed #c6cdb5;margin-top:4px;font-size:12px;">
                     ＋ 新增花材到「${cat}」
                 </div>

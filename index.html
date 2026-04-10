@@ -1115,7 +1115,7 @@ function renderHangList() {
         return;
     }
     el.innerHTML = hangOrders.map((order, idx) => {
-        const total = order.cart.reduce((s,i) => s + (currentStore==='台南FOCUS'?i.priceTN:i.priceKH)*i.qty, 0);
+        const total = order.cart.reduce((s,i) => s + (i.price||i.priceKH||i.priceTN||0)*i.qty, 0);
         const itemNames = order.cart.slice(0,3).map(i=>i.name).join('、') + (order.cart.length>3?`…等${order.cart.length}項`:'');
         return `<div style="background:#fafaf9;border:1px solid #e5e7eb;border-radius:12px;padding:12px 14px;margin-bottom:8px;">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px;">
@@ -1466,7 +1466,7 @@ function addToStudioFromProduct(id) {
     if (!p) return;
     const existing = studioItems.find(i => i.productId === id);
     if (existing) existing.qty = (existing.qty||1) + 1;
-    else studioItems.push({ productId: id, name: p.name, price: p.priceKH, cost: p.cost||0, qty: 1, manual: false });
+    else studioItems.push({ productId: id, name: p.name, price: p.price||0, cost: p.cost||0, qty: 1, manual: false });
     renderStudioItems();
     closeProductModal();
     showToast(`已加入 ${p.name} ✓`);
