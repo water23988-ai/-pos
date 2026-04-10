@@ -1025,7 +1025,6 @@ function cleanRebuildProducts() {
 
   const msg = `✅ 重建完成：共 ${products.length} 筆商品（從舊試算表讀取）。舊資料備份在 Products_BAK。`;
   Logger.log(msg);
-  SpreadsheetApp.getUi().alert(msg);
 }
 
 /**
@@ -1087,7 +1086,6 @@ function migrateProductsToNewFormat() {
 
   const msg = `✅ 遷移完成：共 ${products.length} 筆商品。備份在 Products_BAK。`;
   Logger.log(msg);
-  SpreadsheetApp.getUi().alert(msg);
 }
 
 /**
@@ -1104,7 +1102,6 @@ function fixTransactionsSheet() {
   const nextCol = sh.getLastColumn() + 1;
   sh.getRange(1, nextCol).setValue('items');
   Logger.log(`✅ 已在第 ${nextCol} 欄新增 items 欄位`);
-  SpreadsheetApp.getUi().alert('已新增 items 欄位到 Transactions 工作表！');
 }
 
 // ══════════════════════════════════════════════════════
