@@ -125,10 +125,19 @@
             </div>
         </div>
 
-        <!-- 花材資料庫 Tab -->
+        <!-- 花材資料庫 Tab — 多選本週進花 -->
         <div id="libraryPickerTab" class="hidden">
-            <input type="text" id="librarySearch" placeholder="搜尋花材名稱或類別..." oninput="renderLibraryList()"
-                class="w-full border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775] mb-2">
+            <div class="flex gap-2 mb-2">
+                <input type="text" id="librarySearch" placeholder="搜尋花材名稱或類別..." oninput="renderLibraryList()"
+                    class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#8e9775]">
+                <button onclick="clearLibrarySelection()" class="text-xs text-gray-400 border border-gray-200 px-3 py-2 rounded-xl whitespace-nowrap">清除</button>
+            </div>
+            <!-- 已選計數 + 進入填資料按鈕 -->
+            <div id="librarySelBanner" class="hidden mb-3 bg-[#f1f3eb] border border-[#c6cdb5] rounded-xl px-4 py-3 flex items-center justify-between">
+                <span class="text-sm text-[#6d7756] font-bold">已選 <span id="librarySelCount">0</span> 種花材</span>
+                <button onclick="openWeeklyImport()" class="bg-[#8e9775] text-white text-sm font-bold px-5 py-2 rounded-xl">填入進貨資料 →</button>
+            </div>
+            <p class="text-[10px] text-gray-400 mb-2">勾選本週採購的花材，再點「填入進貨資料」</p>
             <div id="libraryList">
                 <p class="text-center text-gray-300 text-xs py-8">點此載入花材資料庫...</p>
             </div>
@@ -389,7 +398,9 @@ function setPickerTab(tab) {
     if (!isP && _flowerLibrary.length === 0) loadFlowerLibrary();
 }
 
-// ── 花材資料庫 ──
+// ── 花材資料庫 — 多選模式 ──
+let _librarySelected = new Map(); // name → category
+
 async function loadFlowerLibrary() {
     const el = document.getElementById('libraryList');
     el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">載入花材資料庫...</p>';
@@ -403,6 +414,26 @@ async function loadFlowerLibrary() {
     }
 }
 
+function toggleLibraryItem(name, category) {
+    if (_librarySelected.has(name)) _librarySelected.delete(name);
+    else _librarySelected.set(name, category);
+    updateLibrarySelBanner();
+    renderLibraryList();
+}
+
+function updateLibrarySelBanner() {
+    const n = _librarySelected.size;
+    const banner = document.getElementById('librarySelBanner');
+    document.getElementById('librarySelCount').innerText = n;
+    banner.classList.toggle('hidden', n === 0);
+}
+
+function clearLibrarySelection() {
+    _librarySelected.clear();
+    updateLibrarySelBanner();
+    renderLibraryList();
+}
+
 function renderLibraryList() {
     const kw  = (document.getElementById('librarySearch')?.value || '').trim().toLowerCase();
     const el  = document.getElementById('libraryList');
@@ -414,7 +445,6 @@ function renderLibraryList() {
         return;
     }
 
-    // 分類群組
     const catMap = {};
     items.forEach(x => {
         const c = x.category || '其他';
@@ -425,55 +455,146 @@ function renderLibraryList() {
     el.innerHTML = Object.entries(catMap).map(([cat, names]) => `
         <div class="cat-header">${cat}</div>
         ${names.map(name => {
-            const existing = rawProducts.find(p => p.name === name || p.name.startsWith(name));
-            const inBatch  = _batchItems.some(b => b.product.name === name || (existing && b.product.id === existing?.id));
-            return `<div class="inv-row">
-                <div style="flex:1;">
-                    <span style="font-size:13px;font-weight:bold;">${name}</span>
-                    ${existing
-                        ? `<span class="stock-badge stock-ok" style="margin-left:6px;">商品庫 ✓</span>`
-                        : `<span class="stock-badge stock-zero" style="margin-left:6px;">未建立</span>`}
-                    ${inBatch ? `<span class="stock-badge" style="margin-left:4px;background:#fef3c7;color:#92400e;">已加入清單</span>` : ''}
+            const sel = _librarySelected.has(name);
+            const exists = rawProducts.find(p => p.name === name);
+            return `<div class="inv-row" onclick="toggleLibraryItem(${JSON.stringify(name)}, ${JSON.stringify(cat)})"
+                style="cursor:pointer;background:${sel ? '#f1f3eb' : 'white'};border-left:3px solid ${sel ? '#8e9775' : 'transparent'};padding-left:10px;">
+                <div style="margin-right:10px;font-size:18px;color:${sel?'#8e9775':'#d1d5db'};">
+                    ${sel ? '✓' : '○'}
                 </div>
-                <button onclick="selectFromLibrary(${JSON.stringify(name)}, ${JSON.stringify(cat)})"
-                    style="background:${existing?'#8e9775':'#c4a882'};color:white;border:none;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer;font-weight:bold;font-family:'Noto Serif TC',serif;">
-                    ${existing ? '選擇進貨' : '＋建立'}
-                </button>
+                <div style="flex:1;">
+                    <span style="font-size:13px;font-weight:${sel?'bold':'normal'};">${name}</span>
+                    ${exists ? `<span class="stock-badge stock-ok" style="margin-left:6px;">已在商品庫</span>` : ''}
+                </div>
             </div>`;
         }).join('')}
     `).join('');
 }
 
-async function selectFromLibrary(name, category) {
-    // 若已在商品庫，直接進入進貨表單
-    const existing = rawProducts.find(p => p.name === name || p.name.startsWith(name));
-    if (existing) {
-        setPickerTab('products');
-        selectReceiveProduct(existing.id);
-        return;
+// ── 本週進花精靈 ──
+function openWeeklyImport() {
+    if (_librarySelected.size === 0) return;
+    const modal = document.getElementById('weeklyImportModal');
+    const rows  = document.getElementById('weeklyImportRows');
+
+    rows.innerHTML = [..._librarySelected.entries()].map(([name, cat]) => {
+        const existing = rawProducts.find(p => p.name === name);
+        const cost = existing ? existing.cost : '';
+        return `<div class="weekly-row grid items-center gap-1" data-name="${name}" data-cat="${cat}"
+            style="grid-template-columns:1fr 70px 55px 42px 42px 42px;border-bottom:1px solid #f3f4f6;padding-bottom:6px;">
+            <div style="font-size:12px;font-weight:bold;color:#4a4a4a;">${name}</div>
+            <input type="number" class="cost-input border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full"
+                placeholder="NT$" min="0" value="${cost}"
+                oninput="updateRowPrice(this)">
+            <div class="price-display text-xs text-center text-[#8e9775] font-bold">${cost ? 'NT$'+(cost*4) : '—'}</div>
+            <input type="number" class="qty-kh border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
+            <input type="number" class="qty-tn border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
+            <input type="number" class="qty-es border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWeeklyHint()">
+        </div>`;
+    }).join('');
+
+    updateWeeklyHint();
+    modal.classList.remove('hidden');
+}
+
+function updateRowPrice(costEl) {
+    const cost  = parseFloat(costEl.value) || 0;
+    const row   = costEl.closest('.weekly-row');
+    const priceEl = row.querySelector('.price-display');
+    priceEl.innerText = cost > 0 ? `NT$ ${cost * 4}` : '—';
+    updateWeeklyHint();
+}
+
+function applyBulkCost() {
+    const bulk = parseFloat(document.getElementById('bulkCostInput').value) || 0;
+    if (!bulk) return;
+    document.querySelectorAll('.weekly-row .cost-input').forEach(el => {
+        el.value = bulk;
+        updateRowPrice(el);
+    });
+}
+
+function updateWeeklyHint() {
+    let total = 0;
+    document.querySelectorAll('.weekly-row').forEach(row => {
+        const qty = (parseInt(row.querySelector('.qty-kh').value)||0)
+                  + (parseInt(row.querySelector('.qty-tn').value)||0)
+                  + (parseInt(row.querySelector('.qty-es').value)||0);
+        total += qty;
+    });
+    document.getElementById('weeklyImportHint').innerText = total > 0 ? `合計 ${total} 枝` : '';
+}
+
+function closeWeeklyImport() {
+    document.getElementById('weeklyImportModal').classList.add('hidden');
+}
+
+async function submitWeeklyImport() {
+    const rows = [...document.querySelectorAll('.weekly-row')];
+    const items = rows.map(row => ({
+        name    : row.dataset.name,
+        category: row.dataset.cat,
+        cost    : parseFloat(row.querySelector('.cost-input').value) || 0,
+        qtyKH   : parseInt(row.querySelector('.qty-kh').value) || 0,
+        qtyTN   : parseInt(row.querySelector('.qty-tn').value) || 0,
+        qtyES   : parseInt(row.querySelector('.qty-es').value) || 0,
+    })).filter(x => x.qtyKH + x.qtyTN + x.qtyES > 0);
+
+    if (!items.length) return alert('至少一種花材需填入進貨數量');
+
+    const btn = document.getElementById('weeklyImportBtn');
+    btn.disabled = true; btn.innerText = `入庫中 (0/${items.length})...`;
+    setGas('loading');
+
+    let done = 0;
+    for (const item of items) {
+        // 確認商品存在（不存在則建立）
+        let prod = rawProducts.find(p => p.name === item.name);
+        if (!prod) {
+            const price = Math.round(item.cost * 4);
+            try {
+                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'addProduct', data:{ name:item.name, category:item.category, price, cost:item.cost, stockKH:0, stockTN:0, stockES:0 } }) });
+                const res = await r.json();
+                if (res.success) {
+                    prod = { id: res.id, name: item.name, category: item.category, price, cost: item.cost, stockKH:0, stockTN:0, stockES:0 };
+                    rawProducts.push(prod);
+                }
+            } catch(e) { continue; }
+        }
+        if (!prod) continue;
+
+        // 進貨各店
+        const stores = [
+            { store:'高雄FOCUS 13', qty:item.qtyKH, key:'stockKH' },
+            { store:'台南FOCUS',    qty:item.qtyTN, key:'stockTN' },
+            { store:'誠品生活台南', qty:item.qtyES, key:'stockES' },
+        ].filter(s => s.qty > 0);
+
+        for (const s of stores) {
+            try {
+                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'receiveStock', data:{ id:prod.id, store:s.store, qty:s.qty, unitCost:item.cost, note:'本週進花' } }) });
+                const res = await r.json();
+                if (res.success && prod) prod[s.key] = res.newStock;
+            } catch(e) {}
+        }
+
+        // 更新進價與售價
+        if (item.cost > 0) {
+            const price = Math.round(item.cost * 4);
+            fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'updateProduct', data:{ id:prod.id, cost:item.cost, price } }) }).catch(()=>{});
+            if (prod) { prod.cost = item.cost; prod.price = Math.round(item.cost*4); }
+        }
+
+        done++;
+        btn.innerText = `入庫中 (${done}/${items.length})...`;
     }
 
-    // 尚未建立：快速建立商品
-    const costStr = prompt(`「${name}」尚未在商品庫。\n請輸入進價（NT$），系統將自動建立商品：`, '');
-    if (costStr === null) return; // 取消
-    const cost  = parseFloat(costStr) || 0;
-    const price = Math.round(cost * 4);
-
-    setGas('loading');
-    try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addProduct', data: { name, category, price, cost, stockKH: 0, stockTN: 0, stockES: 0 } }) });
-        const result = await res.json();
-        if (result.success) {
-            const newProd = { id: result.id, name, category, price, cost, stockKH: 0, stockTN: 0, stockES: 0 };
-            rawProducts.push(newProd);
-            setGas('ok');
-            showToast(`✅ 已建立：${name}，進入進貨`);
-            setPickerTab('products');
-            selectReceiveProduct(result.id);
-        } else {
-            setGas('error'); showToast('❌ 建立失敗');
-        }
-    } catch(e) { setGas('error'); showToast('❌ 連線失敗'); }
+    setGas('ok');
+    showToast(`✅ 本週進花完成：${done} 種花材已入庫`, 3500);
+    closeWeeklyImport();
+    clearLibrarySelection();
+    renderReceiveList();
+    btn.disabled = false; btn.innerText = '✅ 全部入庫';
 }
 
 function renderReceiveList() {
@@ -762,6 +883,51 @@ function showToast(msg, duration = 2000) {
     _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
 }
 </script>
+
+<!-- ══ 本週進花精靈 Modal ══ -->
+<div id="weeklyImportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-3 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg my-4 shadow-2xl">
+
+    <!-- Header -->
+    <div class="flex justify-between items-center px-5 pt-5 pb-4 border-b border-gray-100">
+      <div>
+        <h3 class="font-bold text-base text-[#4a4a4a]">🌸 本週進花明細</h3>
+        <p class="text-[10px] text-gray-400 mt-0.5">填入每種花的進價與各店數量</p>
+      </div>
+      <button onclick="closeWeeklyImport()" class="text-gray-300 text-2xl leading-none">✕</button>
+    </div>
+
+    <!-- 批次套用進價 -->
+    <div class="px-5 py-3 bg-[#fafaf9] border-b border-gray-100 flex gap-2 items-center">
+      <span class="text-xs text-gray-500 whitespace-nowrap">批次套用進價</span>
+      <input type="number" id="bulkCostInput" placeholder="NT$/枝" min="0" step="1"
+        class="flex-1 border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none focus:border-[#8e9775]">
+      <button onclick="applyBulkCost()" class="bg-[#c4a882] text-white text-xs font-bold px-4 py-1.5 rounded-lg whitespace-nowrap">套用全部</button>
+    </div>
+
+    <!-- 花材明細表 -->
+    <div class="px-5 py-3">
+      <!-- 欄位標題 -->
+      <div class="grid text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2 pr-2" style="grid-template-columns:1fr 70px 55px 42px 42px 42px">
+        <div>花材名稱</div>
+        <div class="text-center">進價(NT$)</div>
+        <div class="text-center">售價×4</div>
+        <div class="text-center">高雄</div>
+        <div class="text-center">台南</div>
+        <div class="text-center">誠品</div>
+      </div>
+      <!-- 動態列 -->
+      <div id="weeklyImportRows" class="space-y-2 max-h-[50vh] overflow-y-auto pr-1"></div>
+    </div>
+
+    <!-- Footer -->
+    <div class="px-5 pb-5 pt-3 border-t border-gray-100 space-y-2">
+      <div id="weeklyImportHint" class="text-xs text-gray-400 text-center"></div>
+      <button onclick="submitWeeklyImport()" id="weeklyImportBtn"
+        class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">✅ 全部入庫</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
