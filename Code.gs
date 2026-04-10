@@ -23,6 +23,7 @@ const SH = {
   MEMBERS     : 'Members',
   INV_LOG     : 'InventoryLog',
   HANG_ORDERS : 'HangOrders',
+  PRICE_LOG   : 'PriceHistory',
 };
 
 // ══════════════════════════════════════════════════════
@@ -43,6 +44,7 @@ function setupSheets() {
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
   ensureSheet(SH.HANG_ORDERS,  ['id','name','store','createdAt','cart','member']);
+  ensureSheet(SH.PRICE_LOG,    ['time','name','category','bundlePrice','stems','unitCost','salePrice','note']);
 
   Logger.log('✅ 所有工作表初始化完成');
 }
@@ -82,6 +84,7 @@ function doGet(e) {
       case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
       case 'getFlowerLibrary':      return jsonOut(getFlowerLibrary());
+      case 'getPriceHistory':       return jsonOut(getPriceHistory(e.parameter.name));
       default:                      return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -110,6 +113,7 @@ function doPost(e) {
       // 掛單
       case 'saveHangOrder':   return jsonOut(saveHangOrder(data));
       case 'deleteHangOrder': return jsonOut(deleteHangOrder(data));
+      case 'logPriceHistory': return jsonOut(logPriceHistory(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -129,7 +133,13 @@ function sheetToObjects(sh) {
   const [headers, ...rows] = sh.getDataRange().getValues();
   return rows.map(row => {
     const obj = {};
-    headers.forEach((h, i) => { obj[h] = row[i]; });
+    headers.forEach((h, i) => {
+      const v = row[i];
+      // Google Sheets auto-parses ISO strings → Date objects; convert back to Taipei time
+      obj[h] = v instanceof Date
+        ? Utilities.formatDate(v, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss")
+        : v;
+    });
     return obj;
   });
 }
@@ -803,6 +813,46 @@ function getFlowerLibrary() {
   }
 
   return result;
+}
+
+// ══════════════════════════════════════════════════════
+//  花材價格歷史
+// ══════════════════════════════════════════════════════
+function logPriceHistory(data) {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(SH.PRICE_LOG);
+  if (!sh) {
+    sh = ss.insertSheet(SH.PRICE_LOG);
+    sh.appendRow(['time','name','category','bundlePrice','stems','unitCost','salePrice','note']);
+  }
+  sh.appendRow([
+    taipeiNow(),
+    data.name         || '',
+    data.category     || '',
+    Number(data.bundlePrice) || 0,
+    Number(data.stems)       || 0,
+    Number(data.unitCost)    || 0,
+    Number(data.salePrice)   || 0,
+    data.note         || '本週進花',
+  ]);
+  return { success: true };
+}
+
+function getPriceHistory(name) {
+  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SH.PRICE_LOG);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const rows = sheetToObjects(sh);
+  const filtered = name ? rows.filter(r => r.name === name) : rows;
+  return filtered.reverse().slice(0, 300).map(r => ({
+    time       : r.time,
+    name       : r.name,
+    category   : r.category,
+    bundlePrice: Number(r.bundlePrice) || 0,
+    stems      : Number(r.stems)       || 0,
+    unitCost   : Number(r.unitCost)    || 0,
+    salePrice  : Number(r.salePrice)   || 0,
+    note       : r.note,
+  }));
 }
 
 // ══════════════════════════════════════════════════════

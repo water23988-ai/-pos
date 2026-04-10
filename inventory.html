@@ -45,11 +45,6 @@
     </div>
     <div class="flex items-center gap-2">
         <span class="gas-dot" id="gasDot"></span>
-        <div class="flex gap-1">
-            <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="tab-btn active" style="padding:6px 14px;font-size:12px;">高雄</button>
-            <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="tab-btn"        style="padding:6px 14px;font-size:12px;">台南</button>
-            <button onclick="setStore('誠品生活台南')" id="btn-es" class="tab-btn"        style="padding:6px 14px;font-size:12px;">誠品</button>
-        </div>
         <nav class="flex gap-1">
             <a href="index.html"    class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">POS</a>
             <a href="products.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">商品</a>
@@ -57,6 +52,23 @@
         </nav>
     </div>
 </div>
+
+<!-- 據點選擇器（防呆大按鈕）-->
+<div class="bg-[#f1f3eb] border-b border-[#d4dbc6] px-4 py-2">
+    <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">目前操作據點</p>
+    <div class="grid grid-cols-3 gap-2">
+        <button onclick="setStore('高雄FOCUS 13')" id="btn-kh"
+            class="store-btn py-2.5 rounded-xl text-sm font-bold border-2 transition-all">高雄 FOCUS</button>
+        <button onclick="setStore('台南FOCUS')" id="btn-tn"
+            class="store-btn py-2.5 rounded-xl text-sm font-bold border-2 transition-all">台南 FOCUS</button>
+        <button onclick="setStore('誠品生活台南')" id="btn-es"
+            class="store-btn py-2.5 rounded-xl text-sm font-bold border-2 transition-all">誠品台南</button>
+    </div>
+</div>
+<style>
+.store-btn { background: white; border-color: #e5e7eb; color: #9ca3af; }
+.store-btn.active { background: #8e9775; border-color: #8e9775; color: white; box-shadow: 0 2px 8px rgba(142,151,117,0.35); }
+</style>
 
 <!-- 分頁切換 -->
 
@@ -147,30 +159,7 @@
     <!-- 進貨表單：多店分配 -->
     <div id="receiveForm" class="hidden bg-white rounded-2xl border border-gray-100 p-5 space-y-4">
 
-        <!-- 把價 & 枝數 -->
-        <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">把價 *</label>
-                <input type="number" id="receiveBundlePrice" placeholder="NT$/把" min="0" step="1"
-                    oninput="updateAutoPrice()" class="s-input">
-            </div>
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">枝數/把 *</label>
-                <input type="number" id="receiveStems" placeholder="枝" min="1" step="1"
-                    oninput="updateAutoPrice()" class="s-input">
-            </div>
-        </div>
-        <!-- 單支成本 & 建議售價 -->
-        <div class="grid grid-cols-2 gap-3">
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">單支成本</label>
-                <div id="unitCostDisplay" class="s-input bg-gray-50 text-gray-500 font-bold" style="border-style:dashed;">—</div>
-            </div>
-            <div>
-                <label class="text-[10px] text-gray-400 font-bold tracking-widest uppercase block mb-2">建議售價（×4）</label>
-                <div id="autoPriceDisplay" class="s-input bg-gray-50 text-[#8e9775] font-bold" style="border-style:dashed;">—</div>
-            </div>
-        </div>
+        <!-- 進貨數量（員工不接觸定價，定價在商品管理頁設定）-->
 
         <!-- 三店進貨分配 -->
         <div>
@@ -263,6 +252,7 @@ window.onload = () => {
         API_URL = prompt('請輸入 API URL：') || '';
         if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
     }
+    setStore('高雄FOCUS 13'); // 預設高雄，並高亮按鈕
     init();
 };
 
@@ -297,9 +287,9 @@ async function refreshProducts() {
 // ── 門市切換 ──
 function setStore(store) {
     currentStore = store;
-    document.getElementById('btn-kh').classList.toggle('active', store === '高雄FOCUS 13');
-    document.getElementById('btn-tn').classList.toggle('active', store === '台南FOCUS');
-    document.getElementById('btn-es').classList.toggle('active', store === '誠品生活台南');
+    ['btn-kh','btn-tn','btn-es'].forEach(id => document.getElementById(id).classList.remove('active'));
+    const map = { '高雄FOCUS 13':'btn-kh', '台南FOCUS':'btn-tn', '誠品生活台南':'btn-es' };
+    if (map[store]) document.getElementById(map[store]).classList.add('active');
     renderStockList();
     clearSelectedProduct();
     renderReceiveList();
@@ -668,26 +658,14 @@ function selectReceiveProduct(id) {
     document.getElementById('selectedProductArea').classList.remove('hidden');
     document.getElementById('receiveProductPicker').classList.add('hidden');
     document.getElementById('receiveForm').classList.remove('hidden');
-    // 清空把價/枝數（每週進價不同，讓使用者重新填）
-    document.getElementById('receiveBundlePrice').value = '';
-    document.getElementById('receiveStems').value = '';
-    document.getElementById('unitCostDisplay').innerText  = p.cost ? `上次 NT$ ${p.cost}` : '—';
-    document.getElementById('autoPriceDisplay').innerText = p.price ? `上次 NT$ ${p.price}` : '—';
     document.getElementById('receiveQtyKH').value = '';
     document.getElementById('receiveQtyTN').value = '';
     document.getElementById('receiveQtyES').value = '';
     document.getElementById('receiveNote').value = '';
     setupQtyListeners();
-    setTimeout(() => document.getElementById('receiveBundlePrice').focus(), 100);
+    setTimeout(() => document.getElementById('receiveQtyKH').focus(), 100);
 }
 
-function updateAutoPrice() {
-    const bundle = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
-    const stems  = parseFloat(document.getElementById('receiveStems').value) || 1;
-    const cost   = bundle > 0 ? Math.round((bundle / stems) * 10) / 10 : 0;
-    document.getElementById('unitCostDisplay').innerText  = cost > 0 ? `NT$ ${cost.toFixed(1)}` : '—';
-    document.getElementById('autoPriceDisplay').innerText = cost > 0 ? `NT$ ${Math.round(cost * 4)}` : '—';
-}
 
 function setupQtyListeners() {
     ['receiveQtyKH','receiveQtyTN','receiveQtyES'].forEach(id => {
@@ -712,9 +690,7 @@ function clearSelectedProduct() {
 
 async function submitReceive() {
     if (!_selectedProduct) return alert('請先選擇品項');
-    const bundlePrice = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
-    const stems       = parseFloat(document.getElementById('receiveStems').value) || 1;
-    const unitCost    = bundlePrice > 0 ? Math.round((bundlePrice / stems) * 10) / 10 : 0;
+    const unitCost = 0; // 定價在商品管理頁設定
     const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
     const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
     const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
@@ -771,9 +747,7 @@ async function submitReceive() {
 // ── 批次進貨 ──
 function addToBatch() {
     if (!_selectedProduct) return alert('請先選擇品項');
-    const bundlePrice = parseFloat(document.getElementById('receiveBundlePrice').value) || 0;
-    const stems       = parseFloat(document.getElementById('receiveStems').value) || 1;
-    const unitCost    = bundlePrice > 0 ? Math.round((bundlePrice / stems) * 10) / 10 : 0;
+    const unitCost = 0; // 定價在商品管理頁設定
     const qtyKH   = parseInt(document.getElementById('receiveQtyKH').value) || 0;
     const qtyTN   = parseInt(document.getElementById('receiveQtyTN').value) || 0;
     const qtyES   = parseInt(document.getElementById('receiveQtyES').value) || 0;
@@ -810,7 +784,6 @@ function renderBatchList() {
             <div>
                 <span style="font-weight:bold;font-size:13px;">${item.product.name}</span>
                 <span style="font-size:11px;color:#9ca3af;margin-left:8px;">${parts.join(' · ')}</span>
-                ${item.unitCost > 0 ? `<span style="font-size:10px;color:#c4a882;margin-left:6px;">進價 NT$${item.unitCost} → 售 NT$${item.unitCost*4}</span>` : ''}
             </div>
             <button onclick="removeBatchItem(${i})" style="color:#f87171;background:none;border:none;font-size:18px;cursor:pointer;line-height:1;">×</button>
         </div>`;

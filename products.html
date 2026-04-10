@@ -47,6 +47,8 @@
         .modal-box { background: white; border-radius: 24px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; padding: 24px; }
 
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        .cat-header { font-size: 10px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 4px 4px; }
+        .inv-row { display: flex; align-items: center; padding: 10px 14px; border-radius: 10px; background: #fafaf9; border: 1px solid #f3f4f6; margin-bottom: 6px; }
     </style>
 </head>
 <body>
@@ -69,29 +71,65 @@
     </div>
 </div>
 
-<!-- 工具列 -->
-<div class="p-4 flex gap-3 items-center">
-    <input type="text" id="searchInput" placeholder="搜尋商品名稱..." oninput="renderList()"
-        class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
-    <select id="catFilter" onchange="renderList()"
-        class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775] bg-white">
-        <option value="">全部類別</option>
-        <option>主花</option>
-        <option>配花</option>
-        <option>葉材</option>
-        <option>花束</option>
-        <option>花瓶</option>
-        <option>其他加購</option>
-    </select>
-    <button onclick="openAddModal()"
-        class="flex-shrink-0 bg-[#8e9775] text-white border-none rounded-xl px-4 py-2 text-sm font-bold cursor-pointer">
-        ＋ 新增
-    </button>
+<!-- 分頁切換 -->
+<div class="px-4 pt-4 pb-0 flex gap-2 overflow-x-auto no-scrollbar">
+    <button onclick="switchProdTab('list')"   id="ptab-list"   class="tab-btn active flex-shrink-0">📋 商品列表</button>
+    <button onclick="switchProdTab('weekly')" id="ptab-weekly" class="tab-btn flex-shrink-0">🌸 本週進花</button>
+    <button onclick="switchProdTab('prices')" id="ptab-prices" class="tab-btn flex-shrink-0">📈 價格波動</button>
 </div>
 
-<!-- 商品列表 -->
-<div class="px-4 pb-24" id="productList">
-    <p class="text-center text-gray-300 text-xs py-16">載入中...</p>
+<!-- ══ Tab: 商品列表 ══ -->
+<div id="tab-list-view">
+    <div class="p-4 flex gap-3 items-center">
+        <input type="text" id="searchInput" placeholder="搜尋商品名稱..." oninput="renderList()"
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+        <select id="catFilter" onchange="renderList()"
+            class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775] bg-white">
+            <option value="">全部類別</option>
+            <option>主花</option><option>配花</option><option>葉材</option>
+            <option>花束</option><option>花瓶</option><option>其他加購</option>
+        </select>
+        <button onclick="openAddModal()"
+            class="flex-shrink-0 bg-[#8e9775] text-white border-none rounded-xl px-4 py-2 text-sm font-bold cursor-pointer">
+            ＋ 新增
+        </button>
+    </div>
+    <div class="px-4 pb-24" id="productList">
+        <p class="text-center text-gray-300 text-xs py-16">載入中...</p>
+    </div>
+</div>
+
+<!-- ══ Tab: 本週進花 ══ -->
+<div id="tab-weekly-view" class="hidden p-4">
+    <p class="text-xs text-gray-400 mb-3">從花材資料庫勾選本週採購的花材，批次填入把價與數量後入庫。</p>
+    <!-- 花材搜尋 + 清除 -->
+    <div class="flex gap-2 mb-2">
+        <input type="text" id="wkLibrarySearch" placeholder="搜尋花材名稱或類別..."
+            oninput="renderWkLibraryList()"
+            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#8e9775]">
+        <button onclick="clearWkSelection()" class="text-xs text-gray-400 border border-gray-200 px-3 py-2 rounded-xl">清除</button>
+    </div>
+    <!-- 已選 banner -->
+    <div id="wkSelBanner" class="hidden mb-3 bg-[#f1f3eb] border border-[#c6cdb5] rounded-xl px-4 py-3 flex items-center justify-between">
+        <span class="text-sm text-[#6d7756] font-bold">已選 <span id="wkSelCount">0</span> 種花材</span>
+        <button onclick="openWkImport()" class="bg-[#8e9775] text-white text-sm font-bold px-5 py-2 rounded-xl">填入進貨資料 →</button>
+    </div>
+    <!-- 花材列表 -->
+    <div id="wkLibraryList">
+        <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
+    </div>
+</div>
+
+<!-- ══ Tab: 價格波動 ══ -->
+<div id="tab-prices-view" class="hidden p-4">
+    <div class="flex gap-2 mb-4">
+        <input type="text" id="priceSearchInput" placeholder="搜尋花材名稱..." oninput="filterPriceHistory()"
+            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
+        <button onclick="loadPriceHistory()" class="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400">🔄</button>
+    </div>
+    <div id="priceHistoryList">
+        <p class="text-center text-gray-300 text-xs py-12">載入中...</p>
+    </div>
 </div>
 
 <!-- ══ 新增 / 編輯 Modal ══ -->
@@ -390,7 +428,297 @@ document.getElementById('editModal').addEventListener('click', function(e) {
 document.getElementById('deleteModal').addEventListener('click', function(e) {
     if (e.target === this) closeDeleteModal();
 });
+
+// ══ 分頁切換 ══
+function switchProdTab(tab) {
+    ['list','weekly','prices'].forEach(t => {
+        document.getElementById(`tab-${t}-view`).classList.toggle('hidden', t !== tab);
+        document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
+    });
+    if (tab === 'weekly' && _wkLibrary.length === 0) loadWkLibrary();
+    if (tab === 'prices') loadPriceHistory();
+}
+
+// ══ 本週進花 — 花材資料庫 ══
+let _wkLibrary  = [];
+let _wkSelected = new Map(); // name → category
+
+async function loadWkLibrary() {
+    const el = document.getElementById('wkLibraryList');
+    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">載入花材資料庫...</p>';
+    try {
+        const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
+        _wkLibrary = await res.json();
+        if (!Array.isArray(_wkLibrary)) _wkLibrary = [];
+        renderWkLibraryList();
+    } catch(e) {
+        el.innerHTML = '<p class="text-center text-red-300 text-xs py-8">載入失敗，請確認 GAS 已更新並重新部署</p>';
+    }
+}
+
+function toggleWkItem(name, category) {
+    if (_wkSelected.has(name)) _wkSelected.delete(name);
+    else _wkSelected.set(name, category);
+    updateWkBanner();
+    renderWkLibraryList();
+}
+
+function updateWkBanner() {
+    const n = _wkSelected.size;
+    document.getElementById('wkSelCount').innerText = n;
+    document.getElementById('wkSelBanner').classList.toggle('hidden', n === 0);
+}
+
+function clearWkSelection() {
+    _wkSelected.clear();
+    updateWkBanner();
+    renderWkLibraryList();
+}
+
+function renderWkLibraryList() {
+    const kw  = (document.getElementById('wkLibrarySearch')?.value || '').trim().toLowerCase();
+    const el  = document.getElementById('wkLibraryList');
+    let items = _wkLibrary;
+    if (kw) items = items.filter(x => x.name.toLowerCase().includes(kw) || (x.category||'').toLowerCase().includes(kw));
+    if (!items.length) { el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無花材</p>'; return; }
+
+    const catMap = {};
+    items.forEach(x => { const c = x.category||'其他'; if (!catMap[c]) catMap[c]=[]; catMap[c].push(x.name); });
+
+    el.innerHTML = Object.entries(catMap).map(([cat, names]) => `
+        <div class="cat-header">${cat}</div>
+        ${names.map(name => {
+            const sel    = _wkSelected.has(name);
+            const exists = rawProducts.find(p => p.name === name);
+            return `<div class="inv-row" onclick="toggleWkItem(${JSON.stringify(name)},${JSON.stringify(cat)})"
+                style="cursor:pointer;background:${sel?'#f1f3eb':'white'};border-left:3px solid ${sel?'#8e9775':'transparent'};padding-left:10px;display:flex;align-items:center;padding:10px 10px 10px 10px;border-radius:10px;border:1px solid #f3f4f6;margin-bottom:6px;">
+                <div style="margin-right:10px;font-size:18px;color:${sel?'#8e9775':'#d1d5db'};">${sel?'✓':'○'}</div>
+                <div style="flex:1;">
+                    <span style="font-size:13px;font-weight:${sel?'bold':'normal'};">${name}</span>
+                    ${exists ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:10px;padding:2px 7px;margin-left:6px;">已在商品庫</span>` : ''}
+                </div>
+            </div>`;
+        }).join('')}
+    `).join('');
+}
+
+// ══ 本週進花精靈 Modal ══
+function openWkImport() {
+    if (_wkSelected.size === 0) return;
+    document.getElementById('wkImportRows').innerHTML = [..._wkSelected.entries()].map(([name, cat]) => `
+        <div class="wk-row grid items-center gap-1" data-name="${name}" data-cat="${cat}"
+            style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px;border-bottom:1px solid #f3f4f6;padding-bottom:6px;">
+            <div style="font-size:12px;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
+            <input type="number" class="wk-bundle border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="NT$" min="0" oninput="updateWkRowCalc(this)">
+            <input type="number" class="wk-stems border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="枝" min="1" value="10" oninput="updateWkRowCalc(this)">
+            <div class="wk-price text-xs text-center text-[#8e9775] font-bold">—</div>
+            <input type="number" class="wk-kh border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
+            <input type="number" class="wk-tn border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
+            <input type="number" class="wk-es border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
+        </div>`).join('');
+    updateWkHint();
+    document.getElementById('wkImportModal').classList.remove('hidden');
+}
+
+function updateWkRowCalc(el) {
+    const row    = el.closest('.wk-row');
+    const bundle = parseFloat(row.querySelector('.wk-bundle').value) || 0;
+    const stems  = parseFloat(row.querySelector('.wk-stems').value)  || 1;
+    const price  = bundle > 0 ? Math.round((bundle / stems) * 4) : 0;
+    row.querySelector('.wk-price').innerText = price > 0 ? `NT$ ${price}` : '—';
+    updateWkHint();
+}
+
+function applyWkBulk() {
+    const b = parseFloat(document.getElementById('wkBulkBundle').value) || 0;
+    const s = parseFloat(document.getElementById('wkBulkStems').value)  || 0;
+    document.querySelectorAll('.wk-row').forEach(row => {
+        if (b) row.querySelector('.wk-bundle').value = b;
+        if (s) row.querySelector('.wk-stems').value  = s;
+        updateWkRowCalc(row.querySelector('.wk-bundle'));
+    });
+}
+
+function updateWkHint() {
+    let total = 0;
+    document.querySelectorAll('.wk-row').forEach(row => {
+        total += (parseInt(row.querySelector('.wk-kh').value)||0)
+               + (parseInt(row.querySelector('.wk-tn').value)||0)
+               + (parseInt(row.querySelector('.wk-es').value)||0);
+    });
+    document.getElementById('wkImportHint').innerText = total > 0 ? `合計 ${total} 枝` : '';
+}
+
+function closeWkImport() {
+    document.getElementById('wkImportModal').classList.add('hidden');
+}
+
+async function submitWkImport() {
+    const rows = [...document.querySelectorAll('.wk-row')];
+    const items = rows.map(row => {
+        const bundle = parseFloat(row.querySelector('.wk-bundle').value) || 0;
+        const stems  = parseFloat(row.querySelector('.wk-stems').value)  || 1;
+        const cost   = bundle > 0 ? Math.round((bundle / stems) * 10) / 10 : 0;
+        return {
+            name: row.dataset.name, category: row.dataset.cat,
+            bundle, stems, cost,
+            qtyKH: parseInt(row.querySelector('.wk-kh').value)||0,
+            qtyTN: parseInt(row.querySelector('.wk-tn').value)||0,
+            qtyES: parseInt(row.querySelector('.wk-es').value)||0,
+        };
+    }).filter(x => x.qtyKH + x.qtyTN + x.qtyES > 0);
+
+    if (!items.length) return alert('至少一種花材需填入進貨數量');
+
+    const btn = document.getElementById('wkImportBtn');
+    btn.disabled = true; btn.innerText = `入庫中 (0/${items.length})...`;
+    setGas('loading');
+
+    let done = 0;
+    for (const item of items) {
+        let prod = rawProducts.find(p => p.name === item.name);
+        if (!prod) {
+            const price = Math.round(item.cost * 4);
+            try {
+                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'addProduct', data:{ name:item.name, category:item.category, price, cost:item.cost, stockKH:0, stockTN:0, stockES:0 } }) });
+                const res = await r.json();
+                if (res.success) {
+                    prod = { id: res.id, name: item.name, category: item.category, price, cost: item.cost, stockKH:0, stockTN:0, stockES:0 };
+                    rawProducts.push(prod);
+                }
+            } catch(e) { continue; }
+        }
+        if (!prod) continue;
+
+        // 進貨各店
+        const stores = [
+            { store:'高雄FOCUS 13', qty:item.qtyKH, key:'stockKH' },
+            { store:'台南FOCUS',    qty:item.qtyTN, key:'stockTN' },
+            { store:'誠品生活台南', qty:item.qtyES, key:'stockES' },
+        ].filter(s => s.qty > 0);
+        for (const s of stores) {
+            try {
+                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'receiveStock', data:{ id:prod.id, store:s.store, qty:s.qty, unitCost:item.cost, note:'本週進花' } }) });
+                const res = await r.json();
+                if (res.success && prod) prod[s.key] = res.newStock;
+            } catch(e) {}
+        }
+
+        // 更新售價並記錄價格歷史
+        if (item.cost > 0) {
+            const price = Math.round(item.cost * 4);
+            fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'updateProduct', data:{ id:prod.id, cost:item.cost, price } }) }).catch(()=>{});
+            fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'logPriceHistory', data:{ name:item.name, category:item.category, bundlePrice:item.bundle, stems:item.stems, unitCost:item.cost, salePrice:price } }) }).catch(()=>{});
+            if (prod) { prod.cost = item.cost; prod.price = price; }
+        }
+        done++;
+        btn.innerText = `入庫中 (${done}/${items.length})...`;
+    }
+
+    setGas('ok');
+    showToast(`✅ 本週進花完成：${done} 種花材已入庫`, 3500);
+    closeWkImport();
+    clearWkSelection();
+    renderList();
+    btn.disabled = false; btn.innerText = '✅ 全部入庫';
+}
+
+// ══ 價格波動 ══
+let _priceHistory = [];
+
+async function loadPriceHistory() {
+    const el = document.getElementById('priceHistoryList');
+    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">載入中...</p>';
+    setGas('loading');
+    try {
+        const res = await fetch(`${API_URL}?action=getPriceHistory`);
+        _priceHistory = await res.json();
+        if (!Array.isArray(_priceHistory)) _priceHistory = [];
+        setGas('ok');
+        filterPriceHistory();
+    } catch(e) {
+        setGas('error');
+        el.innerHTML = '<p class="text-center text-red-300 text-xs py-12">載入失敗，請確認 GAS 已更新</p>';
+    }
+}
+
+function filterPriceHistory() {
+    const kw = (document.getElementById('priceSearchInput').value||'').trim().toLowerCase();
+    const el = document.getElementById('priceHistoryList');
+    let data = _priceHistory;
+    if (kw) data = data.filter(r => (r.name||'').toLowerCase().includes(kw));
+    if (!data.length) {
+        el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">查無價格記錄</p>';
+        return;
+    }
+    // 按花材名稱分組
+    const map = {};
+    data.forEach(r => { if (!map[r.name]) map[r.name]=[]; map[r.name].push(r); });
+
+    el.innerHTML = Object.entries(map).map(([name, rows]) => {
+        const latest = rows[0];
+        return `<div style="background:white;border:1px solid #f3f4f6;border-radius:12px;margin-bottom:12px;overflow:hidden;">
+            <div style="padding:10px 14px;background:#fafaf9;display:flex;justify-content:space-between;align-items:center;">
+                <span style="font-size:13px;font-weight:bold;">${name}</span>
+                <span style="font-size:11px;color:#8e9775;font-weight:bold;">最新售價 NT$ ${latest.salePrice}</span>
+            </div>
+            <div style="overflow-x:auto;">
+            <table style="width:100%;font-size:11px;border-collapse:collapse;">
+                <tr style="background:#f9fafb;color:#9ca3af;font-weight:bold;">
+                    <td style="padding:6px 10px;">日期</td>
+                    <td style="padding:6px 8px;text-align:center;">把價</td>
+                    <td style="padding:6px 8px;text-align:center;">枝數</td>
+                    <td style="padding:6px 8px;text-align:center;">單支成本</td>
+                    <td style="padding:6px 8px;text-align:center;">售價</td>
+                </tr>
+                ${rows.map(r => `<tr style="border-top:1px solid #f3f4f6;">
+                    <td style="padding:6px 10px;color:#6b7280;">${(r.time||'').slice(0,10)}</td>
+                    <td style="padding:6px 8px;text-align:center;">NT$ ${r.bundlePrice}</td>
+                    <td style="padding:6px 8px;text-align:center;">${r.stems}</td>
+                    <td style="padding:6px 8px;text-align:center;">NT$ ${r.unitCost}</td>
+                    <td style="padding:6px 8px;text-align:center;font-weight:bold;color:#8e9775;">NT$ ${r.salePrice}</td>
+                </tr>`).join('')}
+            </table>
+            </div>
+        </div>`;
+    }).join('');
+}
 </script>
+
+<!-- ══ 本週進花精靈 Modal ══ -->
+<div id="wkImportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-3 overflow-y-auto">
+  <div class="bg-white rounded-2xl w-full max-w-lg my-4 shadow-2xl">
+    <div class="flex justify-between items-center px-5 pt-5 pb-4 border-b border-gray-100">
+      <div>
+        <h3 class="font-bold text-base text-[#4a4a4a]">🌸 本週進花明細</h3>
+        <p class="text-[10px] text-gray-400 mt-0.5">把價 ÷ 枝數 = 單支成本 → × 4 = 售價</p>
+      </div>
+      <button onclick="closeWkImport()" class="text-gray-300 text-2xl leading-none">✕</button>
+    </div>
+    <!-- 批次套用 -->
+    <div class="px-5 py-3 bg-[#fafaf9] border-b border-gray-100 flex gap-2 items-center">
+      <span class="text-xs text-gray-500 whitespace-nowrap">批次套用</span>
+      <input type="number" id="wkBulkBundle" placeholder="把價 NT$" min="0"
+        class="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
+      <input type="number" id="wkBulkStems" placeholder="枝數" min="1"
+        class="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
+      <button onclick="applyWkBulk()" class="bg-[#c4a882] text-white text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">套用</button>
+    </div>
+    <!-- 欄位標題 -->
+    <div class="px-5 py-3">
+      <div class="grid text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2" style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px">
+        <div>花材名稱</div><div class="text-center">把價</div><div class="text-center">枝</div>
+        <div class="text-center">售價×4</div><div class="text-center">高雄</div><div class="text-center">台南</div><div class="text-center">誠品</div>
+      </div>
+      <div id="wkImportRows" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
+    </div>
+    <div class="px-5 pb-5 pt-3 border-t border-gray-100 space-y-2">
+      <div id="wkImportHint" class="text-xs text-gray-400 text-center"></div>
+      <button onclick="submitWkImport()" id="wkImportBtn"
+        class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">✅ 全部入庫</button>
+    </div>
+  </div>
+</div>
 
 </body>
 </html>
