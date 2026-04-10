@@ -860,6 +860,66 @@ function getPriceHistory(name) {
 // ══════════════════════════════════════════════════════
 
 /**
+ * 從舊試算表複製所有資料到新試算表（一次性執行）
+ * 舊試算表 ID: 17_tJXE_uXjLTwIzwxRIxjY0bvLFr0Cmmt241EbT29_w
+ * 新試算表 ID: SPREADSHEET_ID（已在上方設定）
+ *
+ * 複製內容：花材資料庫 / Products / Members / Transactions / InventoryLog
+ * 執行前請先在 Apps Script 手動點選此函式並執行
+ */
+function migrateFromOldSpreadsheet() {
+  const OLD_ID = '17_tJXE_uXjLTwIzwxRIxjY0bvLFr0Cmmt241EbT29_w';
+  const newSS  = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const oldSS  = SpreadsheetApp.openById(OLD_ID);
+
+  function copySheet(sheetName, clearFirst) {
+    const oldSh = oldSS.getSheetByName(sheetName);
+    if (!oldSh) { Logger.log('⚠️ 舊試算表找不到：' + sheetName); return 0; }
+    const data = oldSh.getDataRange().getValues();
+    if (data.length === 0) { Logger.log('⚠️ 空工作表：' + sheetName); return 0; }
+
+    let newSh = newSS.getSheetByName(sheetName);
+    if (!newSh) newSh = newSS.insertSheet(sheetName);
+
+    if (clearFirst) {
+      newSh.clearContents();
+      newSh.getRange(1, 1, data.length, data[0].length).setValues(data);
+      Logger.log('✅ ' + sheetName + ' 整份複製完成：' + data.length + ' 列');
+      return data.length;
+    } else {
+      // 僅附加資料列（跳過標題行，避免重複）
+      const newHeaders = newSh.getLastRow() > 0
+        ? newSh.getRange(1, 1, 1, newSh.getLastColumn()).getValues()[0].map(String)
+        : [];
+      const oldHeaders = data[0].map(String);
+      const rows = data.slice(1);
+      if (rows.length === 0) { Logger.log('⚠️ ' + sheetName + ' 無資料列'); return 0; }
+
+      if (newSh.getLastRow() === 0) {
+        // 新表完全空白 → 整份貼入
+        newSh.getRange(1, 1, data.length, data[0].length).setValues(data);
+      } else {
+        // 已有資料 → 只附加（假設欄位順序相同）
+        newSh.getRange(newSh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+      }
+      Logger.log('✅ ' + sheetName + ' 附加完成：' + rows.length + ' 筆');
+      return rows.length;
+    }
+  }
+
+  // 花材資料庫：整份覆蓋（格式特殊，欄位是類別名稱）
+  copySheet('花材資料庫', true);
+
+  // 各資料工作表：附加（不清空，保留新表已有資料）
+  copySheet('Products',     false);
+  copySheet('Members',      false);
+  copySheet('Transactions', false);
+  copySheet('InventoryLog', false);
+
+  Logger.log('🎉 遷移完成！請重新整理前端頁面確認資料正確。');
+}
+
+/**
  * 將舊格式 Products 工作表遷移為新系統格式
  * 舊格式：第1-2列為摘要，第3列為標題（編號/品項名稱/顏色/廠商/進價…）
  * 新格式：第1列標題 = id|name|category|price|cost|stockKH|stockTN|stockES

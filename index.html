@@ -453,6 +453,31 @@
 </div>
 
 <!-- 後台 Modal -->
+<!-- ══ 據點選擇 Popup ══ -->
+<div id="storePickerModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+    <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
+        <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100">
+            <div class="text-2xl mb-1">🌸</div>
+            <h2 class="font-bold text-base text-[#4a4a4a]">請選擇今日營運據點</h2>
+            <p class="text-xs text-gray-400 mt-1">每次開啟頁面需重新選擇</p>
+        </div>
+        <div class="p-5 space-y-3">
+            <button onclick="pickStore('高雄FOCUS 13')"
+                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
+                📍 高雄 FOCUS 13
+            </button>
+            <button onclick="pickStore('台南FOCUS')"
+                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
+                📍 台南 FOCUS
+            </button>
+            <button onclick="pickStore('誠品生活台南')"
+                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
+                📍 誠品生活台南
+            </button>
+        </div>
+    </div>
+</div>
+
 <div id="settingsModal" class="hidden fixed inset-0 bg-black/80 backdrop-blur-md z-[200] flex items-center justify-center p-6">
     <div class="bg-white p-6 rounded-3xl w-full max-w-sm max-h-[85vh] overflow-y-auto">
         <div class="flex justify-between items-center mb-6"><h3 class="font-bold text-lg text-[#8e9775]">老闆專屬後台</h3><button onclick="closeSettings()" class="text-gray-300 text-xl">✕</button></div>
@@ -480,7 +505,7 @@
 let API_URL         = localStorage.getItem('moment_flor_api') || '';
 let rawProducts     = [];
 let currentView     = 'pos';
-let currentStore    = localStorage.getItem('moment_flor_store') || '台南FOCUS';
+let currentStore    = '';
 let selectedPayment = '現金';
 let selectedSource  = 'walk';
 let cart            = [];
@@ -548,15 +573,23 @@ function setGasStatus(state) {
     }
 }
 
+// ── 據點選擇 ──
+function pickStore(store) {
+    document.getElementById('storePickerModal').classList.add('hidden');
+    setStore(store);
+}
+
 // ── 初始化 ──
-window.onload = () => {
-    setStore(currentStore);
+window.onload = async () => {
     setPayment('現金');
     setSource('walk');
     document.getElementById('reportDate').valueAsDate = new Date();
     document.getElementById('s-pickup-date').valueAsDate = new Date();
-    if (API_URL) { fetchProducts(); loadHangOrders(); }
-    else openApiSettings();
+    if (!API_URL) { openApiSettings(); return; }
+    // 先連線，成功後再顯示據點選擇 popup
+    await fetchProducts();
+    loadHangOrders();
+    document.getElementById('storePickerModal').classList.remove('hidden');
 };
 
 // ── 長按後台 ──
@@ -593,11 +626,10 @@ function switchToPOS() {
 // ══ 門市/付款/來源 ══
 function setStore(val) {
     currentStore = val;
-    localStorage.setItem('moment_flor_store', val);
     document.querySelectorAll('.store-btn').forEach(b => b.classList.toggle('active', b.innerText.trim() === val));
     updateSummary();
     if (rawProducts.length > 0) renderModalCategories();
-    loadHangOrders(); // 切換據點時重新載入該據點的掛單
+    loadHangOrders();
 }
 function setPayment(val) {
     selectedPayment = val;
