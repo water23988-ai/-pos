@@ -85,12 +85,13 @@
 <div id="posView">
 <div class="p-4 space-y-5">
     <section>
-        <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">📍 營運據點</h2>
-        <div class="grid grid-cols-2 gap-3">
-            <button onclick="setStore('台南FOCUS')"    class="btn-action store-btn">台南FOCUS</button>
-            <button onclick="setStore('高雄FOCUS 13')" class="btn-action store-btn">高雄FOCUS 13</button>
-            <button onclick="setStore('誠品生活台南')" class="btn-action store-btn">誠品台南</button>
-            <button onclick="switchToStudio()" class="btn-action" style="border-color:#c4a882;color:#8a6a42;background:#fdf8f3;">✦ Studio</button>
+        <h2 class="text-xs font-bold mb-2 text-gray-400 tracking-widest uppercase">📍 今日據點</h2>
+        <div style="background:#f1f3eb;border:2px solid #8e9775;border-radius:16px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
+            <div>
+                <div id="currentStoreDisplay" style="font-size:16px;font-weight:bold;color:#6d7756;">—</div>
+                <div style="font-size:10px;color:#9ca3af;margin-top:2px;">點「切換」重新選擇</div>
+            </div>
+            <button onclick="reopenStorePicker()" style="font-size:12px;color:#8e9775;background:white;border:1.5px solid #c6cdb5;padding:6px 14px;border-radius:10px;cursor:pointer;font-family:'Noto Serif TC',serif;">切換</button>
         </div>
     </section>
     <section>
@@ -454,7 +455,7 @@
 
 <!-- 後台 Modal -->
 <!-- ══ 據點選擇 Popup ══ -->
-<div id="storePickerModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+<div id="storePickerModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
     <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
         <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100">
             <div class="text-2xl mb-1">🌸</div>
@@ -514,6 +515,7 @@ let discountRate    = 0;
 let discountFixed   = 0;
 let pointsRedeemed  = 0;   // 新增：點數兌換
 let hangOrders      = [];
+let _deletedGasIds = new Set(); // 已刪除的 GAS 掛單 ID，防止 loadHangOrders 重新拉回
 let productModalMode = 'pos';
 let _recalledHangGasId = null; // 叫回時立刻清除，結帳不再使用
 let _recalledHangName  = null; // 記錄叫回的掛單名稱，供「掛回同名」使用
@@ -576,7 +578,11 @@ function setGasStatus(state) {
 // ── 據點選擇 ──
 function pickStore(store) {
     document.getElementById('storePickerModal').classList.add('hidden');
+    document.getElementById('currentStoreDisplay').innerText = store;
     setStore(store);
+}
+function reopenStorePicker() {
+    document.getElementById('storePickerModal').classList.remove('hidden');
 }
 
 // ── 初始化 ──
@@ -589,7 +595,7 @@ window.onload = async () => {
     // 先連線，成功後再顯示據點選擇 popup
     await fetchProducts();
     loadHangOrders();
-    document.getElementById('storePickerModal').classList.remove('hidden');
+    if (!currentStore) document.getElementById('storePickerModal').classList.remove('hidden');
 };
 
 // ── 長按後台 ──
@@ -704,7 +710,7 @@ function openModalProducts(cat) {
     document.getElementById('modalCurrentCatLabel').innerText  = cat;
     const list = rawProducts.filter(p => (p.category || '其他加購') === cat);
     document.getElementById('modalProductGrid').innerHTML = list.map(p => {
-        const price   = isKH() ? p.priceKH : p.priceTN;
+        const price   = p.price || 0;
         const stock   = getStoreStock(p);
         const soldout = stock <= 0;
         if (soldout) {
@@ -747,7 +753,7 @@ function addToCart(id) {
         existing.qty++;
         showToast(`${p.name} × ${existing.qty} ✓`);
     } else {
-        cart.push({ id: p.id, name: p.name, qty: 1, priceTN: p.priceTN, priceKH: p.priceKH, stockTN: p.stockTN, stockKH: p.stockKH, cost: p.cost || 0 });
+        cart.push({ id: p.id, name: p.name, qty: 1, price: p.price||0, priceTN: p.price||0, priceKH: p.price||0, stockTN: p.stockTN||0, stockKH: p.stockKH||0, stockES: p.stockES||0, cost: p.cost || 0 });
         showToast(`已加入 ${p.name} ✓`);
     }
     renderCart();
@@ -793,7 +799,7 @@ async function putBackHang() {
         } catch(e) {}
     }
 }
-function getItemPrice(item) { return isKH() ? item.priceKH : item.priceTN; }
+function getItemPrice(item) { return item.price || item.priceKH || item.priceTN || 0; }
 function getSubtotal()      { return cart.reduce((s, i) => s + getItemPrice(i) * i.qty, 0); }
 function getItemDiscount() {
     const sub = getSubtotal();
@@ -1056,7 +1062,7 @@ async function loadHangOrders() {
         if (Array.isArray(data) && data.length > 0) {
             const localGasIds = new Set(hangOrders.map(h => h.gasId).filter(Boolean));
             data.forEach(h => {
-                if (!localGasIds.has(h.id)) {
+                if (!localGasIds.has(h.id) && !_deletedGasIds.has(h.id)) {
                     hangOrders.push({ gasId: h.id, name: h.name, store: h.store || storeForGAS(), cart: h.cart||[], member: h.member||null });
                 }
             });
@@ -1146,6 +1152,7 @@ async function recallOrder(idx) {
     showRecallBanner(orderName);
     showToast(`📌 已叫回：${orderName}`);
     // ✅ 立刻刪除雲端掛單，防止掛回時產生重複
+    if (gasId) _deletedGasIds.add(gasId); // 立刻記錄，防止重新載入時帶回
     if (API_URL && gasId) {
         try { await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteHangOrder', data: { id: gasId } }) }); } catch(e) {}
     }
