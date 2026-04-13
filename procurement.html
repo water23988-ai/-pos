@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾逅花事 | 進貨管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
+        * { font-family: 'Noto Serif TC', serif; }
+        body { background: #fcfbf9; color: #4a4a4a; }
+        .tab-btn { padding: 8px 18px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+        .tab-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
+        .s-input { width: 100%; border: 2px solid #e8ddd0; border-radius: 10px; padding: 9px 12px; font-size: 13px; outline: none; background: white; transition: border-color 0.2s; font-family: 'Noto Serif TC', serif; }
+        .s-input:focus { border-color: #8e9775; }
+        .s-select { width: 100%; border: 2px solid #e8ddd0; border-radius: 10px; padding: 9px 10px; font-size: 13px; outline: none; background: white; font-family: 'Noto Serif TC', serif; }
+        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 13px 20px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; font-family: 'Noto Serif TC', serif; }
+        .btn-primary:active { opacity: 0.8; }
+        .btn-primary:disabled { background: #c4b8ac; cursor: not-allowed; }
+        .store-btn { border: 2px solid #e5e7eb; border-radius: 10px; padding: 8px 4px; font-size: 12px; font-weight: bold; background: white; color: #9ca3af; cursor: pointer; transition: all 0.2s; font-family: 'Noto Serif TC', serif; }
+        .store-btn.active { background: #8e9775; border-color: #8e9775; color: white; }
+        .src-btn { border: 2px solid #e5e7eb; border-radius: 20px; padding: 6px 14px; font-size: 12px; background: white; color: #9ca3af; cursor: pointer; transition: all 0.2s; font-family: 'Noto Serif TC', serif; white-space: nowrap; }
+        .src-btn.active { background: #f1f3eb; border-color: #8e9775; color: #6d7756; font-weight: bold; }
+        .gas-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #9ca3af; }
+        .gas-dot.ok      { background: #22c55e; }
+        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
+        .gas-dot.error   { background: #ef4444; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .item-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; position: relative; }
+        .calc-row { background: #f8faf6; border-radius: 8px; padding: 8px 10px; margin-top: 8px; display: flex; gap: 12px; font-size: 12px; }
+        .calc-pill { text-align: center; }
+        .calc-pill .val { font-weight: bold; font-size: 14px; color: #6d7756; }
+        .calc-pill .lbl { color: #9ca3af; font-size: 10px; }
+        .batch-row { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; cursor: pointer; }
+        .batch-row.expanded { border-color: #8e9775; }
+        .item-detail-row { font-size: 12px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- Header -->
+<div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+    <div>
+        <h1 class="text-base font-bold text-[#8e9775]">🚚 拾逅花事 | 進貨管理</h1>
+        <p id="statusInfo" class="text-[10px] text-gray-400 italic">連接中...</p>
+    </div>
+    <div class="flex items-center gap-2">
+        <span class="gas-dot" id="gasDot"></span>
+        <nav class="flex gap-1">
+            <a href="index.html"     class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">POS</a>
+            <a href="products.html"  class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">商品</a>
+            <a href="inventory.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">盤點</a>
+            <a href="dashboard.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">後台</a>
+        </nav>
+    </div>
+</div>
+
+<!-- API 設定 -->
+<div id="apiBar" class="hidden bg-amber-50 border-b border-amber-200 px-4 py-2">
+    <p class="text-xs text-amber-700 mb-1">尚未設定 API 網址</p>
+    <div class="flex gap-2">
+        <input id="apiInput" type="text" placeholder="貼上 GAS 部署網址" class="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-xs outline-none">
+        <button onclick="saveApi()" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">儲存</button>
+    </div>
+</div>
+
+<!-- 據點選擇 -->
+<div class="bg-[#f1f3eb] border-b border-[#d4dbc6] px-4 py-2">
+    <p class="text-[9px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">進貨據點</p>
+    <div class="grid grid-cols-3 gap-2">
+        <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="store-btn">高雄 FOCUS</button>
+        <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="store-btn">台南 FOCUS</button>
+        <button onclick="setStore('誠品生活台南')" id="btn-es" class="store-btn">誠品台南</button>
+    </div>
+</div>
+
+<!-- Tabs -->
+<div class="px-4 pt-3 pb-0 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100">
+    <button onclick="switchTab('add')"  id="tab-add"  class="tab-btn active">＋ 新增進貨</button>
+    <button onclick="switchTab('log')"  id="tab-log"  class="tab-btn">📋 進貨紀錄</button>
+</div>
+
+<!-- ════════ 新增進貨 Tab ════════ -->
+<div id="view-add" class="px-4 py-4 space-y-4 pb-32">
+
+    <!-- 供應商 -->
+    <div>
+        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">供應商</p>
+        <div class="flex flex-wrap gap-2" id="srcBtns">
+            <button class="src-btn active" onclick="setSrc(this,'高雄深綠')">高雄深綠</button>
+            <button class="src-btn" onclick="setSrc(this,'台南花市')">台南花市</button>
+            <button class="src-btn" onclick="setSrc(this,'台北花誠')">台北花誠</button>
+            <button class="src-btn" onclick="setSrc(this,'自訂')">自訂…</button>
+        </div>
+        <input id="srcCustom" type="text" placeholder="輸入供應商名稱" class="s-input mt-2 hidden" oninput="selectedSource=this.value">
+    </div>
+
+    <!-- 日期 + 備註 -->
+    <div class="grid grid-cols-2 gap-3">
+        <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">進貨日期</p>
+            <input id="procDate" type="date" class="s-input">
+        </div>
+        <div>
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">備註</p>
+            <input id="procNote" type="text" placeholder="選填" class="s-input">
+        </div>
+    </div>
+
+    <!-- 花材清單 -->
+    <div>
+        <div class="flex justify-between items-center mb-2">
+            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">花材清單</p>
+            <button onclick="addItemRow()" style="background:#f1f3eb;border:none;border-radius:20px;padding:5px 14px;font-size:12px;color:#6d7756;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">＋ 新增品項</button>
+        </div>
+        <div id="itemList"></div>
+        <p id="emptyHint" class="text-center text-gray-300 text-xs py-6">點「新增品項」開始輸入進貨花材</p>
+    </div>
+
+    <!-- 合計 -->
+    <div id="totalBar" class="hidden bg-[#f1f3eb] border border-[#d4dbc6] rounded-2xl p-4">
+        <div class="flex justify-between items-center">
+            <span class="text-sm text-gray-600">本批總花費</span>
+            <span id="totalCostDisplay" class="text-xl font-bold text-[#6d7756]">NT$ 0</span>
+        </div>
+        <div class="flex justify-between items-center mt-1">
+            <span class="text-xs text-gray-400">品項數</span>
+            <span id="totalItemsDisplay" class="text-xs text-gray-500">0 項</span>
+        </div>
+    </div>
+
+    <!-- 送出 -->
+    <button id="submitBtn" onclick="submitProcurement()" class="btn-primary">送出進貨</button>
+</div>
+
+<!-- ════════ 進貨紀錄 Tab ════════ -->
+<div id="view-log" class="hidden px-4 py-4 pb-20">
+    <button onclick="loadBatches()" style="background:#f1f3eb;border:none;border-radius:20px;padding:7px 18px;font-size:12px;color:#6d7756;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;margin-bottom:12px;">重新載入</button>
+    <div id="batchList"><p class="text-center text-gray-300 text-xs py-10">載入中...</p></div>
+</div>
+
+<script>
+// ══ 設定 ══
+let API_URL      = localStorage.getItem('gas_api_url') || '';
+let currentStore = '';
+let selectedSource = '高雄深綠';
+let flowerLibrary  = [];
+let procItems      = [];   // [{ flowerName, category, stemsPerBunch, bunchesQty, pricePerBunch }]
+let _expandedBatch = null;
+let _batchData     = [];
+
+// ══ API ══
+function setGas(state) {
+    const dot  = document.getElementById('gasDot');
+    const info = document.getElementById('statusInfo');
+    dot.className = 'gas-dot ' + state;
+    if (state === 'loading') info.innerText = '同步中...';
+    if (state === 'ok')      info.innerText = '✅ 連線正常';
+    if (state === 'error')   info.innerText = '❌ API 連線錯誤';
+}
+
+function saveApi() {
+    const v = document.getElementById('apiInput').value.trim();
+    if (!v) return;
+    localStorage.setItem('gas_api_url', v);
+    API_URL = v;
+    document.getElementById('apiBar').classList.add('hidden');
+    init();
+}
+
+// ══ 據點 ══
+function setStore(s) {
+    currentStore = s;
+    ['kh','tn','es'].forEach(k => document.getElementById('btn-'+k).classList.remove('active'));
+    const map = { '高雄FOCUS 13':'btn-kh', '台南FOCUS':'btn-tn', '誠品生活台南':'btn-es' };
+    if (map[s]) document.getElementById(map[s]).classList.add('active');
+}
+
+// ══ 供應商 ══
+function setSrc(btn, src) {
+    document.querySelectorAll('.src-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    const customInput = document.getElementById('srcCustom');
+    if (src === '自訂') {
+        customInput.classList.remove('hidden');
+        selectedSource = customInput.value || '';
+        customInput.focus();
+    } else {
+        customInput.classList.add('hidden');
+        selectedSource = src;
+    }
+}
+
+// ══ Tab ══
+function switchTab(t) {
+    ['add','log'].forEach(id => {
+        document.getElementById('view-'+id).classList.toggle('hidden', id !== t);
+        document.getElementById('tab-'+id).classList.toggle('active', id === t);
+    });
+    if (t === 'log') loadBatches();
+}
+
+// ══ 花材庫建議 ══
+async function loadFlowerLibrary() {
+    if (!API_URL) return;
+    try {
+        const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
+        flowerLibrary = await res.json();
+    } catch(e) {}
+}
+
+function flowerOptions() {
+    const cats = [...new Set(flowerLibrary.map(f => f.category))];
+    return cats.map(cat => {
+        const names = flowerLibrary.filter(f => f.category === cat).map(f => f.name);
+        return `<optgroup label="${cat}">${names.map(n => `<option value="${n}" data-cat="${cat}">${n}</option>`).join('')}</optgroup>`;
+    }).join('');
+}
+
+// ══ 花材清單 CRUD ══
+function addItemRow() {
+    const idx = procItems.length;
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, bunchesQty:0, pricePerBunch:0 });
+    document.getElementById('emptyHint').style.display = 'none';
+    renderItemList();
+    // 自動捲到新加的卡片
+    setTimeout(() => {
+        const cards = document.querySelectorAll('.item-card');
+        if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }, 100);
+}
+
+function removeItemRow(idx) {
+    procItems.splice(idx, 1);
+    if (procItems.length === 0) document.getElementById('emptyHint').style.display = '';
+    renderItemList();
+    updateTotal();
+}
+
+function onFlowerSelect(idx, selectEl) {
+    const opt = selectEl.options[selectEl.selectedIndex];
+    procItems[idx].flowerName = opt.value;
+    procItems[idx].category   = opt.getAttribute('data-cat') || '主花';
+    // 同步分類顯示
+    const catEl = document.getElementById(`cat-${idx}`);
+    if (catEl) catEl.value = procItems[idx].category;
+}
+
+function onFieldChange(idx, field, val) {
+    procItems[idx][field] = field === 'flowerName' || field === 'category' ? val : Number(val) || 0;
+    updateCalc(idx);
+    updateTotal();
+}
+
+function updateCalc(idx) {
+    const item = procItems[idx];
+    const spb  = Number(item.stemsPerBunch) || 0;
+    const bq   = Number(item.bunchesQty)    || 0;
+    const ppb  = Number(item.pricePerBunch) || 0;
+    const totalStems     = spb * bq;
+    const costPerStem    = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
+    const suggestedPrice = Math.round(costPerStem * 3.8);
+    const itemCost       = ppb * bq;
+
+    const stemEl = document.getElementById(`calc-stems-${idx}`);
+    const costEl = document.getElementById(`calc-cost-${idx}`);
+    const suggEl = document.getElementById(`calc-sugg-${idx}`);
+    const totEl  = document.getElementById(`calc-total-${idx}`);
+    if (stemEl) stemEl.innerText = totalStems;
+    if (costEl) costEl.innerText = costPerStem.toFixed(1);
+    if (suggEl) suggEl.innerText = suggestedPrice;
+    if (totEl)  totEl.innerText  = 'NT$ ' + itemCost.toLocaleString();
+}
+
+function updateTotal() {
+    const total = procItems.reduce((s, item) => {
+        return s + (Number(item.pricePerBunch)||0) * (Number(item.bunchesQty)||0);
+    }, 0);
+    const bar = document.getElementById('totalBar');
+    if (procItems.length > 0) {
+        bar.classList.remove('hidden');
+        document.getElementById('totalCostDisplay').innerText = 'NT$ ' + total.toLocaleString();
+        document.getElementById('totalItemsDisplay').innerText = procItems.length + ' 項';
+    } else {
+        bar.classList.add('hidden');
+    }
+}
+
+function renderItemList() {
+    const el = document.getElementById('itemList');
+    const opts = flowerOptions();
+    el.innerHTML = procItems.map((item, idx) => `
+    <div class="item-card" id="icard-${idx}">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+            <span style="font-size:11px;font-weight:bold;color:#8e9775;">品項 ${idx+1}</span>
+            <button onclick="removeItemRow(${idx})" style="background:none;border:none;color:#f87171;font-size:18px;cursor:pointer;line-height:1;">×</button>
+        </div>
+
+        <!-- 花材名稱 -->
+        <div style="margin-bottom:8px;">
+            <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">花材名稱</p>
+            ${opts ? `
+            <select onchange="onFlowerSelect(${idx},this);onFieldChange(${idx},'flowerName',this.value)" class="s-select" style="margin-bottom:4px;">
+                <option value="">— 從花材庫選取 —</option>
+                ${opts}
+            </select>` : ''}
+            <input type="text" placeholder="或手動輸入花材名稱" class="s-input" style="font-size:12px;"
+                value="${item.flowerName}"
+                oninput="onFieldChange(${idx},'flowerName',this.value)">
+        </div>
+
+        <!-- 分類 -->
+        <div style="margin-bottom:8px;">
+            <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">分類</p>
+            <select id="cat-${idx}" class="s-select" onchange="onFieldChange(${idx},'category',this.value)">
+                <option value="主花" ${item.category==='主花'?'selected':''}>主花</option>
+                <option value="配花" ${item.category==='配花'?'selected':''}>配花</option>
+                <option value="葉材" ${item.category==='葉材'?'selected':''}>葉材</option>
+                <option value="其他" ${item.category==='其他'?'selected':''}>其他</option>
+            </select>
+        </div>
+
+        <!-- 數量資訊 -->
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div>
+                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">每把枝數</p>
+                <input type="number" min="1" placeholder="枝" class="s-input" style="font-size:13px;padding:8px 10px;"
+                    value="${item.stemsPerBunch||''}"
+                    oninput="onFieldChange(${idx},'stemsPerBunch',this.value)">
+            </div>
+            <div>
+                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">購入把數</p>
+                <input type="number" min="1" placeholder="把" class="s-input" style="font-size:13px;padding:8px 10px;"
+                    value="${item.bunchesQty||''}"
+                    oninput="onFieldChange(${idx},'bunchesQty',this.value)">
+            </div>
+            <div>
+                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">每把單價</p>
+                <input type="number" min="0" placeholder="NT$" class="s-input" style="font-size:13px;padding:8px 10px;"
+                    value="${item.pricePerBunch||''}"
+                    oninput="onFieldChange(${idx},'pricePerBunch',this.value)">
+            </div>
+        </div>
+
+        <!-- 自動計算結果 -->
+        <div class="calc-row">
+            <div class="calc-pill flex-1">
+                <div class="val" id="calc-stems-${idx}">0</div>
+                <div class="lbl">總枝數</div>
+            </div>
+            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-pill flex-1">
+                <div class="val" id="calc-cost-${idx}">0</div>
+                <div class="lbl">單支成本</div>
+            </div>
+            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-pill flex-1">
+                <div class="val" id="calc-sugg-${idx}">0</div>
+                <div class="lbl">建議售價</div>
+            </div>
+            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-pill flex-1">
+                <div class="val" id="calc-total-${idx}" style="font-size:12px;">NT$ 0</div>
+                <div class="lbl">小計</div>
+            </div>
+        </div>
+    </div>`).join('');
+
+    // 重新計算所有卡片
+    procItems.forEach((_, i) => updateCalc(i));
+    updateTotal();
+}
+
+// ══ 送出進貨 ══
+async function submitProcurement() {
+    if (!API_URL) return alert('請先設定 API 網址');
+    if (!currentStore) return alert('請先選擇進貨據點');
+    if (!selectedSource) return alert('請選擇供應商');
+    if (procItems.length === 0) return alert('請至少新增一項花材');
+
+    // 驗證必填
+    for (let i = 0; i < procItems.length; i++) {
+        const it = procItems[i];
+        if (!it.flowerName) return alert(`品項 ${i+1}：請輸入花材名稱`);
+        if (!it.stemsPerBunch || it.stemsPerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把枝數`);
+        if (!it.bunchesQty   || it.bunchesQty   <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入購入把數`);
+        if (!it.pricePerBunch|| it.pricePerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把單價`);
+    }
+
+    const btn = document.getElementById('submitBtn');
+    btn.disabled = true; btn.innerText = '送出中...';
+    setGas('loading');
+
+    try {
+        const payload = {
+            action: 'addProcurement',
+            data: {
+                source: selectedSource,
+                store : currentStore,
+                date  : document.getElementById('procDate').value || '',
+                note  : document.getElementById('procNote').value.trim(),
+                items : procItems.map(it => ({
+                    flowerName   : it.flowerName,
+                    category     : it.category,
+                    stemsPerBunch: Number(it.stemsPerBunch),
+                    bunchesQty   : Number(it.bunchesQty),
+                    pricePerBunch: Number(it.pricePerBunch),
+                })),
+            }
+        };
+        const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify(payload) });
+        const result = await res.json();
+
+        if (result.success) {
+            setGas('ok');
+            showToast(`✅ 進貨完成！${result.totalItems} 項 · NT$ ${(result.totalCost||0).toLocaleString()}`);
+            procItems = [];
+            document.getElementById('itemList').innerHTML = '';
+            document.getElementById('emptyHint').style.display = '';
+            document.getElementById('procNote').value = '';
+            document.getElementById('totalBar').classList.add('hidden');
+        } else {
+            setGas('error');
+            alert('送出失敗：' + (result.error || '未知錯誤'));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗，請確認 API 網址');
+    }
+    btn.disabled = false; btn.innerText = '送出進貨';
+}
+
+// ══ 進貨紀錄 ══
+async function loadBatches() {
+    if (!API_URL) return;
+    const el = document.getElementById('batchList');
+    el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
+    setGas('loading');
+    try {
+        const res = await fetch(`${API_URL}?action=getProcurementBatches`);
+        _batchData = await res.json();
+        setGas('ok');
+        renderBatches();
+    } catch(e) {
+        setGas('error');
+        el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗</p>';
+    }
+}
+
+function renderBatches() {
+    const el = document.getElementById('batchList');
+    if (!_batchData.length) {
+        el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">尚無進貨紀錄</p>';
+        return;
+    }
+    el.innerHTML = _batchData.map(b => `
+    <div class="batch-row ${_expandedBatch===b.batchId?'expanded':''}" onclick="toggleBatch('${b.batchId}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+            <div>
+                <p style="font-weight:bold;font-size:13px;">${b.source || '—'}</p>
+                <p style="font-size:11px;color:#9ca3af;margin-top:2px;">${String(b.date||'').slice(0,10)} · ${b.store||''} · ${b.totalItems}項</p>
+            </div>
+            <div style="text-align:right;">
+                <p style="font-weight:bold;color:#6d7756;font-size:14px;">NT$ ${Number(b.totalCost).toLocaleString()}</p>
+                <p style="font-size:10px;color:#c4b8ac;">${_expandedBatch===b.batchId?'▲':'▼'}</p>
+            </div>
+        </div>
+        ${_expandedBatch === b.batchId ? `<div id="detail-${b.batchId}" style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:8px;">
+            <p style="font-size:11px;color:#9ca3af;padding:8px 0;">載入品項中...</p>
+        </div>` : ''}
+    </div>`).join('');
+
+    if (_expandedBatch) loadBatchItems(_expandedBatch);
+}
+
+async function toggleBatch(batchId) {
+    _expandedBatch = _expandedBatch === batchId ? null : batchId;
+    renderBatches();
+}
+
+async function loadBatchItems(batchId) {
+    const el = document.getElementById(`detail-${batchId}`);
+    if (!el) return;
+    try {
+        const res   = await fetch(`${API_URL}?action=getProcurementItems&batchId=${encodeURIComponent(batchId)}`);
+        const items = await res.json();
+        if (!Array.isArray(items) || !items.length) {
+            el.innerHTML = '<p style="font-size:12px;color:#9ca3af;padding:8px 0;">無品項資料</p>';
+            return;
+        }
+        el.innerHTML = items.map(it => `
+        <div class="item-detail-row">
+            <div>
+                <span style="font-size:13px;font-weight:bold;">${it.flowerName}</span>
+                <span style="font-size:10px;color:#9ca3af;margin-left:6px;">${it.category}</span>
+            </div>
+            <div style="text-align:right;font-size:12px;">
+                <span style="color:#6d7756;font-weight:bold;">${it.totalStems}枝</span>
+                <span style="color:#9ca3af;margin-left:6px;">成本 ${Number(it.costPerStem).toFixed(1)}</span>
+                <span style="background:#f1f3eb;color:#6d7756;border-radius:8px;padding:1px 7px;margin-left:6px;font-size:11px;">建議 NT$${it.suggestedPrice}</span>
+            </div>
+        </div>
+        <div style="font-size:11px;color:#9ca3af;padding-bottom:6px;">
+            ${it.bunchesQty}把 × ${it.stemsPerBunch}枝/把 · 每把 NT$${it.pricePerBunch}
+        </div>`).join('');
+    } catch(e) {
+        el.innerHTML = '<p style="font-size:12px;color:#f87171;padding:8px 0;">載入失敗</p>';
+    }
+}
+
+// ══ Toast ══
+let _toastTimer;
+function showToast(msg, dur=2500) {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ══ 初始化 ══
+async function init() {
+    if (!API_URL) {
+        document.getElementById('apiBar').classList.remove('hidden');
+        document.getElementById('statusInfo').innerText = '請設定 API';
+        return;
+    }
+    setGas('loading');
+    // 設定今天日期
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone:'Asia/Taipei' }).format(new Date());
+    document.getElementById('procDate').value = today;
+    // 設定預設據點
+    setStore('高雄FOCUS 13');
+    // 載入花材庫
+    await loadFlowerLibrary();
+    setGas('ok');
+    document.getElementById('statusInfo').innerText = '✅ 連線正常';
+}
+
+window.onload = init;
+</script>
+</body>
+</html>
