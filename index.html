@@ -418,6 +418,7 @@
                 <button onclick="setHistoryStore('all')"     id="hs-all" class="source-chip source-hist active" style="font-size:11px;">全部</button>
                 <button onclick="setHistoryStore('高雄FOCUS 13')" id="hs-kh"  class="source-chip source-hist" style="font-size:11px;">高雄</button>
                 <button onclick="setHistoryStore('台南FOCUS')"    id="hs-tn"  class="source-chip source-hist" style="font-size:11px;">台南</button>
+                <button onclick="setHistoryStore('誠品生活台南')" id="hs-es"  class="source-chip source-hist" style="font-size:11px;">誠品</button>
                 <button onclick="setHistoryStore('Studio')"   id="hs-st"  class="source-chip source-hist" style="font-size:11px;">Studio</button>
             </div>
         </div>
@@ -843,7 +844,7 @@ function editPrice(idx) {
     const val  = prompt(`修改「${item.name}」單價：`, getItemPrice(item));
     if (val === null) return;
     const n = parseInt(val);
-    if (!isNaN(n) && n >= 0) { if (isKH()) item.priceKH = n; else item.priceTN = n; renderCart(); }
+    if (!isNaN(n) && n >= 0) { item.price = n; item.priceKH = n; item.priceTN = n; renderCart(); }
 }
 function updateCheckoutBar() {
     const sub   = getSubtotal();
@@ -1009,16 +1010,18 @@ async function restockProduct(id) {
 async function reportWaste(id) {
     const p = rawProducts.find(x => String(x.id) === String(id));
     if (!p) return;
-    const stock = isKH() ? p.stockKH : p.stockTN;
+    const store = currentStore;
+    const stock = store === '台南FOCUS' ? p.stockTN : store === '誠品生活台南' ? p.stockES : p.stockKH;
     const qty   = prompt(`報廢「${p.name}」幾枝？（庫存 ${stock} 枝）`);
     if (!qty || isNaN(qty) || Number(qty) <= 0) return;
     if (Number(qty) > stock) return alert('報廢數量超過庫存');
-    const note = prompt('報廢原因（可略過）') || '';
+    const note = prompt('報廢原因（可略過）') || '報廢';
+    const newQty = stock - Number(qty);
     setGasStatus('loading');
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addWaste', data: { date: new Date().toISOString(), store: storeForGAS(), productId: p.id, productName: p.name, qty: Number(qty), unitCost: p.cost||0, note } }) });
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateStock', data: { id: p.id, store, qty: newQty, note: `報廢 ${qty} 枝：${note}` } }) });
         const result = await res.json();
-        if (result.success) { showToast(`✅ 已記錄報廢：${p.name} ${qty} 枝`); setGasStatus('ok'); fetchProducts(); }
+        if (result.success) { showToast(`✅ 已記錄報廢：${p.name} ${qty} 枝`); setGasStatus('ok'); await fetchProducts(); const cat = document.getElementById('modalCurrentCatLabel').innerText; if (cat) openModalProducts(cat); }
         else { alert('報廢失敗：' + (result.error || '')); setGasStatus('error'); }
     } catch (e) { alert('連線失敗'); setGasStatus('error'); }
 }
@@ -1320,7 +1323,7 @@ let _selectedHistoryStore = 'all';
 function setHistoryStore(store) {
     _selectedHistoryStore = store;
     document.querySelectorAll('.source-hist').forEach(b => b.classList.remove('active'));
-    const idMap = { 'all':'hs-all', '高雄FOCUS 13':'hs-kh', '台南FOCUS':'hs-tn', 'Studio':'hs-st' };
+    const idMap = { 'all':'hs-all', '高雄FOCUS 13':'hs-kh', '台南FOCUS':'hs-tn', '誠品生活台南':'hs-es', 'Studio':'hs-st' };
     const el = document.getElementById(idMap[store]);
     if (el) el.classList.add('active');
     if (document.getElementById('historyDateInput').value) loadHistory();
@@ -1364,7 +1367,7 @@ async function loadHistory() {
                 const badge  = tx.voided ? '<span style="background:#fee2e2;color:#dc2626;font-size:9px;padding:1px 5px;border-radius:4px;margin-left:4px;">已退款</span>' : '';
                 const member = tx.memberName && tx.memberName !== '散客' ? `👤 ${tx.memberName}` : '散客';
                 const storeTag = `<span style="font-size:9px;color:#c4b8ac;margin-left:4px;">${(tx.store||'').replace('FOCUS','').replace(' 13','').trim()}</span>`;
-                const timeStr = String(tx.date||'').slice(0,19).replace('T',' ');
+                const timeStr = fmtTaipei(tx.date);
                 return `<div onclick="openTxDetail('${tx.id}')" style="background:#fafaf9;border:1px solid #f3f4f6;border-radius:10px;padding:10px 12px;margin-bottom:6px;cursor:pointer;">
                     <div style="display:flex;justify-content:space-between;align-items:center;">
                         <span style="font-size:11px;color:#9ca3af;">${member}${badge}${storeTag}</span>
@@ -1379,49 +1382,48 @@ async function loadHistory() {
     }
 }
 
-async function openTxDetail(txId) {
+function fmtTaipei(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr);
+    if (isNaN(d)) return String(dateStr).slice(0,19).replace('T',' ');
+    return new Intl.DateTimeFormat('sv-SE', { timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit', hour:'2-digit', minute:'2-digit', second:'2-digit' }).format(d).replace('T',' ');
+}
+
+function openTxDetail(txId) {
     _currentVoidTxId = txId;
     document.getElementById('txDetailModal').classList.add('show');
     document.getElementById('txDetailTitle').innerText = `明細 · ${txId}`;
-    document.getElementById('txDetailContent').innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
     const voidBtn = document.getElementById('voidBtn');
     voidBtn.style.display = 'none';
-    setGasStatus('loading');
-    try {
-        const [itemsRes] = await Promise.all([
-            fetch(`${API_URL}?action=getTransactionItems&txId=${encodeURIComponent(txId)}`)
-        ]);
-        const items = await itemsRes.json();
-        setGasStatus('ok');
 
-        // 找到對應的 tx 資料
-        const tx = _historyData.find(t => t.id === txId) || {};
+    const tx = (_historyData || []).find(t => t.id === txId);
+    if (!tx) {
+        document.getElementById('txDetailContent').innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">找不到交易資料</p>';
+        return;
+    }
 
-        document.getElementById('txDetailContent').innerHTML = `
-            <div style="font-size:10px;color:#9ca3af;text-align:center;margin-bottom:12px;">
-                ${tx.date ? String(tx.date).slice(0,19) : ''} · ${tx.store || ''}
-            </div>
-            ${Array.isArray(items) && items.length ? items.map(item => `
-                <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #f9fafb;font-size:13px;">
-                    <span>${item['品項名稱']} × ${item['數量']}</span>
-                    <span style="font-weight:bold;">NT$ ${Number(item['小計']).toLocaleString()}</span>
-                </div>`).join('') : '<p style="color:#9ca3af;text-align:center;font-size:12px;padding:16px 0;">無品項資料</p>'}
-            <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:12px;">
-                <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>付款方式</span><span>${tx.pay || '—'}</span></div>
-                <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>會員</span><span>${tx.memberName || '散客'}</span></div>
-                ${Number(tx.discount)>0 ? `<div style="display:flex;justify-content:space-between;color:#f87171;margin-bottom:3px;"><span>折扣</span><span>-NT$ ${Number(tx.discount).toLocaleString()}</span></div>` : ''}
-                <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;color:#8e9775;margin-top:4px;"><span>合計</span><span>NT$ ${Number(tx.total).toLocaleString()}</span></div>
-            </div>`;
+    const items = Array.isArray(tx.items) ? tx.items : [];
+    document.getElementById('txDetailContent').innerHTML = `
+        <div style="font-size:10px;color:#9ca3af;text-align:center;margin-bottom:12px;">
+            ${fmtTaipei(tx.date)} · ${tx.store || ''}
+        </div>
+        ${items.length ? items.map(item => `
+            <div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #f9fafb;font-size:13px;">
+                <span>${item.name || ''} × ${item.qty || 1}</span>
+                <span style="font-weight:bold;">NT$ ${((Number(item.unitPrice)||0)*(Number(item.qty)||1)).toLocaleString()}</span>
+            </div>`).join('') : '<p style="color:#9ca3af;text-align:center;font-size:12px;padding:16px 0;">無品項資料</p>'}
+        <div style="margin-top:10px;padding-top:8px;border-top:1px solid #e5e7eb;font-size:12px;">
+            <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>付款方式</span><span>${tx.pay || '—'}</span></div>
+            <div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>會員</span><span>${tx.memberName || '散客'}</span></div>
+            ${tx.note ? `<div style="display:flex;justify-content:space-between;color:#6b7280;margin-bottom:3px;"><span>備註</span><span style="text-align:right;max-width:60%;">${tx.note}</span></div>` : ''}
+            ${Number(tx.discount)>0 ? `<div style="display:flex;justify-content:space-between;color:#f87171;margin-bottom:3px;"><span>折扣</span><span>-NT$ ${Number(tx.discount).toLocaleString()}</span></div>` : ''}
+            <div style="display:flex;justify-content:space-between;font-weight:bold;font-size:14px;color:#8e9775;margin-top:4px;"><span>合計</span><span>NT$ ${Number(tx.total).toLocaleString()}</span></div>
+        </div>`;
 
-        // 不是已退款才顯示退款按鈕
-        if (!tx.voided) {
-            voidBtn.style.display = 'block';
-            voidBtn.disabled = false;
-            voidBtn.innerText = '執行退款';
-        }
-    } catch(e) {
-        setGasStatus('error');
-        document.getElementById('txDetailContent').innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗</p>';
+    if (!tx.voided) {
+        voidBtn.style.display = 'block';
+        voidBtn.disabled = false;
+        voidBtn.innerText = '執行退款';
     }
 }
 function closeTxDetailModal() { document.getElementById('txDetailModal').classList.remove('show'); }
