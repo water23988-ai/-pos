@@ -1,6 +1,8 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
-//  版本：2.0  |  2026-04
+//  版本：2.1  |  2026-04
+//  更新：新增進貨模組（ProcurementBatches / ProcurementItems）
+//        成本回寫改為加權平均邏輯
 // ══════════════════════════════════════════════════════
 //
 //  【使用說明】
@@ -17,6 +19,11 @@
 const SPREADSHEET_ID = '1BQjkFe1pl7OYxvnZLoItVWZjYFnqBZalbwJPLPKMw4w';
 
 // ── 工作表名稱 ──
+const SH_PROC = {
+  BATCHES : 'ProcurementBatches',
+  ITEMS   : 'ProcurementItems',
+};
+
 const SH = {
   PRODUCTS    : 'Products',
   TRANSACTIONS: 'Transactions',
@@ -47,6 +54,19 @@ function setupSheets() {
   ensureSheet(SH.PRICE_LOG,    ['time','name','category','bundlePrice','stems','unitCost','salePrice','note']);
 
   Logger.log('✅ 所有工作表初始化完成');
+}
+
+function setupProcurementSheets() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  function ensureSheet(name, headers) {
+    let sh = ss.getSheetByName(name);
+    if (!sh) sh = ss.insertSheet(name);
+    if (sh.getLastRow() === 0) sh.appendRow(headers);
+    return sh;
+  }
+  ensureSheet(SH_PROC.BATCHES, ['batchId','date','source','note','totalItems','totalCost']);
+  ensureSheet(SH_PROC.ITEMS,   ['itemId','batchId','flowerName','category','stemsPerBunch','bunchesQty','pricePerBunch','totalStems','costPerStem','suggestedPrice','store','date']);
+  Logger.log('✅ 進貨工作表初始化完成');
 }
 
 // ══════════════════════════════════════════════════════
@@ -84,8 +104,10 @@ function doGet(e) {
       case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
       case 'getFlowerLibrary':      return jsonOut(getFlowerLibrary());
-      case 'getPriceHistory':       return jsonOut(getPriceHistory(e.parameter.name));
-      default:                      return jsonOut({ error: 'Unknown GET action: ' + action });
+      case 'getPriceHistory':         return jsonOut(getPriceHistory(e.parameter.name));
+      case 'getProcurementBatches':   return jsonOut(getProcurementBatches());
+      case 'getProcurementItems':     return jsonOut(getProcurementItems(e.parameter.batchId));
+      default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
     return jsonOut({ error: err.message });
@@ -115,6 +137,7 @@ function doPost(e) {
       case 'deleteHangOrder':      return jsonOut(deleteHangOrder(data));
       case 'logPriceHistory':      return jsonOut(logPriceHistory(data));
       case 'addFlowerToLibrary':   return jsonOut(addFlowerToLibrary(data));
+      case 'addProcurement':       return jsonOut(addProcurement(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -1102,6 +1125,111 @@ function fixTransactionsSheet() {
   const nextCol = sh.getLastColumn() + 1;
   sh.getRange(1, nextCol).setValue('items');
   Logger.log(`✅ 已在第 ${nextCol} 欄新增 items 欄位`);
+}
+
+// ══════════════════════════════════════════════════════
+//  進貨模組
+// ══════════════════════════════════════════════════════
+function getProcurementBatches() {
+  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SH_PROC.BATCHES);
+  if (!sh || sh.getLastRow() < 2) return [];
+  return sheetToObjects(sh).reverse().slice(0, 100).map(r => ({
+    batchId   : r.batchId,
+    date      : r.date,
+    source    : r.source,
+    note      : r.note,
+    totalItems: Number(r.totalItems) || 0,
+    totalCost : Number(r.totalCost)  || 0,
+  }));
+}
+
+function getProcurementItems(batchId) {
+  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SH_PROC.ITEMS);
+  if (!sh || sh.getLastRow() < 2) return [];
+  const rows     = sheetToObjects(sh);
+  const filtered = batchId ? rows.filter(r => r.batchId === batchId) : rows;
+  return filtered.reverse().slice(0, 500).map(r => ({
+    itemId        : r.itemId,
+    batchId       : r.batchId,
+    flowerName    : r.flowerName,
+    category      : r.category,
+    stemsPerBunch : Number(r.stemsPerBunch)  || 0,
+    bunchesQty    : Number(r.bunchesQty)     || 0,
+    pricePerBunch : Number(r.pricePerBunch)  || 0,
+    totalStems    : Number(r.totalStems)     || 0,
+    costPerStem   : Number(r.costPerStem)    || 0,
+    suggestedPrice: Number(r.suggestedPrice) || 0,
+    store         : r.store,
+    date          : r.date,
+  }));
+}
+
+function addProcurement(data) {
+  const ss      = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const batchSh = ss.getSheetByName(SH_PROC.BATCHES);
+  const itemSh  = ss.getSheetByName(SH_PROC.ITEMS);
+  if (!batchSh || !itemSh) return { success: false, error: '進貨工作表不存在，請先執行 setupProcurementSheets()' };
+
+  const date    = data.date || Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const batchId = 'B' + Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyyMMdd') +
+                  Math.random().toString(36).slice(2, 5).toUpperCase();
+  const items     = data.items || [];
+  let   totalCost = 0;
+  const itemRows  = [];
+
+  items.forEach((item, idx) => {
+    const stemsPerBunch  = Number(item.stemsPerBunch)  || 0;
+    const bunchesQty     = Number(item.bunchesQty)     || 0;
+    const pricePerBunch  = Number(item.pricePerBunch)  || 0;
+    const totalStems     = stemsPerBunch * bunchesQty;
+    const costPerStem    = stemsPerBunch > 0 ? Math.round(pricePerBunch / stemsPerBunch * 100) / 100 : 0;
+    const suggestedPrice = Math.round(costPerStem * 3.8);
+    totalCost += pricePerBunch * bunchesQty;
+    itemRows.push([
+      batchId + '-' + String(idx + 1).padStart(2, '0'),
+      batchId, item.flowerName || '', item.category || '主花',
+      stemsPerBunch, bunchesQty, pricePerBunch,
+      totalStems, costPerStem, suggestedPrice, data.store || '', date,
+    ]);
+    updateProductCostWeighted({ flowerName: item.flowerName, store: data.store, newStems: totalStems, newCost: costPerStem });
+  });
+
+  batchSh.appendRow([batchId, date, data.source || '', data.note || '', items.length, Math.round(totalCost)]);
+  if (itemRows.length > 0) {
+    itemSh.getRange(itemSh.getLastRow() + 1, 1, itemRows.length, itemRows[0].length).setValues(itemRows);
+  }
+  return { success: true, batchId, totalItems: items.length, totalCost: Math.round(totalCost) };
+}
+
+function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameCol    = headers.indexOf('name');
+  const costCol    = headers.indexOf('cost');
+  const stockKHCol = headers.indexOf('stockKH');
+  const stockTNCol = headers.indexOf('stockTN');
+  const stockESCol = headers.indexOf('stockES');
+  const storeCol   = store === '台南FOCUS' ? stockTNCol : store === '誠品生活台南' ? stockESCol : stockKHCol;
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][nameCol] || '').trim() !== String(flowerName || '').trim()) continue;
+    const row          = i + 1;
+    const oldCost      = Number(vals[i][costCol])  || 0;
+    const oldStock     = Number(vals[i][storeCol]) || 0;
+    const weightedCost = (oldStock + newStems) > 0
+      ? Math.round(((oldCost * oldStock) + (newCost * newStems)) / (oldStock + newStems) * 100) / 100
+      : newCost;
+    sh.getRange(row, costCol  + 1).setValue(weightedCost);
+    sh.getRange(row, storeCol + 1).setValue(oldStock + newStems);
+    getSheet(SH.INV_LOG).appendRow([
+      taipeiNow(), vals[i][headers.indexOf('id')], flowerName,
+      store, oldStock, oldStock + newStems, newStems,
+      `進貨入庫（加權成本 ${weightedCost}）`, 'receive',
+    ]);
+    return;
+  }
+  Logger.log(`⚠️ 進貨警告：找不到「${flowerName}」，成本未回寫`);
 }
 
 // ══════════════════════════════════════════════════════
