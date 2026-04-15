@@ -145,7 +145,7 @@
 
 <script>
 // ══ 設定 ══
-let API_URL      = localStorage.getItem('gas_api_url') || '';
+let API_URL      = localStorage.getItem('moment_flor_api') || '';
 let currentStore = '';
 let selectedSource = '高雄深綠';
 let flowerLibrary  = [];
@@ -166,7 +166,7 @@ function setGas(state) {
 function saveApi() {
     const v = document.getElementById('apiInput').value.trim();
     if (!v) return;
-    localStorage.setItem('gas_api_url', v);
+    localStorage.setItem('moment_flor_api', v);
     API_URL = v;
     document.getElementById('apiBar').classList.add('hidden');
     init();
