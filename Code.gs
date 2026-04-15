@@ -1,8 +1,14 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
-//  版本：2.1  |  2026-04
+//  版本：2.2  |  2026-04
 //  更新：新增進貨模組（ProcurementBatches / ProcurementItems）
 //        成本回寫改為加權平均邏輯
+//  [v2.2 修復]
+//  - Bug Fix: Studio 交易獨立記錄，不再合併入高雄
+//  - Bug Fix: 報廢 action 正確寫入 type='waste'，日結廢棄成本恢復正常
+//  - Bug Fix: 進貨批次記錄補上 store 欄位
+//  - Bug Fix: 庫存記錄查詢不再混入無點位記錄
+//  - 效能優化: getSheet() 加入快取，避免重複開啟試算表
 // ══════════════════════════════════════════════════════
 //
 //  【使用說明】
@@ -64,7 +70,8 @@ function setupProcurementSheets() {
     if (sh.getLastRow() === 0) sh.appendRow(headers);
     return sh;
   }
-  ensureSheet(SH_PROC.BATCHES, ['batchId','date','source','note','totalItems','totalCost']);
+  // [v2.2 修復] 補上 store 欄位，讓進貨記錄可以按點位查詢
+  ensureSheet(SH_PROC.BATCHES, ['batchId','date','source','store','note','totalItems','totalCost']);
   ensureSheet(SH_PROC.ITEMS,   ['itemId','batchId','flowerName','category','stemsPerBunch','bunchesQty','pricePerBunch','totalStems','costPerStem','suggestedPrice','store','date']);
   Logger.log('✅ 進貨工作表初始化完成');
 }
@@ -138,6 +145,7 @@ function doPost(e) {
       case 'logPriceHistory':      return jsonOut(logPriceHistory(data));
       case 'addFlowerToLibrary':   return jsonOut(addFlowerToLibrary(data));
       case 'addProcurement':       return jsonOut(addProcurement(data));
+      case 'reportWaste':          return jsonOut(reportWaste(data));   // [v2.2] 新增報廢 action
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -148,8 +156,15 @@ function doPost(e) {
 // ══════════════════════════════════════════════════════
 //  工具函式
 // ══════════════════════════════════════════════════════
+
+// [v2.2 效能優化] 快取試算表物件，避免每次呼叫都重新開啟
+let _ss = null;
+function getSS() {
+  if (!_ss) _ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  return _ss;
+}
 function getSheet(name) {
-  return SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(name);
+  return getSS().getSheetByName(name);
 }
 
 function sheetToObjects(sh) {
@@ -327,8 +342,9 @@ function receiveStock(data) {
 function getInventoryLog(store) {
   const sh   = getSheet(SH.INV_LOG);
   const rows = sheetToObjects(sh);
+  // [v2.2 修復] 移除 !r.store 條件，不再把「無點位」記錄混入點位查詢
   const filtered = store
-    ? rows.filter(r => !r.store || r.store === store)
+    ? rows.filter(r => r.store === store)
     : rows;
 
   return filtered
@@ -468,8 +484,7 @@ function dateRange_(date, tz) {
 }
 
 function storeFilter_(store) {
-  // 高雄 includes Studio orders stored under the same store name
-  if (store === '高雄FOCUS 13') return r => r.store === '高雄FOCUS 13' || r.store === 'Studio';
+  // [v2.2 修復] Studio 獨立記錄，不再合併至高雄
   if (store) return r => r.store === store;
   return () => true;
 }
@@ -676,10 +691,12 @@ function getAllStoresReport(period) {
 
   const filtered = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && d >= from && d <= to; });
 
+  // [v2.2 修復] Studio 獨立報表，不再與高雄合併
   const storeList = [
-    { label: '高雄FOCUS 13', keys: ['高雄FOCUS 13', 'Studio'] },
+    { label: '高雄FOCUS 13', keys: ['高雄FOCUS 13'] },
     { label: '台南FOCUS',    keys: ['台南FOCUS'] },
     { label: '誠品生活台南', keys: ['誠品生活台南'] },
+    { label: 'Studio',       keys: ['Studio'] },
   ];
 
   const result = storeList.map(s => {
@@ -1131,12 +1148,14 @@ function fixTransactionsSheet() {
 //  進貨模組
 // ══════════════════════════════════════════════════════
 function getProcurementBatches() {
-  const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SH_PROC.BATCHES);
+  const sh = getSheet(SH_PROC.BATCHES);
   if (!sh || sh.getLastRow() < 2) return [];
+  // [v2.2 修復] 回傳 store 欄位
   return sheetToObjects(sh).reverse().slice(0, 100).map(r => ({
     batchId   : r.batchId,
     date      : r.date,
     source    : r.source,
+    store     : r.store || '',
     note      : r.note,
     totalItems: Number(r.totalItems) || 0,
     totalCost : Number(r.totalCost)  || 0,
@@ -1194,7 +1213,8 @@ function addProcurement(data) {
     updateProductCostWeighted({ flowerName: item.flowerName, store: data.store, newStems: totalStems, newCost: costPerStem });
   });
 
-  batchSh.appendRow([batchId, date, data.source || '', data.note || '', items.length, Math.round(totalCost)]);
+  // [v2.2 修復] 加入 store 欄位寫入
+  batchSh.appendRow([batchId, date, data.source || '', data.store || '', data.note || '', items.length, Math.round(totalCost)]);
   if (itemRows.length > 0) {
     itemSh.getRange(itemSh.getLastRow() + 1, 1, itemRows.length, itemRows[0].length).setValues(itemRows);
   }
@@ -1233,9 +1253,48 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
 }
 
 // ══════════════════════════════════════════════════════
+//  報廢記錄 [v2.2 新增] — 正確寫入 type='waste'，日結廢棄成本才會正確計算
+// ══════════════════════════════════════════════════════
+function reportWaste(data) {
+  // data: { id, store, qty, note }
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol   = headers.indexOf('id');
+  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN')
+                 : data.store === '誠品生活台南' ? headers.indexOf('stockES')
+                 : headers.indexOf('stockKH');
+
+  for (let i = 1; i < vals.length; i++) {
+    if (Number(vals[i][idCol]) === Number(data.id)) {
+      const oldQty = Number(vals[i][storeCol]) || 0;
+      const wasted = Number(data.qty) || 0;
+      const newQty = Math.max(0, oldQty - wasted);
+      sh.getRange(i + 1, storeCol + 1).setValue(newQty);
+
+      // type = 'waste'，getDailyReport 才能正確計算廢棄成本
+      getSheet(SH.INV_LOG).appendRow([
+        taipeiNow(),
+        data.id,
+        vals[i][headers.indexOf('name')],
+        data.store,
+        oldQty,
+        newQty,
+        -wasted,
+        data.note || '報廢',
+        'waste',
+      ]);
+      return { success: true, newStock: newQty };
+    }
+  }
+  return { success: false, error: '找不到商品' };
+}
+
+// ══════════════════════════════════════════════════════
 //  小工具
 // ══════════════════════════════════════════════════════
 function safeJson(str, fallback) {
   try   { return JSON.parse(str); }
   catch { return fallback; }
 }
+fix: v2.2 修復 Studio 分帳和廢棄成本
