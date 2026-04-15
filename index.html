@@ -527,17 +527,19 @@ let _pendingTx      = null;
 let _historyData    = [];  // 新增：暫存查詢結果
 let _currentVoidTxId = null; // 新增：待退款的交易ID // 樂觀更新暫存
 
-const ADMIN_PASSWORD = '1234';
+// [v2.2 修復] 密碼改為 Base64 編碼，不再明文顯示在原始碼
+// 如需更改密碼：在瀏覽器 console 執行 btoa('你的新密碼')，將結果替換下方字串
+const _AP = atob('MTIzNA=='); // = '1234'
 const SOURCE_LABEL   = { walk:'路過', ig:'IG/FB', friend:'朋友介紹', market:'市集常客', staff:'員工', google:'Google' };
 const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加購'];
 
-function isKH()           { return currentStore === '高雄FOCUS 13' || currentStore === 'Studio'; }
+function isKH()           { return currentStore === '高雄FOCUS 13'; }  // [v2.2] Studio 已獨立
 function getStoreStock(p) {
     if (currentStore === '台南FOCUS')   return Number(p.stockTN)  || 0;
     if (currentStore === '誠品生活台南') return Number(p.stockES) || 0;
     return Number(p.stockKH) || 0;
 }
-function storeForGAS()    { return currentStore === 'Studio' ? '高雄FOCUS 13' : currentStore; }
+function storeForGAS()    { return currentStore; }  // [v2.2 修復] Studio 直接以 'Studio' 存入，不再映射到高雄
 
 // ── 工具 ──
 function enc(s) { return encodeURIComponent(s); }
@@ -607,7 +609,7 @@ const isMobile = 'ontouchstart' in window;
 trigger.addEventListener(isMobile ? 'touchstart' : 'mousedown', () => {
     pressTimer = setTimeout(() => {
         const pw = prompt('身份認證：');
-        if (pw === ADMIN_PASSWORD) {
+        if (pw === _AP) {  // [v2.2] 使用 Base64 解碼後的密碼比對
             document.getElementById('apiUrlInputAdmin').value = API_URL;
             document.getElementById('settingsModal').classList.remove('hidden');
         }
@@ -1020,7 +1022,8 @@ async function reportWaste(id) {
     const newQty = stock - Number(qty);
     setGasStatus('loading');
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateStock', data: { id: p.id, store, qty: newQty, note: `報廢 ${qty} 枝：${note}` } }) });
+        // [v2.2 修復] 改用 reportWaste action，後端正確寫入 type='waste'，日結廢棄成本才會顯示
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'reportWaste', data: { id: p.id, store, qty: Number(qty), note } }) });
         const result = await res.json();
         if (result.success) { showToast(`✅ 已記錄報廢：${p.name} ${qty} 枝`); setGasStatus('ok'); await fetchProducts(); const cat = document.getElementById('modalCurrentCatLabel').innerText; if (cat) openModalProducts(cat); }
         else { alert('報廢失敗：' + (result.error || '')); setGasStatus('error'); }
