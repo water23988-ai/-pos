@@ -150,8 +150,10 @@ function doPost(e) {
       case 'deleteHangOrder':      return jsonOut(deleteHangOrder(data));
       case 'logPriceHistory':      return jsonOut(logPriceHistory(data));
       case 'addFlowerToLibrary':   return jsonOut(addFlowerToLibrary(data));
-      case 'addProcurement':       return jsonOut(addProcurement(data));
-      case 'reportWaste':          return jsonOut(reportWaste(data));   // [v2.2] 新增報廢 action
+      case 'addProcurement':          return jsonOut(addProcurement(data));
+      case 'reportWaste':             return jsonOut(reportWaste(data));
+      case 'voidTransaction':         return jsonOut(voidTransaction(data));
+      case 'deleteProcurementBatch':  return jsonOut(deleteProcurementBatch(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -1248,9 +1250,10 @@ function addProcurement(data) {
       batchId + '-' + String(idx + 1).padStart(2, '0'),
       batchId, item.flowerName || '', item.category || '主花',
       stemsPerBunch, bunchesQty, pricePerBunch,
-      totalStems, costPerStem, suggestedPrice, data.store || '', date,
+      totalStems, costPerStem, suggestedPrice, item.store || data.store || '', date,
     ]);
-    updateProductCostWeighted({ flowerName: item.flowerName, store: data.store, newStems: totalStems, newCost: costPerStem });
+    // [v2.4] 支援 per-item store（多點位同批進貨）
+    updateProductCostWeighted({ flowerName: item.flowerName, store: item.store || data.store, newStems: totalStems, newCost: costPerStem });
 
     // [v2.3] 進貨時同步記錄價格歷史（修復：以前只有「本週進花」流程才會寫入）
     const phSh = getSheet(SH.PRICE_LOG);
@@ -1376,6 +1379,94 @@ function reportWaste(data) {
     }
   }
   return { success: false, error: '找不到商品' };
+}
+
+// ══════════════════════════════════════════════════════
+//  退款 [v2.4 新增]
+// ══════════════════════════════════════════════════════
+function voidTransaction(data) {
+  // data: { txId, reason }
+  const sh      = getSheet(SH.TRANSACTIONS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol   = headers.indexOf('id');
+
+  // voided 欄若不存在則動態新增
+  let voidedCol = headers.indexOf('voided');
+  if (voidedCol === -1) {
+    voidedCol = headers.length;
+    sh.getRange(1, voidedCol + 1).setValue('voided');
+  }
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][idCol]) !== String(data.txId)) continue;
+
+    // 已退款則拒絕
+    const alreadyVoided = vals[i][voidedCol];
+    if (alreadyVoided === true || String(alreadyVoided).toLowerCase() === 'true') {
+      return { success: false, error: '此交易已退款過了' };
+    }
+
+    // 標記退款
+    sh.getRange(i + 1, voidedCol + 1).setValue(true);
+
+    // 還原庫存
+    const store = vals[i][headers.indexOf('store')];
+    const items = safeJson(String(vals[i][headers.indexOf('items')] || ''), []);
+    items.forEach(item => {
+      if (item.id && Number(item.id) > 0 && Number(item.qty) > 0) {
+        updateStockDelta(item.id, store, Number(item.qty), `退款還原：${data.txId}`);
+      }
+    });
+
+    // 扣回會員點數與消費金額
+    const memberId  = String(vals[i][headers.indexOf('memberId')] || '');
+    const earnedPts = Number(vals[i][headers.indexOf('earnedPoints')]) || 0;
+    const txTotal   = Number(vals[i][headers.indexOf('total')]) || 0;
+    if (memberId && earnedPts > 0) {
+      updateMemberPoints({ id: memberId, addPoints: -earnedPts, addSpend: -txTotal });
+    }
+
+    return { success: true };
+  }
+  return { success: false, error: '找不到交易紀錄' };
+}
+
+// ══════════════════════════════════════════════════════
+//  刪除進貨批次 [v2.4 新增]
+// ══════════════════════════════════════════════════════
+function deleteProcurementBatch(data) {
+  // data: { batchId }
+  const batchSh = getSheet(SH_PROC.BATCHES);
+  const itemSh  = getSheet(SH_PROC.ITEMS);
+  if (!batchSh || !itemSh) return { success: false, error: '進貨工作表不存在' };
+
+  // 刪 batch 列
+  const bVals  = batchSh.getDataRange().getValues();
+  const bIdCol = bVals[0].indexOf('batchId');
+  let deleted  = false;
+  for (let i = bVals.length - 1; i >= 1; i--) {
+    if (String(bVals[i][bIdCol]) === String(data.batchId)) {
+      batchSh.deleteRow(i + 1);
+      deleted = true;
+      break;
+    }
+  }
+
+  // 刪對應 items（逆序，避免 row index 錯位）
+  if (itemSh.getLastRow() >= 2) {
+    const iVals = itemSh.getDataRange().getValues();
+    const ibCol = iVals[0].indexOf('batchId');
+    for (let i = iVals.length - 1; i >= 1; i--) {
+      if (String(iVals[i][ibCol]) === String(data.batchId)) {
+        itemSh.deleteRow(i + 1);
+      }
+    }
+  }
+
+  return deleted
+    ? { success: true }
+    : { success: false, error: '找不到此進貨批次' };
 }
 
 // ══════════════════════════════════════════════════════

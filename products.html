@@ -75,7 +75,6 @@
 <!-- 分頁切換 -->
 <div class="px-4 pt-4 pb-0 flex gap-2 overflow-x-auto no-scrollbar">
     <button onclick="switchProdTab('list')"   id="ptab-list"   class="tab-btn active flex-shrink-0">📋 商品列表</button>
-    <button onclick="switchProdTab('weekly')" id="ptab-weekly" class="tab-btn flex-shrink-0">🌸 本週進花</button>
     <button onclick="switchProdTab('prices')" id="ptab-prices" class="tab-btn flex-shrink-0">📈 價格波動</button>
 </div>
 
@@ -97,27 +96,6 @@
     </div>
     <div class="px-4 pb-24" id="productList">
         <p class="text-center text-gray-300 text-xs py-16">載入中...</p>
-    </div>
-</div>
-
-<!-- ══ Tab: 本週進花 ══ -->
-<div id="tab-weekly-view" class="hidden p-4">
-    <p class="text-xs text-gray-400 mb-3">從花材資料庫勾選本週採購的花材，批次填入把價與數量後入庫。</p>
-    <!-- 花材搜尋 + 清除 -->
-    <div class="flex gap-2 mb-2">
-        <input type="text" id="wkLibrarySearch" placeholder="搜尋花材名稱或類別..."
-            oninput="renderWkLibraryList()"
-            class="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:border-[#8e9775]">
-        <button onclick="clearWkSelection()" class="text-xs text-gray-400 border border-gray-200 px-3 py-2 rounded-xl">清除</button>
-    </div>
-    <!-- 已選 banner -->
-    <div id="wkSelBanner" class="hidden mb-3 bg-[#f1f3eb] border border-[#c6cdb5] rounded-xl px-4 py-3 flex items-center justify-between">
-        <span class="text-sm text-[#6d7756] font-bold">已選 <span id="wkSelCount">0</span> 種花材</span>
-        <button onclick="openWkImport()" class="bg-[#8e9775] text-white text-sm font-bold px-5 py-2 rounded-xl">填入進貨資料 →</button>
-    </div>
-    <!-- 花材列表 -->
-    <div id="wkLibraryList">
-        <p class="text-center text-gray-300 text-xs py-8">載入中...</p>
     </div>
 </div>
 
@@ -434,11 +412,10 @@ document.getElementById('deleteModal').addEventListener('click', function(e) {
 
 // ══ 分頁切換 ══
 function switchProdTab(tab) {
-    ['list','weekly','prices'].forEach(t => {
+    ['list','prices'].forEach(t => {
         document.getElementById(`tab-${t}-view`).classList.toggle('hidden', t !== tab);
         document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
     });
-    if (tab === 'weekly' && _wkLibrary.length === 0) loadWkLibrary();
     if (tab === 'prices') loadPriceHistory();
 }
 
