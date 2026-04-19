@@ -1,8 +1,12 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
-//  版本：2.2  |  2026-04
+//  版本：2.3  |  2026-04
 //  更新：新增進貨模組（ProcurementBatches / ProcurementItems）
 //        成本回寫改為加權平均邏輯
+//  [v2.3 修復]
+//  - Bug Fix: deleteProduct 改為軟刪除（status='inactive'），歷史報表成本不斷鏈
+//  - 新增 reactivateProduct：可將停用商品重新啟用
+//  - Products 工作表新增 status 欄位（active / inactive）
 //  [v2.2 修復]
 //  - Bug Fix: Studio 交易獨立記錄，不再合併入高雄
 //  - Bug Fix: 報廢 action 正確寫入 type='waste'，日結廢棄成本恢復正常
@@ -52,7 +56,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','status']);
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -130,7 +134,8 @@ function doPost(e) {
       // 商品
       case 'addProduct':    return jsonOut(addProduct(data));
       case 'updateProduct': return jsonOut(updateProduct(data));
-      case 'deleteProduct': return jsonOut(deleteProduct(data));
+      case 'deleteProduct':     return jsonOut(deleteProduct(data));
+      case 'reactivateProduct': return jsonOut(reactivateProduct(data));
       // 庫存
       case 'updateStock':   return jsonOut(updateStock(data));
       case 'receiveStock':  return jsonOut(receiveStock(data));
@@ -199,16 +204,19 @@ function newId(prefix) {
 function getProducts() {
   const sh   = getSheet(SH.PRODUCTS);
   const rows = sheetToObjects(sh);
-  return rows.map(r => ({
-    id      : Number(r.id),
-    name    : r.name,
-    category: r.category || '其他加購',
-    price   : Number(r.price)   || 0,
-    cost    : Number(r.cost)    || 0,
-    stockKH : Number(r.stockKH) || 0,
-    stockTN : Number(r.stockTN) || 0,
-    stockES : Number(r.stockES) || 0,
-  }));
+  // [v2.3] 軟刪除：只回傳 status 為 'active' 或空值（舊資料）的商品
+  return rows
+    .filter(r => (r.status || 'active') !== 'inactive')
+    .map(r => ({
+      id      : Number(r.id),
+      name    : r.name,
+      category: r.category || '其他加購',
+      price   : Number(r.price)   || 0,
+      cost    : Number(r.cost)    || 0,
+      stockKH : Number(r.stockKH) || 0,
+      stockTN : Number(r.stockTN) || 0,
+      stockES : Number(r.stockES) || 0,
+    }));
 }
 
 function addProduct(data) {
@@ -226,6 +234,7 @@ function addProduct(data) {
     Number(data.stockKH) || 0,
     Number(data.stockTN) || 0,
     Number(data.stockES) || 0,
+    'active',  // [v2.3] status 欄位
   ]);
   return { success: true, id };
 }
@@ -254,13 +263,43 @@ function updateProduct(data) {
 }
 
 function deleteProduct(data) {
-  const sh   = getSheet(SH.PRODUCTS);
-  const vals = sh.getDataRange().getValues();
-  const idCol = vals[0].indexOf('id');
+  // [v2.3] 軟刪除：不實際刪列，改為設定 status = 'inactive'
+  // 這樣歷史報表仍可透過商品 ID 查到名稱與成本，不會出現資料斷鏈
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol   = headers.indexOf('id');
 
-  for (let i = vals.length - 1; i >= 1; i--) {
+  // 若 status 欄不存在（舊試算表），動態新增
+  let statusCol = headers.indexOf('status');
+  if (statusCol === -1) {
+    statusCol = headers.length;
+    sh.getRange(1, statusCol + 1).setValue('status');
+  }
+
+  for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
-      sh.deleteRow(i + 1);
+      sh.getRange(i + 1, statusCol + 1).setValue('inactive');
+      return { success: true };
+    }
+  }
+  return { success: false, error: '找不到商品' };
+}
+
+function reactivateProduct(data) {
+  // [v2.3] 重新啟用已停用商品
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol   = headers.indexOf('id');
+  let   statusCol = headers.indexOf('status');
+  if (statusCol === -1) {
+    statusCol = headers.length;
+    sh.getRange(1, statusCol + 1).setValue('status');
+  }
+  for (let i = 1; i < vals.length; i++) {
+    if (Number(vals[i][idCol]) === Number(data.id)) {
+      sh.getRange(i + 1, statusCol + 1).setValue('active');
       return { success: true };
     }
   }
