@@ -118,6 +118,7 @@ function doGet(e) {
       case 'getPriceHistory':         return jsonOut(getPriceHistory(e.parameter.name));
       case 'getProcurementBatches':   return jsonOut(getProcurementBatches());
       case 'getProcurementItems':     return jsonOut(getProcurementItems(e.parameter.batchId));
+      case 'getFlowerProcHistory':    return jsonOut(getFlowerProcHistory(e.parameter.name));
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -1250,6 +1251,21 @@ function addProcurement(data) {
       totalStems, costPerStem, suggestedPrice, data.store || '', date,
     ]);
     updateProductCostWeighted({ flowerName: item.flowerName, store: data.store, newStems: totalStems, newCost: costPerStem });
+
+    // [v2.3] 進貨時同步記錄價格歷史（修復：以前只有「本週進花」流程才會寫入）
+    const phSh = getSheet(SH.PRICE_LOG);
+    if (phSh) {
+      phSh.appendRow([
+        taipeiNow(),
+        item.flowerName || '',
+        item.category   || '',
+        pricePerBunch,
+        stemsPerBunch,
+        costPerStem,
+        Math.round(costPerStem * 4),
+        `進貨（${data.source || ''}）`,
+      ]);
+    }
   });
 
   // [v2.2 修復] 加入 store 欄位寫入
@@ -1289,6 +1305,39 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
     return;
   }
   Logger.log(`⚠️ 進貨警告：找不到「${flowerName}」，成本未回寫`);
+}
+
+// ══════════════════════════════════════════════════════
+//  花材進貨歷史查詢 [v2.3 新增]
+// ══════════════════════════════════════════════════════
+function getFlowerProcHistory(name) {
+  const itemSh  = getSheet(SH_PROC.ITEMS);
+  const batchSh = getSheet(SH_PROC.BATCHES);
+  if (!itemSh || itemSh.getLastRow() < 2) return [];
+
+  const items   = sheetToObjects(itemSh);
+  const batches = (batchSh && batchSh.getLastRow() >= 2) ? sheetToObjects(batchSh) : [];
+  const batchMap = {};
+  batches.forEach(b => { batchMap[b.batchId] = b; });
+
+  const filtered = name
+    ? items.filter(r => String(r.flowerName || '').trim() === String(name).trim())
+    : items;
+
+  return filtered
+    .map(r => ({
+      date         : r.date || (batchMap[r.batchId] ? batchMap[r.batchId].date : ''),
+      source       : batchMap[r.batchId] ? (batchMap[r.batchId].source || '') : '',
+      store        : r.store || '',
+      stemsPerBunch: Number(r.stemsPerBunch)  || 0,
+      bunchesQty   : Number(r.bunchesQty)     || 0,
+      pricePerBunch: Number(r.pricePerBunch)  || 0,
+      totalStems   : Number(r.totalStems)     || 0,
+      costPerStem  : Number(r.costPerStem)    || 0,
+      suggestedPrice: Number(r.suggestedPrice) || 0,
+    }))
+    .sort((a, b) => new Date(b.date) - new Date(a.date))
+    .slice(0, 8);
 }
 
 // ══════════════════════════════════════════════════════

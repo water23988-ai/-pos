@@ -145,13 +145,15 @@
 
 <script>
 // ══ 設定 ══
-let API_URL      = localStorage.getItem('moment_flor_api') || '';
-let currentStore = '';
+let API_URL        = localStorage.getItem('moment_flor_api') || '';
+let currentStore   = '';
 let selectedSource = '高雄深綠';
 let flowerLibrary  = [];
 let procItems      = [];   // [{ flowerName, category, stemsPerBunch, bunchesQty, pricePerBunch }]
 let _expandedBatch = null;
 let _batchData     = [];
+let _flowerHistories = {};  // 快取：{ flowerName: [history] }
+let _histTimers      = {};  // debounce timers
 
 // ══ API ══
 function setGas(state) {
@@ -245,9 +247,109 @@ function onFlowerSelect(idx, selectEl) {
     const opt = selectEl.options[selectEl.selectedIndex];
     procItems[idx].flowerName = opt.value;
     procItems[idx].category   = opt.getAttribute('data-cat') || '主花';
-    // 同步分類顯示
     const catEl = document.getElementById(`cat-${idx}`);
     if (catEl) catEl.value = procItems[idx].category;
+    // 查詢歷史
+    if (opt.value) fetchAndShowHistory(idx, opt.value);
+}
+
+// ── 花材歷史進貨查詢 ──
+function onFlowerNameInput(idx, val) {
+    onFieldChange(idx, 'flowerName', val);
+    clearTimeout(_histTimers[idx]);
+    const histEl = document.getElementById(`hist-${idx}`);
+    if (!val || val.length < 1) {
+        if (histEl) histEl.innerHTML = '';
+        return;
+    }
+    _histTimers[idx] = setTimeout(() => fetchAndShowHistory(idx, val), 700);
+}
+
+async function fetchAndShowHistory(idx, flowerName) {
+    if (!flowerName || !API_URL) return;
+    const histEl = document.getElementById(`hist-${idx}`);
+    if (!histEl) return;
+
+    // 有快取直接顯示
+    if (_flowerHistories[flowerName]) {
+        renderHistPanel(idx, flowerName, _flowerHistories[flowerName]);
+        return;
+    }
+
+    histEl.innerHTML = '<p style="font-size:11px;color:#c4b8ac;padding:4px 0;">查詢歷史進貨中...</p>';
+    try {
+        const res  = await fetch(`${API_URL}?action=getFlowerProcHistory&name=${encodeURIComponent(flowerName)}`);
+        const data = await res.json();
+        _flowerHistories[flowerName] = Array.isArray(data) ? data : [];
+        renderHistPanel(idx, flowerName, _flowerHistories[flowerName]);
+    } catch(e) {
+        if (histEl) histEl.innerHTML = '';
+    }
+}
+
+function renderHistPanel(idx, flowerName, hist) {
+    const histEl = document.getElementById(`hist-${idx}`);
+    if (!histEl) return;
+    if (!hist || !hist.length) {
+        histEl.innerHTML = '<p style="font-size:11px;color:#c4b8ac;margin-top:6px;">這個花材尚無進貨紀錄</p>';
+        return;
+    }
+    const encoded = encodeURIComponent(flowerName);
+    histEl.innerHTML = `
+        <div style="border-top:1px solid #f0ece6;margin-top:10px;padding-top:10px;">
+            <p style="font-size:10px;color:#9ca3af;font-weight:bold;letter-spacing:0.06em;margin-bottom:6px;">以往進貨紀錄（點「用這筆」自動帶入）</p>
+            ${hist.slice(0, 5).map((h, i) => `
+            <div style="background:#f8faf6;border:1px solid #e2ebd6;border-radius:10px;padding:9px 12px;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
+                <div style="flex:1;min-width:0;">
+                    <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
+                        <span style="font-size:12px;font-weight:bold;color:#4a4a4a;">${h.source || '—'}</span>
+                        <span style="font-size:10px;color:#9ca3af;">${String(h.date||'').slice(0,10)}</span>
+                        <span style="font-size:10px;background:#f1f3eb;color:#6d7756;border-radius:6px;padding:1px 6px;">${h.store||''}</span>
+                    </div>
+                    <div style="font-size:12px;color:#6d7756;margin-top:3px;">
+                        每把 <strong>NT$${h.pricePerBunch}</strong> · ${h.stemsPerBunch}枝/把 · 單支成本 ${Number(h.costPerStem).toFixed(1)}
+                    </div>
+                </div>
+                <button onclick="copyHistEntry(${idx},${i},'${encoded}')"
+                    style="flex-shrink:0;background:#8e9775;color:white;border:none;border-radius:8px;padding:6px 12px;font-size:11px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">
+                    用這筆
+                </button>
+            </div>`).join('')}
+        </div>`;
+}
+
+function copyHistEntry(idx, histIdx, encodedName) {
+    const flowerName = decodeURIComponent(encodedName);
+    const hist = _flowerHistories[flowerName];
+    if (!hist || !hist[histIdx]) return;
+    const h = hist[histIdx];
+
+    procItems[idx].stemsPerBunch = h.stemsPerBunch;
+    procItems[idx].pricePerBunch = h.pricePerBunch;
+    // bunchesQty 不複製，讓使用者自己填這次進了幾把
+
+    // 切換供應商
+    if (h.source) setSrcByValue(h.source);
+
+    renderItemList();
+    setTimeout(() => fetchAndShowHistory(idx, flowerName), 80);
+    showToast(`✅ 已帶入 ${h.source} 的進貨資料，請確認把數`);
+}
+
+function setSrcByValue(src) {
+    const btns = document.querySelectorAll('.src-btn');
+    let found = false;
+    btns.forEach(b => {
+        b.classList.remove('active');
+        if (b.innerText.trim() === src) { b.classList.add('active'); selectedSource = src; found = true; }
+    });
+    if (!found) {
+        btns.forEach(b => { if (b.innerText.includes('自訂')) b.classList.add('active'); });
+        const ci = document.getElementById('srcCustom');
+        ci.classList.remove('hidden');
+        ci.value = src;
+        selectedSource = src;
+    }
 }
 
 function onFieldChange(idx, field, val) {
@@ -304,13 +406,14 @@ function renderItemList() {
         <div style="margin-bottom:8px;">
             <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">花材名稱</p>
             ${opts ? `
-            <select onchange="onFlowerSelect(${idx},this);onFieldChange(${idx},'flowerName',this.value)" class="s-select" style="margin-bottom:4px;">
+            <select onchange="onFlowerSelect(${idx},this)" class="s-select" style="margin-bottom:4px;">
                 <option value="">— 從花材庫選取 —</option>
                 ${opts}
             </select>` : ''}
             <input type="text" placeholder="或手動輸入花材名稱" class="s-input" style="font-size:12px;"
                 value="${item.flowerName}"
-                oninput="onFieldChange(${idx},'flowerName',this.value)">
+                oninput="onFlowerNameInput(${idx},this.value)">
+            <div id="hist-${idx}"></div>
         </div>
 
         <!-- 分類 -->

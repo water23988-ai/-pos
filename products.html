@@ -267,6 +267,7 @@ function renderList() {
         ${catMap[cat].map(p => {
             const khClass = p.stockKH > 5 ? 'stock-ok' : p.stockKH > 0 ? 'stock-low' : 'stock-zero';
             const tnClass = p.stockTN > 5 ? 'stock-ok' : p.stockTN > 0 ? 'stock-low' : 'stock-zero';
+            const esClass = p.stockES > 5 ? 'stock-ok' : p.stockES > 0 ? 'stock-low' : 'stock-zero';
             return `
             <div class="prod-row">
                 <div style="flex:1;min-width:0;">
@@ -274,9 +275,10 @@ function renderList() {
                     <div class="flex items-center gap-2 mt-1 flex-wrap">
                         <span class="price-tag">售 NT$${p.price || 0} ／ 進 NT$${p.cost || 0}</span>
                     </div>
-                    <div class="flex items-center gap-2 mt-1">
+                    <div class="flex items-center gap-2 mt-1 flex-wrap">
                         <span class="stock-badge ${khClass}">高雄 ${p.stockKH}</span>
                         <span class="stock-badge ${tnClass}">台南 ${p.stockTN}</span>
+                        <span class="stock-badge ${esClass}">誠品 ${p.stockES}</span>
                     </div>
                 </div>
                 <div class="flex flex-col gap-1 flex-shrink-0">
