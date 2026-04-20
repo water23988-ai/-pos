@@ -488,6 +488,7 @@ function getSalesReport(store, from, to) {
     const d = new Date(r.date);
     if (isNaN(d)) return false;
     if (store && r.store !== store) return false;
+    if (r.voided === true || String(r.voided).toLowerCase() === 'true') return false; // [v2.4] 排除已退款
     return d >= fromDate && d <= toDate;
   });
 
@@ -536,10 +537,11 @@ function getDailyReport(store, date) {
   const rows = sheetToObjects(sh);
   const { from, to } = dateRange_(date);
 
-  const filt = storeFilter_(store);
+  const filt    = storeFilter_(store);
+  const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true'); // [v2.4]
   const todayTxs = rows.filter(r => {
     const d = new Date(r.date);
-    return !isNaN(d) && filt(r) && d >= from && d <= to;
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= from && d <= to;
   });
 
   // Same weekday last week
@@ -547,7 +549,7 @@ function getDailyReport(store, date) {
   const lwTo   = new Date(to);   lwTo.setDate(lwTo.getDate() - 7);
   const lwTxs  = rows.filter(r => {
     const d = new Date(r.date);
-    return !isNaN(d) && filt(r) && d >= lwFrom && d <= lwTo;
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= lwFrom && d <= lwTo;
   });
 
   const compute = txs => ({
@@ -610,7 +612,7 @@ function getWeeklyTrend(store) {
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23,59,59,999);
 
-    const txs      = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && d >= weekStart && d <= weekEnd; });
+    const txs      = rows.filter(r => { const d = new Date(r.date); const iv = r.voided===true||String(r.voided).toLowerCase()==='true'; return !isNaN(d) && filt(r) && !iv && d >= weekStart && d <= weekEnd; });
     const revenue  = txs.reduce((s,r) => s + (Number(r.total)||0), 0);
     const cost     = txs.reduce((s,r) => s + (Number(r.cost)||0),  0);
     const label    = `${weekStart.getMonth()+1}/${weekStart.getDate()}`;
@@ -635,7 +637,7 @@ function getItemRanking(store, date) {
   });
 
   const itemMap = {};
-  rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && d >= from && d <= to; })
+  rows.filter(r => { const d = new Date(r.date); const iv = r.voided===true||String(r.voided).toLowerCase()==='true'; return !isNaN(d) && filt(r) && !iv && d >= from && d <= to; }) // [v2.4]
     .forEach(tx => {
       const items = safeJson(tx.items, []);
       items.forEach(item => {
@@ -703,6 +705,7 @@ function getTransactionHistory(store, date) {
     pay       : r.pay,
     note      : r.note,
     items     : safeJson(r.items, []),
+    voided    : r.voided === true || String(r.voided).toLowerCase() === 'true', // [v2.4]
   }));
 }
 
@@ -731,7 +734,11 @@ function getAllStoresReport(period) {
     to   = new Date(now); to.setHours(23,59,59,999);
   }
 
-  const filtered = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && d >= from && d <= to; });
+  const filtered = rows.filter(r => {
+    const d = new Date(r.date);
+    const isVoided = r.voided === true || String(r.voided).toLowerCase() === 'true';
+    return !isNaN(d) && d >= from && d <= to && !isVoided; // [v2.4] 排除已退款
+  });
 
   // [v2.2 修復] Studio 獨立報表，不再與高雄合併
   const storeList = [
@@ -1252,7 +1259,8 @@ function addProcurement(data) {
       stemsPerBunch, bunchesQty, pricePerBunch,
       totalStems, costPerStem, suggestedPrice, item.store || data.store || '', date,
     ]);
-    // [v2.4] 支援 per-item store（多點位同批進貨）
+    // [v2.4] 商品不存在時自動建立，再更新成本與庫存
+    ensureProductExists(item.flowerName, item.category, costPerStem, suggestedPrice);
     updateProductCostWeighted({ flowerName: item.flowerName, store: item.store || data.store, newStems: totalStems, newCost: costPerStem });
 
     // [v2.3] 進貨時同步記錄價格歷史（修復：以前只有「本週進花」流程才會寫入）
@@ -1277,6 +1285,23 @@ function addProcurement(data) {
     itemSh.getRange(itemSh.getLastRow() + 1, 1, itemRows.length, itemRows[0].length).setValues(itemRows);
   }
   return { success: true, batchId, totalItems: items.length, totalCost: Math.round(totalCost) };
+}
+
+// [v2.4] 進貨時若商品不存在，自動建立
+function ensureProductExists(name, category, cost, price) {
+  if (!name) return;
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameCol = headers.indexOf('name');
+  // 檢查是否已存在
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][nameCol] || '').trim() === String(name).trim()) return;
+  }
+  // 不存在 → 自動建立
+  const maxId = vals.slice(1).reduce((m, r) => Math.max(m, Number(r[headers.indexOf('id')]) || 0), 0);
+  sh.appendRow([maxId + 1, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 'active']);
+  Logger.log(`✅ 自動建立商品：${name}`);
 }
 
 function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {

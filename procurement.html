@@ -231,9 +231,11 @@ function flowerOptions() {
 
 // ══ 新增 / 移除品項 ══
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, pricePerBunch:0, qtyKH:0, qtyTN:0, qtyES:0 });
+    procItems.unshift({ flowerName:'', category:'主花', stemsPerBunch:0, pricePerBunch:0, qtyKH:0, qtyTN:0, qtyES:0 });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
+    // 新品項在最上方，捲回頂端
+    document.getElementById('itemList').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 function removeItemRow(idx) {
     procItems.splice(idx, 1);
