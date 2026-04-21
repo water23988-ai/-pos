@@ -4,784 +4,599 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>拾逅花事 | 商品管理</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
-        * { font-family: 'Noto Serif TC', serif; }
-        body { background: #fcfbf9; color: #4a4a4a; }
-        input, button, select, textarea { font-family: 'Noto Serif TC', serif; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        * { font-family: 'Noto Sans TC', -apple-system, sans-serif; box-sizing: border-box; }
+        body { background: #F0E9DF; color: #3D2E1E; overflow-x: hidden; -webkit-font-smoothing: antialiased; margin: 0; }
 
-        .tab-btn { padding: 8px 20px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; font-size: 13px; cursor: pointer; transition: all 0.2s; }
-        .tab-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
+        /* 側邊欄 */
+        .side-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; z-index: 200; box-shadow: 2px 0 12px rgba(0,0,0,0.06); }
+        .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; }
+        .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .nav-brand-name { font-size: 14px; font-weight: 800; color: #3d2e1e; }
+        .nav-brand-sub { font-size: 10px; color: #a08060; margin-top: 2px; }
+        .nav-section-label { font-size: 9px; font-weight: 700; color: #b8976a; letter-spacing: 0.12em; text-transform: uppercase; padding: 14px 18px 6px; }
+        .nav-items { flex: 1; padding: 10px 8px; overflow-y: auto; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #7a5c3a; font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 10px; margin-bottom: 2px; transition: all 0.15s; }
+        .nav-item:hover { background: rgba(0,0,0,0.05); color: #3d2e1e; }
+        .nav-item.active { background: rgba(109,119,86,0.15); color: #4d3520; font-weight: 700; }
+        .nav-icon { font-size: 17px; flex-shrink: 0; }
+        .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
+        .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
+        .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
 
-        .s-input { width: 100%; border: 2px solid #e8ddd0; border-radius: 12px; padding: 10px 14px; font-size: 14px; outline: none; background: white; transition: border-color 0.2s; }
-        .s-input:focus { border-color: #8e9775; }
-        .s-label { font-size: 10px; color: #9ca3af; font-weight: bold; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+        /* 主內容 */
+        .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
+        .main-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 24px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .main-header-title { font-size: 16px; font-weight: 800; color: #3D2E1E; }
+        .main-content { padding: 20px; }
 
-        .btn-primary   { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 20px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; font-family: 'Noto Serif TC', serif; }
-        .btn-primary:active { opacity: 0.8; }
-        .btn-danger    { background: #fee2e2; color: #dc2626; border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: 'Noto Serif TC', serif; }
-        .btn-edit      { background: #f1f3eb; color: #6d7756; border: none; border-radius: 8px; padding: 6px 12px; font-size: 12px; cursor: pointer; font-weight: bold; font-family: 'Noto Serif TC', serif; }
+        /* 通用卡片 */
+        .card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .card-title { font-size: 11px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
 
-        .prod-row { display: flex; align-items: center; background: #fafaf9; border: 1px solid #f3f4f6; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; gap: 8px; }
-        .cat-badge { font-size: 10px; background: #f1f3eb; color: #6d7756; border-radius: 20px; padding: 2px 8px; white-space: nowrap; }
-        .price-tag { font-size: 12px; color: #9ca3af; }
-        .stock-ok   { background: #dcfce7; color: #16a34a; }
-        .stock-low  { background: #fef9c3; color: #ca8a04; }
-        .stock-zero { background: #fee2e2; color: #dc2626; }
-        .stock-badge { font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 10px; white-space: nowrap; }
+        /* 表單元素 */
+        .f-input { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
+        .f-input:focus { border-color: #8e9775; background: #FAF7F2; box-shadow: 0 0 0 3px rgba(142,151,117,0.1); }
+        .f-select { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; }
+        .f-label { font-size: 11px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; text-transform: uppercase; display: block; margin-bottom: 6px; }
 
-        .cat-header { font-size: 10px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 4px 4px; }
+        /* 按鈕 */
+        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 24px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { background: #C8B89A; cursor: not-allowed; }
+        .btn-secondary { background: #F5EFE6; color: #7A6550; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-secondary:hover { background: #EDE5D8; }
+        .btn-ghost { background: none; color: #A89278; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
 
-        .gas-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #9ca3af; }
-        .gas-dot.ok      { background: #22c55e; }
-        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
-        .gas-dot.error   { background: #ef4444; }
+        /* Chips */
+        .chip { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #7A6550; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+
+        /* GAS dot */
+        .gas-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #C8B89A; flex-shrink: 0; }
+        .gas-dot.ok { background: #8E9775; }
+        .gas-dot.loading { background: #C4A87A; animation: blink 0.8s infinite; }
+        .gas-dot.error { background: #C4928A; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s ease; pointer-events: none; white-space: nowrap; }
+        /* Toast */
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #7A6550; color: white; padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 300; align-items: center; justify-content: center; padding: 20px; }
-        .modal-overlay.show { display: flex; }
-        .modal-box { background: white; border-radius: 24px; width: 100%; max-width: 400px; max-height: 90vh; overflow-y: auto; padding: 24px; }
+        /* API Modal */
+        .api-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
+        .api-modal.show { display: flex; }
+        .api-modal-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; margin: 16px; border: 1px solid #DDD0BC; }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .cat-header { font-size: 10px; font-weight: bold; color: #9ca3af; letter-spacing: 0.08em; text-transform: uppercase; padding: 10px 4px 4px; }
-        .inv-row { display: flex; align-items: center; padding: 10px 14px; border-radius: 10px; background: #fafaf9; border: 1px solid #f3f4f6; margin-bottom: 6px; }
+        /* 篩選列 */
+        .filter-bar { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 14px 18px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+        .search-wrap { position: relative; min-width: 200px; }
+        .search-wrap input { padding-left: 34px; }
+        .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; pointer-events: none; color: #A89278; }
+
+        /* 商品卡片網格 */
+        .products-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 14px; }
+        .product-card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 18px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); position: relative; transition: all 0.15s; }
+        .product-card:hover { border-color: #C4A87A; box-shadow: 0 3px 10px rgba(122,101,80,0.12); }
+        .product-card-edit { position: absolute; top: 12px; right: 12px; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 8px; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-size: 13px; cursor: pointer; transition: all 0.15s; }
+        .product-card-edit:hover { background: #EDE5D8; border-color: #C4A87A; }
+        .product-card-name { font-size: 15px; font-weight: 700; color: #3D2E1E; padding-right: 38px; margin-bottom: 6px; line-height: 1.3; }
+        .product-card-cat { display: inline-block; font-size: 10px; font-weight: 700; color: #8e9775; background: #f0f3ec; border-radius: 6px; padding: 2px 8px; margin-bottom: 10px; }
+        .product-card-price { font-size: 20px; font-weight: 800; color: #4d6145; }
+        .product-card-cost { font-size: 11px; color: #A89278; margin-top: 2px; }
+        .product-card-divider { border: none; border-top: 1px solid #EDE5D8; margin: 10px 0; }
+        .product-card-stock-title { font-size: 9px; font-weight: 700; color: #A89278; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 6px; }
+        .stock-row { display: flex; gap: 8px; }
+        .stock-badge { flex: 1; text-align: center; background: #F5EFE6; border-radius: 8px; padding: 5px 4px; }
+        .stock-badge-val { font-size: 13px; font-weight: 700; color: #3D2E1E; }
+        .stock-badge-lbl { font-size: 9px; color: #A89278; margin-top: 1px; }
+        .stock-low { background: rgba(196,146,138,0.15); }
+        .stock-low .stock-badge-val { color: #C4928A; }
+
+        /* 商品 Modal */
+        .product-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; overflow-y: auto; }
+        .product-modal.show { display: flex; }
+        .product-modal-box { background: #FAF7F2; border-radius: 20px; padding: 28px; width: 100%; max-width: 480px; margin: 20px 16px; border: 1px solid #DDD0BC; }
+        .modal-title { font-size: 16px; font-weight: 800; color: #3D2E1E; }
+        .modal-row { margin-bottom: 14px; }
+        .modal-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
+        .modal-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .btn-danger { background: rgba(196,146,138,0.15); color: #C4928A; border: 1.5px solid rgba(196,146,138,0.3); border-radius: 10px; padding: 11px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-danger:hover { background: rgba(196,146,138,0.25); }
+
+        /* 空狀態 */
+        .empty-state { text-align: center; padding: 60px 20px; color: #A89278; }
+        .empty-state-icon { font-size: 40px; margin-bottom: 12px; }
+        .empty-state-text { font-size: 14px; }
+
+        /* Loading */
+        .loading-state { text-align: center; padding: 60px 20px; color: #A89278; }
+        .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #DDD0BC; border-top-color: #8e9775; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 商品數量 badge */
+        .count-badge { background: #F5EFE6; color: #7A6550; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
+
+        /* ── Toggle Switch ── */
+        .toggle-wrap { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #EDE5D8; }
+        .toggle-label-text { font-size: 11px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; }
+        .toggle-label-text.on { color: #6d7756; }
+        .toggle { position: relative; width: 40px; height: 22px; cursor: pointer; display: inline-block; }
+        .toggle input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-track { position: absolute; inset: 0; background: #DDD0BC; border-radius: 11px; transition: background 0.2s; }
+        .toggle input:checked + .toggle-track { background: #8e9775; }
+        .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); pointer-events: none; }
+        .toggle input:checked ~ .toggle-thumb { left: 21px; }
     </style>
 </head>
 <body>
-
 <div id="toast"></div>
 
-<!-- Header -->
-<div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
-    <div>
-        <h1 class="text-base font-bold text-[#8e9775]">🌸 拾逅花事 | 商品管理</h1>
-        <p id="statusInfo" class="text-[10px] text-gray-400 italic">連接中...</p>
-    </div>
-    <div class="flex items-center gap-2">
-        <span class="gas-dot" id="gasDot"></span>
-        <nav class="flex gap-1 text-[11px]">
-            <a href="index.html"     class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">POS</a>
-            <a href="inventory.html"  class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">庫存</a>
-            <a href="procurement.html" class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">進貨</a>
-            <a href="dashboard.html"  class="text-gray-400 border border-gray-200 px-2 py-1 rounded-full">後台</a>
-        </nav>
+<!-- API Modal -->
+<div class="api-modal" id="apiModal">
+    <div class="api-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">⚙️ 連線設定</h3>
+            <button onclick="closeApiModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
+        </div>
+        <label class="f-label">API URL</label>
+        <input type="text" id="apiInput" class="f-input" style="margin-bottom:14px;" placeholder="貼上 GAS 部署網址">
+        <button onclick="saveApi()" class="btn-primary" style="width:100%;">儲存並連線</button>
     </div>
 </div>
 
-<!-- 分頁切換 -->
-<div class="px-4 pt-4 pb-0 flex gap-2 overflow-x-auto no-scrollbar">
-    <button onclick="switchProdTab('list')"   id="ptab-list"   class="tab-btn active flex-shrink-0">📋 商品列表</button>
-    <button onclick="switchProdTab('prices')" id="ptab-prices" class="tab-btn flex-shrink-0">📈 價格波動</button>
-</div>
-
-<!-- ══ Tab: 商品列表 ══ -->
-<div id="tab-list-view">
-    <div class="p-4 flex gap-3 items-center">
-        <input type="text" id="searchInput" placeholder="搜尋商品名稱..." oninput="renderList()"
-            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
-        <select id="catFilter" onchange="renderList()"
-            class="border border-gray-200 rounded-xl px-3 py-2 text-xs outline-none focus:border-[#8e9775] bg-white">
-            <option value="">全部類別</option>
-            <option>主花</option><option>配花</option><option>葉材</option>
-            <option>花束</option><option>花瓶</option><option>其他加購</option>
-        </select>
-        <button onclick="openAddModal()"
-            class="flex-shrink-0 bg-[#8e9775] text-white border-none rounded-xl px-4 py-2 text-sm font-bold cursor-pointer">
-            ＋ 新增
-        </button>
-    </div>
-    <div class="px-4 pb-24" id="productList">
-        <p class="text-center text-gray-300 text-xs py-16">載入中...</p>
-    </div>
-</div>
-
-<!-- ══ Tab: 價格波動 ══ -->
-<div id="tab-prices-view" class="hidden p-4">
-    <div class="flex gap-2 mb-4">
-        <input type="text" id="priceSearchInput" placeholder="搜尋花材名稱..." oninput="filterPriceHistory()"
-            class="flex-1 border border-gray-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-[#8e9775]">
-        <button onclick="loadPriceHistory()" class="border border-gray-200 rounded-xl px-3 py-2 text-xs text-gray-400">🔄</button>
-    </div>
-    <div id="priceHistoryList">
-        <p class="text-center text-gray-300 text-xs py-12">載入中...</p>
-    </div>
-</div>
-
-<!-- ══ 新增 / 編輯 Modal ══ -->
-<div class="modal-overlay" id="editModal">
-    <div class="modal-box">
-        <div class="flex justify-between items-center mb-5">
-            <h3 class="font-bold text-base" id="modalTitle">新增商品</h3>
-            <button onclick="closeModal()" class="text-gray-300 text-xl leading-none">✕</button>
+<!-- 商品新增/編輯 Modal -->
+<div class="product-modal" id="productModal">
+    <div class="product-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;">
+            <h3 class="modal-title" id="modalTitle">新增商品</h3>
+            <button onclick="closeProductModal()" style="background:none;border:none;font-size:20px;cursor:pointer;color:#A89278;">✕</button>
         </div>
 
-        <input type="hidden" id="editId">
+        <input type="hidden" id="editProductId">
 
-        <div class="space-y-4">
+        <div class="modal-row">
+            <label class="f-label">商品名稱</label>
+            <input type="text" id="fieldName" class="f-input" placeholder="例：玫瑰 / 滿天星 / 手綁花束">
+        </div>
+
+        <div class="modal-grid-2">
             <div>
-                <label class="s-label">商品名稱 *</label>
-                <input type="text" id="editName" placeholder="例：玫瑰（紅）" class="s-input">
-            </div>
-            <div>
-                <label class="s-label">類別</label>
-                <select id="editCategory" class="s-input">
-                    <option>主花</option>
-                    <option>配花</option>
-                    <option>葉材</option>
-                    <option>花束</option>
-                    <option>花瓶</option>
-                    <option>其他加購</option>
+                <label class="f-label">分類</label>
+                <select id="fieldCategory" class="f-select">
+                    <option value="主花">主花</option>
+                    <option value="配花">配花</option>
+                    <option value="葉材">葉材</option>
+                    <option value="花束">花束</option>
+                    <option value="花瓶">花瓶</option>
+                    <option value="其他">其他</option>
                 </select>
             </div>
-            <div class="grid grid-cols-2 gap-3">
-                <div>
-                    <label class="s-label">售價（NT$）</label>
-                    <input type="number" id="editPrice" placeholder="0" min="0" class="s-input">
-                </div>
-                <div>
-                    <label class="s-label">進價成本（NT$）</label>
-                    <input type="number" id="editCost" placeholder="0" min="0" class="s-input">
-                </div>
+            <div>
+                <label class="f-label">售價（NT$）</label>
+                <input type="number" id="fieldPrice" class="f-input" min="0" placeholder="0">
             </div>
-            <div class="grid grid-cols-3 gap-3">
+        </div>
+
+        <div class="modal-grid-2">
+            <div>
+                <label class="f-label">成本（NT$）</label>
+                <input type="number" id="fieldCost" class="f-input" min="0" placeholder="0">
+            </div>
+            <div>
+                <label class="f-label">建議售價（NT$）</label>
+                <input type="number" id="fieldSuggestedPrice" class="f-input" min="0" placeholder="自動計算">
+            </div>
+        </div>
+
+        <div>
+            <label class="f-label">庫存數量</label>
+            <div class="modal-grid-3">
                 <div>
-                    <label class="s-label">高雄庫存（枝）</label>
-                    <input type="number" id="editStockKH" placeholder="0" min="0" class="s-input">
+                    <label class="f-label" style="color:#8A9BA8;">高雄 (KH)</label>
+                    <input type="number" id="fieldStockKH" class="f-input" min="0" placeholder="0">
                 </div>
                 <div>
-                    <label class="s-label">台南庫存（枝）</label>
-                    <input type="number" id="editStockTN" placeholder="0" min="0" class="s-input">
+                    <label class="f-label" style="color:#8A9BA8;">台南 (TN)</label>
+                    <input type="number" id="fieldStockTN" class="f-input" min="0" placeholder="0">
                 </div>
                 <div>
-                    <label class="s-label">誠品庫存（枝）</label>
-                    <input type="number" id="editStockES" placeholder="0" min="0" class="s-input">
+                    <label class="f-label" style="color:#8A9BA8;">誠品 (ES)</label>
+                    <input type="number" id="fieldStockES" class="f-input" min="0" placeholder="0">
                 </div>
             </div>
         </div>
 
-        <div class="mt-5 space-y-2">
-            <button onclick="submitProduct()" class="btn-primary" id="saveBtn">儲存商品</button>
-            <button onclick="closeModal()" style="background:none;border:none;width:100%;padding:10px;font-size:13px;color:#9ca3af;cursor:pointer;font-family:'Noto Serif TC',serif;">取消</button>
+        <div class="modal-actions">
+            <button onclick="closeProductModal()" class="btn-ghost" style="flex:1;">取消</button>
+            <button id="deleteBtn" onclick="deleteProduct()" class="btn-danger" style="display:none;">刪除</button>
+            <button onclick="saveProduct()" class="btn-primary" style="flex:2;" id="saveBtn">儲存商品</button>
         </div>
     </div>
 </div>
 
-<!-- ══ 刪除確認 Modal ══ -->
-<div class="modal-overlay" id="deleteModal">
-    <div class="bg-white rounded-2xl p-6 w-full max-w-xs">
-        <h3 class="font-bold text-base mb-2">刪除商品</h3>
-        <p class="text-sm text-gray-500 mb-5">「<span id="deleteProductName" class="font-bold text-[#4a4a4a]"></span>」將從 POS 選品畫面隱藏，歷史銷售紀錄與報表資料完整保留。</p>
-        <div class="flex gap-3">
-            <button onclick="closeDeleteModal()" class="flex-1 border border-gray-200 rounded-xl py-3 text-sm cursor-pointer bg-white">取消</button>
-            <button onclick="confirmDelete()" class="flex-1 bg-red-500 text-white rounded-xl py-3 text-sm font-bold cursor-pointer border-none">確認刪除</button>
+<!-- 側邊欄 -->
+<nav class="side-nav" id="sideNav">
+    <div class="nav-brand">
+        <div class="nav-brand-icon">🌸</div>
+        <div>
+            <div class="nav-brand-name">拾逅花事</div>
+            <div class="nav-brand-sub">Moment Flor · POS</div>
         </div>
+    </div>
+    <div class="nav-items">
+        <div class="nav-section-label">主要功能</div>
+        <a href="index.html" class="nav-item"><span class="nav-icon">🛒</span>收銀台</a>
+        <a href="sales.html" class="nav-item"><span class="nav-icon">🔍</span>銷售紀錄</a>
+        <div class="nav-section-label">管理工具</div>
+        <a href="procurement.html" class="nav-item"><span class="nav-icon">🚚</span>進貨管理</a>
+        <a href="products.html" class="nav-item active"><span class="nav-icon">🌹</span>商品管理</a>
+        <a href="inventory.html" class="nav-item"><span class="nav-icon">📦</span>庫存管理</a>
+        <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span>後台報表</a>
+    </div>
+    <div class="nav-bottom">
+        <div class="gas-status-bar">
+            <span class="gas-dot" id="gasDot"></span>
+            <span id="gasLabel">—</span>
+            <span>GAS 連線</span>
+            <button onclick="openApiModal()" title="API 設定">⚙️</button>
+        </div>
+    </div>
+</nav>
+
+<!-- 主區域 -->
+<div class="main-area">
+    <!-- Header -->
+    <div class="main-header">
+        <div style="display:flex;align-items:center;gap:12px;">
+            <div class="main-header-title">🌹 商品管理</div>
+            <span class="count-badge" id="productCount">—</span>
+        </div>
+        <button onclick="openAddModal()" class="btn-primary" style="padding:10px 20px;font-size:13px;">＋ 新增商品</button>
+    </div>
+
+    <!-- 主內容 -->
+    <div class="main-content">
+
+        <!-- 篩選列 -->
+        <div class="filter-bar">
+            <div class="filter-chips" id="catChips">
+                <button class="chip active" onclick="setCatFilter(this,'全部')">全部</button>
+                <button class="chip" onclick="setCatFilter(this,'主花')">主花</button>
+                <button class="chip" onclick="setCatFilter(this,'配花')">配花</button>
+                <button class="chip" onclick="setCatFilter(this,'葉材')">葉材</button>
+                <button class="chip" onclick="setCatFilter(this,'花束')">花束</button>
+                <button class="chip" onclick="setCatFilter(this,'花瓶')">花瓶</button>
+                <button class="chip" onclick="setCatFilter(this,'其他')">其他</button>
+            </div>
+            <div class="search-wrap">
+                <span class="search-icon">🔍</span>
+                <input type="text" id="searchInput" class="f-input" placeholder="搜尋商品名稱..." oninput="renderProducts()" style="min-width:180px;">
+            </div>
+        </div>
+
+        <!-- 商品網格 -->
+        <div id="productsContainer">
+            <div class="loading-state"><div class="spinner"></div></div>
+        </div>
+
     </div>
 </div>
 
 <script>
-let API_URL     = localStorage.getItem('moment_flor_api') || '';
-let rawProducts = [];
-let _deleteId   = null;
-let _toastTimer;
+let API_URL = localStorage.getItem('moment_flor_api') || '';
+let allProducts = [];
+let currentCat  = '全部';
 
-const CAT_ORDER = ['主花','配花','葉材','花束','花瓶','其他加購'];
+// ══ API Modal ══
+function openApiModal() {
+    document.getElementById('apiInput').value = API_URL;
+    document.getElementById('apiModal').classList.add('show');
+}
+function closeApiModal() {
+    document.getElementById('apiModal').classList.remove('show');
+}
+document.getElementById('apiModal').addEventListener('click', function(e) {
+    if (e.target === this) closeApiModal();
+});
+function saveApi() {
+    const v = document.getElementById('apiInput').value.trim();
+    if (!v) return;
+    localStorage.setItem('moment_flor_api', v);
+    API_URL = v;
+    closeApiModal();
+    init();
+}
 
-// ── 初始化 ──
-window.onload = () => {
-    const pw = prompt('請輸入管理密碼：');
-    if (pw !== '8282') { document.body.innerHTML = '<p style="text-align:center;padding:60px;color:#9ca3af;">🔒 權限不足</p>'; return; }
-    if (!API_URL) {
-        API_URL = prompt('請輸入 API URL（GAS 部署網址）：') || '';
-        if (API_URL) localStorage.setItem('moment_flor_api', API_URL);
-    }
-    loadProducts();
-};
+// ══ GAS 狀態 ══
+function setGas(state) {
+    const dot   = document.getElementById('gasDot');
+    const label = document.getElementById('gasLabel');
+    dot.className = 'gas-dot ' + state;
+    if (state === 'loading') label.innerText = '同步中';
+    if (state === 'ok')      label.innerText = '正常';
+    if (state === 'error')   label.innerText = '錯誤';
+}
 
+// ══ 分類篩選 ══
+function setCatFilter(btn, cat) {
+    document.querySelectorAll('#catChips .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentCat = cat;
+    renderProducts();
+}
+
+// ══ 載入商品 ══
 async function loadProducts() {
+    if (!API_URL) {
+        document.getElementById('productsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">⚙️</div>
+                <div class="empty-state-text">請先設定 GAS API 網址</div>
+                <button onclick="openApiModal()" class="btn-primary" style="margin-top:16px;">設定 API</button>
+            </div>`;
+        return;
+    }
     setGas('loading');
+    document.getElementById('productsContainer').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     try {
-        const res = await fetch(`${API_URL}?action=getProducts`);
-        rawProducts = await res.json();
+        const res  = await fetch(`${API_URL}?action=getProducts`);
+        const data = await res.json();
+        allProducts = Array.isArray(data) ? data : (data.products || data.data || []);
         setGas('ok');
-        document.getElementById('statusInfo').innerText = `✅ 共 ${rawProducts.length} 項商品`;
-        renderList();
+        renderProducts();
     } catch(e) {
         setGas('error');
-        document.getElementById('statusInfo').innerText = '❌ 連線失敗';
-        document.getElementById('productList').innerHTML = '<p class="text-center text-red-300 text-xs py-16">無法連線，請確認 API URL</p>';
+        document.getElementById('productsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">❌</div>
+                <div class="empty-state-text" style="color:#C4928A;">載入失敗，請確認 API 連線</div>
+                <button onclick="loadProducts()" class="btn-secondary" style="margin-top:16px;">重試</button>
+            </div>`;
     }
 }
 
-// ── 渲染列表 ──
-function renderList() {
-    const keyword = (document.getElementById('searchInput').value || '').trim().toLowerCase();
-    const catF    = document.getElementById('catFilter').value;
+function renderProducts() {
+    const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+    let list = allProducts;
+    if (currentCat !== '全部') list = list.filter(p => (p.category || p.分類 || '') === currentCat);
+    if (q) list = list.filter(p => (p.name || p.productName || p.商品名稱 || '').toLowerCase().includes(q));
 
-    const catMap = {};
-    rawProducts.forEach(p => {
-        if (keyword && !(p.name||'').toLowerCase().includes(keyword)) return;
-        const cat = p.category || '其他加購';
-        if (catF && cat !== catF) return;
-        if (!catMap[cat]) catMap[cat] = [];
-        catMap[cat].push(p);
-    });
+    document.getElementById('productCount').innerText = list.length + ' 項商品';
 
-    const cats = Object.keys(catMap).sort((a,b) => {
-        const ai = CAT_ORDER.indexOf(a), bi = CAT_ORDER.indexOf(b);
-        return (ai===-1?99:ai) - (bi===-1?99:bi);
-    });
-
-    if (!cats.length) {
-        document.getElementById('productList').innerHTML = '<p class="text-center text-gray-300 text-xs py-16">查無商品</p>';
+    if (!list.length) {
+        document.getElementById('productsContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">🌸</div>
+                <div class="empty-state-text">${q || currentCat !== '全部' ? '查無符合的商品' : '還沒有商品，點右上角新增'}</div>
+            </div>`;
         return;
     }
 
-    document.getElementById('productList').innerHTML = cats.map(cat => `
-        <div class="cat-header">${cat}</div>
-        ${catMap[cat].map(p => {
-            const khClass = p.stockKH > 5 ? 'stock-ok' : p.stockKH > 0 ? 'stock-low' : 'stock-zero';
-            const tnClass = p.stockTN > 5 ? 'stock-ok' : p.stockTN > 0 ? 'stock-low' : 'stock-zero';
-            const esClass = p.stockES > 5 ? 'stock-ok' : p.stockES > 0 ? 'stock-low' : 'stock-zero';
-            return `
-            <div class="prod-row">
-                <div style="flex:1;min-width:0;">
-                    <div style="font-size:14px;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.name}</div>
-                    <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        <span class="price-tag">售 NT$${p.price || 0} ／ 進 NT$${p.cost || 0}</span>
-                    </div>
-                    <div class="flex items-center gap-2 mt-1 flex-wrap">
-                        <span class="stock-badge ${khClass}">高雄 ${p.stockKH}</span>
-                        <span class="stock-badge ${tnClass}">台南 ${p.stockTN}</span>
-                        <span class="stock-badge ${esClass}">誠品 ${p.stockES}</span>
-                    </div>
-                </div>
-                <div class="flex flex-col gap-1 flex-shrink-0">
-                    <button class="btn-edit" onclick="openEditModal(${p.id})">編輯</button>
-                    <button class="btn-danger" onclick="openDeleteModal(${p.id})">刪除</button>
-                </div>
-            </div>`;
-        }).join('')}
-    `).join('');
+    document.getElementById('productsContainer').innerHTML = `<div class="products-grid">${list.map(p => productCardHtml(p)).join('')}</div>`;
 }
 
-// ── 新增 Modal ──
+function productCardHtml(p) {
+    const id       = p.id || p.productId || p.商品ID || '';
+    const name     = p.name || p.productName || p.商品名稱 || '未命名';
+    const cat      = p.category || p.分類 || '其他';
+    const price    = Number(p.price || p.售價 || 0);
+    const cost     = Number(p.cost || p.成本 || 0);
+    const sugprice = Number(p.suggestedPrice || p.建議售價 || 0);
+    const stockKH  = Number(p.stockKH || p.庫存KH || 0);
+    const stockTN  = Number(p.stockTN || p.庫存TN || 0);
+    const stockES  = Number(p.stockES || p.庫存ES || 0);
+    const visible  = p.visible !== false && p.visible !== 'false' && p.visible !== 0;
+
+    const khClass  = stockKH <= 3 ? 'stock-low' : '';
+    const tnClass  = stockTN <= 3 ? 'stock-low' : '';
+    const esClass  = stockES <= 3 ? 'stock-low' : '';
+
+    return `<div class="product-card">
+        <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
+        <div class="product-card-name">${escHtml(name)}</div>
+        <span class="product-card-cat">${escHtml(cat)}</span>
+        <div class="product-card-price">NT$ ${price.toLocaleString()}</div>
+        <div class="product-card-cost">成本 NT$ ${cost.toLocaleString()} ${sugprice > 0 ? '· 建議 NT$ ' + sugprice.toLocaleString() : ''}</div>
+        <hr class="product-card-divider">
+        <div class="product-card-stock-title">庫存</div>
+        <div class="stock-row">
+            <div class="stock-badge ${khClass}">
+                <div class="stock-badge-val">${stockKH}</div>
+                <div class="stock-badge-lbl">高雄</div>
+            </div>
+            <div class="stock-badge ${tnClass}">
+                <div class="stock-badge-val">${stockTN}</div>
+                <div class="stock-badge-lbl">台南</div>
+            </div>
+            <div class="stock-badge ${esClass}">
+                <div class="stock-badge-val">${stockES}</div>
+                <div class="stock-badge-lbl">誠品</div>
+            </div>
+        </div>
+        <div class="toggle-wrap">
+            <span class="toggle-label-text ${visible ? 'on' : ''}">${visible ? '收銀台顯示中' : '已隱藏'}</span>
+            <label class="toggle">
+                <input type="checkbox" ${visible ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
+                <div class="toggle-track"></div>
+                <div class="toggle-thumb"></div>
+            </label>
+        </div>
+    </div>`;
+}
+
+function escHtml(s) {
+    if (typeof s !== 'string') s = String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+// ══ Modal 開啟/關閉 ══
 function openAddModal() {
     document.getElementById('modalTitle').innerText = '新增商品';
-    document.getElementById('saveBtn').innerText    = '新增商品';
-    document.getElementById('editId').value       = '';
-    document.getElementById('editName').value     = '';
-    document.getElementById('editCategory').value = '主花';
-    document.getElementById('editPrice').value    = '';
-    document.getElementById('editCost').value     = '';
-    document.getElementById('editStockKH').value  = '0';
-    document.getElementById('editStockTN').value  = '0';
-    document.getElementById('editStockES').value  = '0';
-    document.getElementById('editModal').classList.add('show');
-    setTimeout(() => document.getElementById('editName').focus(), 100);
+    document.getElementById('editProductId').value = '';
+    document.getElementById('deleteBtn').style.display = 'none';
+    ['fieldName','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES'].forEach(id => {
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('fieldCategory').value = '主花';
+    document.getElementById('productModal').classList.add('show');
 }
 
-// ── 編輯 Modal ──
-function openEditModal(id) {
-    const p = rawProducts.find(x => Number(x.id) === Number(id));
-    if (!p) return;
+function openEditModal(jsonStr) {
+    let p;
+    try { p = JSON.parse(jsonStr); } catch(e) { return; }
+
     document.getElementById('modalTitle').innerText = '編輯商品';
-    document.getElementById('saveBtn').innerText    = '儲存修改';
-    document.getElementById('editId').value       = p.id;
-    document.getElementById('editName').value     = p.name;
-    document.getElementById('editCategory').value = p.category || '主花';
-    document.getElementById('editPrice').value    = p.price  || 0;
-    document.getElementById('editCost').value     = p.cost   || 0;
-    document.getElementById('editStockKH').value  = p.stockKH || 0;
-    document.getElementById('editStockTN').value  = p.stockTN || 0;
-    document.getElementById('editStockES').value  = p.stockES || 0;
-    document.getElementById('editModal').classList.add('show');
+    document.getElementById('editProductId').value    = p.id || p.productId || p.商品ID || '';
+    document.getElementById('fieldName').value         = p.name || p.productName || p.商品名稱 || '';
+    document.getElementById('fieldCategory').value     = p.category || p.分類 || '其他';
+    document.getElementById('fieldPrice').value        = p.price || p.售價 || '';
+    document.getElementById('fieldCost').value         = p.cost || p.成本 || '';
+    document.getElementById('fieldSuggestedPrice').value = p.suggestedPrice || p.建議售價 || '';
+    document.getElementById('fieldStockKH').value      = p.stockKH || p.庫存KH || '';
+    document.getElementById('fieldStockTN').value      = p.stockTN || p.庫存TN || '';
+    document.getElementById('fieldStockES').value      = p.stockES || p.庫存ES || '';
+    document.getElementById('deleteBtn').style.display = '';
+    document.getElementById('productModal').classList.add('show');
 }
 
-function closeModal() {
-    document.getElementById('editModal').classList.remove('show');
+function closeProductModal() {
+    document.getElementById('productModal').classList.remove('show');
 }
+document.getElementById('productModal').addEventListener('click', function(e) {
+    if (e.target === this) closeProductModal();
+});
 
-// ── 儲存（新增 or 編輯）──
-async function submitProduct() {
-    const id       = document.getElementById('editId').value;
-    const name     = document.getElementById('editName').value.trim();
-    const category = document.getElementById('editCategory').value;
-    const price    = parseFloat(document.getElementById('editPrice').value)   || 0;
-    const cost     = parseFloat(document.getElementById('editCost').value)    || 0;
-    const stockKH  = parseInt(document.getElementById('editStockKH').value)   || 0;
-    const stockTN  = parseInt(document.getElementById('editStockTN').value)   || 0;
-    const stockES  = parseInt(document.getElementById('editStockES').value)   || 0;
+// ══ 儲存商品 ══
+async function saveProduct() {
+    const id   = document.getElementById('editProductId').value.trim();
+    const name = document.getElementById('fieldName').value.trim();
+    if (!name) { showToast('請輸入商品名稱'); return; }
 
-    if (!name) { alert('請輸入商品名稱'); return; }
+    const payload = {
+        action: id ? 'updateProduct' : 'addProduct',
+        data: {
+            id,
+            name,
+            category       : document.getElementById('fieldCategory').value,
+            price           : Number(document.getElementById('fieldPrice').value) || 0,
+            cost            : Number(document.getElementById('fieldCost').value)  || 0,
+            suggestedPrice  : Number(document.getElementById('fieldSuggestedPrice').value) || 0,
+            stockKH         : Number(document.getElementById('fieldStockKH').value) || 0,
+            stockTN         : Number(document.getElementById('fieldStockTN').value) || 0,
+            stockES         : Number(document.getElementById('fieldStockES').value) || 0,
+            visible         : id ? undefined : true, // 新增時預設顯示，編輯時不改變
+        }
+    };
 
-    const isEdit = !!id;
-    const action = isEdit ? 'updateProduct' : 'addProduct';
-    const data   = isEdit
-        ? { id: Number(id), name, category, price, cost, stockKH, stockTN, stockES }
-        : { name, category, price, cost, stockKH, stockTN, stockES };
+    if (!API_URL) { showToast('請先設定 API 網址'); openApiModal(); return; }
 
     const btn = document.getElementById('saveBtn');
-    btn.disabled = true;
-    btn.innerText = '儲存中...';
+    btn.disabled = true; btn.innerText = '儲存中...';
     setGas('loading');
 
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, data }) });
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify(payload) });
         const result = await res.json();
         if (result.success) {
-            if (isEdit) {
-                const p = rawProducts.find(x => Number(x.id) === Number(id));
-                if (p) Object.assign(p, { name, category, price, cost, stockKH, stockTN });
-            } else {
-                rawProducts.push({ id: result.id, name, category, price, cost, stockKH, stockTN, stockES });
+            setGas('ok');
+            showToast(id ? '✅ 商品已更新' : '✅ 商品已新增');
+            closeProductModal();
+            await loadProducts();
+        } else {
+            setGas('error');
+            showToast('儲存失敗：' + (result.error || '未知錯誤'));
+        }
+    } catch(e) {
+        setGas('error');
+        showToast('連線失敗，請確認 API 網址');
+    }
+    btn.disabled = false; btn.innerText = '儲存商品';
+}
+
+// ══ 刪除商品 ══
+async function deleteProduct() {
+    const id = document.getElementById('editProductId').value.trim();
+    if (!id) return;
+    if (!confirm('確定要刪除此商品？此操作無法復原。')) return;
+    if (!API_URL) { showToast('請先設定 API 網址'); return; }
+
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id } }) });
+        const result = await res.json();
+        if (result.success) {
+            setGas('ok');
+            showToast('✅ 商品已刪除');
+            closeProductModal();
+            await loadProducts();
+        } else {
+            setGas('error');
+            showToast('刪除失敗：' + (result.error || '未知錯誤'));
+        }
+    } catch(e) {
+        setGas('error');
+        showToast('連線失敗');
+    }
+}
+
+// ══ 切換收銀台顯示 ══
+async function toggleVisibility(id, checkbox) {
+    const visible = checkbox.checked;
+    const wrap    = checkbox.closest('.toggle-wrap');
+    const label   = wrap ? wrap.querySelector('.toggle-label-text') : null;
+
+    if (!API_URL) {
+        showToast('請先設定 API 網址');
+        checkbox.checked = !visible; // 還原
+        return;
+    }
+
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data: { id, visible } }) });
+        const result = await res.json();
+        if (result.success) {
+            showToast(visible ? '✅ 已顯示在收銀台' : '🔕 已從收銀台隱藏');
+            if (label) {
+                label.innerText    = visible ? '收銀台顯示中' : '已隱藏';
+                label.className    = 'toggle-label-text' + (visible ? ' on' : '');
             }
-            setGas('ok');
-            closeModal();
-            renderList();
-            showToast(isEdit ? `✅ 已更新：${name}` : `✅ 已新增：${name}`);
+            // 同步更新本地陣列
+            const p = allProducts.find(p => (p.id || p.productId) == id);
+            if (p) p.visible = visible;
         } else {
-            setGas('error');
-            alert('儲存失敗：' + (result.error || ''));
+            showToast('更新失敗');
+            checkbox.checked = !visible;
         }
     } catch(e) {
-        setGas('error');
-        alert('連線失敗');
-    } finally {
-        btn.disabled = false;
-        btn.innerText = isEdit ? '儲存修改' : '新增商品';
+        showToast('連線失敗');
+        checkbox.checked = !visible;
     }
 }
 
-// ── 刪除 Modal ──
-function openDeleteModal(id) {
-    const p = rawProducts.find(x => Number(x.id) === Number(id));
-    if (!p) return;
-    _deleteId = id;
-    document.getElementById('deleteProductName').innerText = p.name;
-    document.getElementById('deleteModal').classList.add('show');
-}
-function closeDeleteModal() {
-    document.getElementById('deleteModal').classList.remove('show');
-    _deleteId = null;
-}
-async function confirmDelete() {
-    if (!_deleteId) return;
-    const p = rawProducts.find(x => Number(x.id) === Number(_deleteId));
-    setGas('loading');
-    try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'deleteProduct', data: { id: _deleteId } }) });
-        const result = await res.json();
-        if (result.success) {
-            rawProducts = rawProducts.filter(x => Number(x.id) !== Number(_deleteId));
-            setGas('ok');
-            closeDeleteModal();
-            renderList();
-            document.getElementById('statusInfo').innerText = `✅ 共 ${rawProducts.length} 項商品`;
-            showToast(`🗑 已刪除：${p ? p.name : ''}`);
-        } else {
-            setGas('error');
-            alert('刪除失敗：' + (result.error || ''));
-        }
-    } catch(e) {
-        setGas('error');
-        alert('連線失敗');
-    }
-}
-
-// ── 工具 ──
-function setGas(state) { document.getElementById('gasDot').className = 'gas-dot ' + state; }
-function showToast(msg, duration = 2500) {
+// ══ Toast ══
+let _toastTimer;
+function showToast(msg, dur=2500) {
     const el = document.getElementById('toast');
     el.innerText = msg;
     el.classList.add('show');
     clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.remove('show'), duration);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
 }
 
-// 點擊 Modal 背景關閉
-document.getElementById('editModal').addEventListener('click', function(e) {
-    if (e.target === this) closeModal();
-});
-document.getElementById('deleteModal').addEventListener('click', function(e) {
-    if (e.target === this) closeDeleteModal();
-});
-
-// ══ 分頁切換 ══
-function switchProdTab(tab) {
-    ['list','prices'].forEach(t => {
-        document.getElementById(`tab-${t}-view`).classList.toggle('hidden', t !== tab);
-        document.getElementById(`ptab-${t}`).classList.toggle('active', t === tab);
-    });
-    if (tab === 'prices') loadPriceHistory();
-}
-
-// ══ 本週進花 — 花材資料庫 ══
-let _wkLibrary  = [];
-let _wkSelected = new Map(); // name → category
-
-async function loadWkLibrary() {
-    const el = document.getElementById('wkLibraryList');
-    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">載入花材資料庫...</p>';
-    try {
-        const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
-        _wkLibrary = await res.json();
-        if (!Array.isArray(_wkLibrary)) _wkLibrary = [];
-        renderWkLibraryList();
-    } catch(e) {
-        el.innerHTML = '<p class="text-center text-red-300 text-xs py-8">載入失敗，請確認 GAS 已更新並重新部署</p>';
-    }
-}
-
-function toggleWkItem(name, category) {
-    if (_wkSelected.has(name)) _wkSelected.delete(name);
-    else _wkSelected.set(name, category);
-    updateWkBanner();
-    renderWkLibraryList();
-}
-
-function updateWkBanner() {
-    const n = _wkSelected.size;
-    document.getElementById('wkSelCount').innerText = n;
-    document.getElementById('wkSelBanner').classList.toggle('hidden', n === 0);
-}
-
-function clearWkSelection() {
-    _wkSelected.clear();
-    updateWkBanner();
-    renderWkLibraryList();
-}
-
-let _wkExpandedCat = null;
-
-function renderWkLibraryList() {
-    const kw  = (document.getElementById('wkLibrarySearch')?.value || '').trim().toLowerCase();
-    const el  = document.getElementById('wkLibraryList');
-    let items = _wkLibrary;
-    if (kw) items = items.filter(x => x.name.toLowerCase().includes(kw) || (x.category||'').toLowerCase().includes(kw));
-    if (!items.length) {
-        el.innerHTML = '<p class="text-center text-gray-300 text-xs py-8">查無花材</p>';
-        return;
-    }
-
-    // 分類
-    const catMap = {};
-    items.forEach(x => { const c = x.category||'其他'; if (!catMap[c]) catMap[c]=[]; catMap[c].push(x.name); });
-
-    const selectedTotal = _wkSelected.size;
-    el.innerHTML = Object.entries(catMap).map(([cat, names]) => {
-        const selCount   = names.filter(n => _wkSelected.has(n)).length;
-        const isExpanded = _wkExpandedCat === cat || kw;
-        return `
-        <div style="margin-bottom:6px;border:1px solid #e5e7eb;border-radius:12px;overflow:hidden;">
-            <div data-cat="${cat.replace(/"/g,'&quot;')}" onclick="toggleWkCat(this.dataset.cat)"
-                style="display:flex;justify-content:space-between;align-items:center;padding:10px 14px;background:${selCount>0?'#f1f3eb':'#fafaf9'};cursor:pointer;">
-                <span style="font-weight:bold;font-size:13px;color:${selCount>0?'#6d7756':'#4a4a4a'};">${cat}</span>
-                <div style="display:flex;align-items:center;gap:8px;">
-                    ${selCount > 0 ? `<span style="font-size:11px;background:#8e9775;color:white;border-radius:10px;padding:2px 8px;">已選 ${selCount}</span>` : ''}
-                    <span style="font-size:16px;color:#9ca3af;">${isExpanded ? '▲' : '▼'}</span>
-                </div>
-            </div>
-            ${isExpanded ? `<div style="border-top:1px solid #f3f4f6;padding:8px;">
-                ${names.map(name => {
-                    const sel    = _wkSelected.has(name);
-                    const exists = rawProducts.find(p => p.name === name);
-                    return `<div data-name="${name.replace(/"/g,'&quot;')}" data-cat="${cat.replace(/"/g,'&quot;')}" onclick="event.stopPropagation();toggleWkItem(this.dataset.name,this.dataset.cat)"
-                        style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;background:${sel?'#f1f3eb':'white'};margin-bottom:4px;">
-                        <span style="font-size:18px;color:${sel?'#8e9775':'#d1d5db'};margin-right:10px;">${sel?'✓':'○'}</span>
-                        <span style="font-size:13px;font-weight:${sel?'bold':'normal'};flex:1;">${name}</span>
-                        ${exists ? `<span style="font-size:10px;background:#dcfce7;color:#16a34a;border-radius:8px;padding:2px 7px;">在庫</span>` : ''}
-                    </div>`;
-                }).join('')}
-                <div data-cat="${cat.replace(/"/g,'&quot;')}" onclick="openAddFlowerModal(this.dataset.cat)"
-                    style="display:flex;align-items:center;padding:8px 10px;border-radius:8px;cursor:pointer;color:#8e9775;border:1px dashed #c6cdb5;margin-top:4px;font-size:12px;">
-                    ＋ 新增花材到「${cat}」
-                </div>
-            </div>` : ''}
-        </div>`;
-    }).join('');
-}
-
-function toggleWkCat(cat) {
-    _wkExpandedCat = _wkExpandedCat === cat ? null : cat;
-    renderWkLibraryList();
-}
-
-function openAddFlowerModal(cat) {
-    document.getElementById('newFlowerCat').value = cat || '';
-    document.getElementById('newFlowerName').value = '';
-    document.getElementById('addFlowerModal').classList.remove('hidden');
-    setTimeout(() => document.getElementById('newFlowerName').focus(), 100);
-}
-function closeAddFlowerModal() {
-    document.getElementById('addFlowerModal').classList.add('hidden');
-}
-async function submitAddFlower() {
-    const name = document.getElementById('newFlowerName').value.trim();
-    const cat  = document.getElementById('newFlowerCat').value.trim() || '其他';
-    if (!name) return alert('請輸入花材名稱');
-    setGas('loading');
-    try {
-        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addFlowerToLibrary', data: { name, category: cat } }) });
-        const r   = await res.json();
-        if (r.success) {
-            _wkLibrary.push({ name, category: cat });
-            _wkExpandedCat = cat;
-            closeAddFlowerModal();
-            renderWkLibraryList();
-            showToast(`✅ 已新增：${name}`);
-            setGas('ok');
-        } else {
-            setGas('error');
-            alert('新增失敗：' + (r.error || ''));
-        }
-    } catch(e) {
+// ══ 初始化 ══
+function init() {
+    if (!API_URL) {
         setGas('error');
-        alert('連線失敗');
+        document.getElementById('gasLabel').innerText = '未設定';
     }
+    loadProducts();
 }
 
-// ══ 本週進花精靈 Modal ══
-function openWkImport() {
-    if (_wkSelected.size === 0) return;
-    document.getElementById('wkImportRows').innerHTML = [..._wkSelected.entries()].map(([name, cat]) => `
-        <div class="wk-row grid items-center gap-1" data-name="${name}" data-cat="${cat}"
-            style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px;border-bottom:1px solid #f3f4f6;padding-bottom:6px;">
-            <div style="font-size:12px;font-weight:bold;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${name}</div>
-            <input type="number" class="wk-bundle border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="NT$" min="0" oninput="updateWkRowCalc(this)">
-            <input type="number" class="wk-stems border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="枝" min="1" value="10" oninput="updateWkRowCalc(this)">
-            <div class="wk-price text-xs text-center text-[#8e9775] font-bold">—</div>
-            <input type="number" class="wk-kh border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
-            <input type="number" class="wk-tn border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
-            <input type="number" class="wk-es border border-gray-200 rounded-lg px-1 py-1 text-xs text-center outline-none focus:border-[#8e9775] w-full" placeholder="0" min="0" oninput="updateWkHint()">
-        </div>`).join('');
-    updateWkHint();
-    document.getElementById('wkImportModal').classList.remove('hidden');
-}
-
-function updateWkRowCalc(el) {
-    const row    = el.closest('.wk-row');
-    const bundle = parseFloat(row.querySelector('.wk-bundle').value) || 0;
-    const stems  = parseFloat(row.querySelector('.wk-stems').value)  || 1;
-    const price  = bundle > 0 ? Math.round((bundle / stems) * 4) : 0;
-    row.querySelector('.wk-price').innerText = price > 0 ? `NT$ ${price}` : '—';
-    updateWkHint();
-}
-
-function applyWkBulk() {
-    const b = parseFloat(document.getElementById('wkBulkBundle').value) || 0;
-    const s = parseFloat(document.getElementById('wkBulkStems').value)  || 0;
-    document.querySelectorAll('.wk-row').forEach(row => {
-        if (b) row.querySelector('.wk-bundle').value = b;
-        if (s) row.querySelector('.wk-stems').value  = s;
-        updateWkRowCalc(row.querySelector('.wk-bundle'));
-    });
-}
-
-function updateWkHint() {
-    let total = 0;
-    document.querySelectorAll('.wk-row').forEach(row => {
-        total += (parseInt(row.querySelector('.wk-kh').value)||0)
-               + (parseInt(row.querySelector('.wk-tn').value)||0)
-               + (parseInt(row.querySelector('.wk-es').value)||0);
-    });
-    document.getElementById('wkImportHint').innerText = total > 0 ? `合計 ${total} 枝` : '';
-}
-
-function closeWkImport() {
-    document.getElementById('wkImportModal').classList.add('hidden');
-}
-
-async function submitWkImport() {
-    const rows = [...document.querySelectorAll('.wk-row')];
-    const items = rows.map(row => {
-        const bundle = parseFloat(row.querySelector('.wk-bundle').value) || 0;
-        const stems  = parseFloat(row.querySelector('.wk-stems').value)  || 1;
-        const cost   = bundle > 0 ? Math.round((bundle / stems) * 10) / 10 : 0;
-        return {
-            name: row.dataset.name, category: row.dataset.cat,
-            bundle, stems, cost,
-            qtyKH: parseInt(row.querySelector('.wk-kh').value)||0,
-            qtyTN: parseInt(row.querySelector('.wk-tn').value)||0,
-            qtyES: parseInt(row.querySelector('.wk-es').value)||0,
-        };
-    }).filter(x => x.qtyKH + x.qtyTN + x.qtyES > 0);
-
-    if (!items.length) return alert('至少一種花材需填入進貨數量');
-
-    const btn = document.getElementById('wkImportBtn');
-    btn.disabled = true; btn.innerText = `入庫中 (0/${items.length})...`;
-    setGas('loading');
-
-    let done = 0;
-    for (const item of items) {
-        let prod = rawProducts.find(p => p.name === item.name);
-        if (!prod) {
-            const price = Math.round(item.cost * 4);
-            try {
-                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'addProduct', data:{ name:item.name, category:item.category, price, cost:item.cost, stockKH:0, stockTN:0, stockES:0 } }) });
-                const res = await r.json();
-                if (res.success) {
-                    prod = { id: res.id, name: item.name, category: item.category, price, cost: item.cost, stockKH:0, stockTN:0, stockES:0 };
-                    rawProducts.push(prod);
-                }
-            } catch(e) { continue; }
-        }
-        if (!prod) continue;
-
-        // 進貨各店
-        const stores = [
-            { store:'高雄FOCUS 13', qty:item.qtyKH, key:'stockKH' },
-            { store:'台南FOCUS',    qty:item.qtyTN, key:'stockTN' },
-            { store:'誠品生活台南', qty:item.qtyES, key:'stockES' },
-        ].filter(s => s.qty > 0);
-        for (const s of stores) {
-            try {
-                const r = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'receiveStock', data:{ id:prod.id, store:s.store, qty:s.qty, unitCost:item.cost, note:'本週進花' } }) });
-                const res = await r.json();
-                if (res.success && prod) prod[s.key] = res.newStock;
-            } catch(e) {}
-        }
-
-        // 更新售價並記錄價格歷史
-        if (item.cost > 0) {
-            const price = Math.round(item.cost * 4);
-            fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'updateProduct', data:{ id:prod.id, cost:item.cost, price } }) }).catch(()=>{});
-            fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'logPriceHistory', data:{ name:item.name, category:item.category, bundlePrice:item.bundle, stems:item.stems, unitCost:item.cost, salePrice:price } }) }).catch(()=>{});
-            if (prod) { prod.cost = item.cost; prod.price = price; }
-        }
-        done++;
-        btn.innerText = `入庫中 (${done}/${items.length})...`;
-    }
-
-    setGas('ok');
-    showToast(`✅ 本週進花完成：${done} 種花材已入庫`, 3500);
-    closeWkImport();
-    clearWkSelection();
-    renderList();
-    btn.disabled = false; btn.innerText = '✅ 全部入庫';
-}
-
-// ══ 價格波動 ══
-let _priceHistory = [];
-
-async function loadPriceHistory() {
-    const el = document.getElementById('priceHistoryList');
-    el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">載入中...</p>';
-    setGas('loading');
-    try {
-        const res = await fetch(`${API_URL}?action=getPriceHistory`);
-        _priceHistory = await res.json();
-        if (!Array.isArray(_priceHistory)) _priceHistory = [];
-        setGas('ok');
-        filterPriceHistory();
-    } catch(e) {
-        setGas('error');
-        el.innerHTML = '<p class="text-center text-red-300 text-xs py-12">載入失敗，請確認 GAS 已更新</p>';
-    }
-}
-
-function filterPriceHistory() {
-    const kw = (document.getElementById('priceSearchInput').value||'').trim().toLowerCase();
-    const el = document.getElementById('priceHistoryList');
-    let data = _priceHistory;
-    if (kw) data = data.filter(r => (r.name||'').toLowerCase().includes(kw));
-    if (!data.length) {
-        el.innerHTML = '<p class="text-center text-gray-300 text-xs py-12">查無價格記錄</p>';
-        return;
-    }
-    // 按花材名稱分組
-    const map = {};
-    data.forEach(r => { if (!map[r.name]) map[r.name]=[]; map[r.name].push(r); });
-
-    el.innerHTML = Object.entries(map).map(([name, rows]) => {
-        const latest = rows[0];
-        return `<div style="background:white;border:1px solid #f3f4f6;border-radius:12px;margin-bottom:12px;overflow:hidden;">
-            <div style="padding:10px 14px;background:#fafaf9;display:flex;justify-content:space-between;align-items:center;">
-                <span style="font-size:13px;font-weight:bold;">${name}</span>
-                <span style="font-size:11px;color:#8e9775;font-weight:bold;">最新售價 NT$ ${latest.salePrice}</span>
-            </div>
-            <div style="overflow-x:auto;">
-            <table style="width:100%;font-size:11px;border-collapse:collapse;">
-                <tr style="background:#f9fafb;color:#9ca3af;font-weight:bold;">
-                    <td style="padding:6px 10px;">日期</td>
-                    <td style="padding:6px 8px;text-align:center;">把價</td>
-                    <td style="padding:6px 8px;text-align:center;">枝數</td>
-                    <td style="padding:6px 8px;text-align:center;">單支成本</td>
-                    <td style="padding:6px 8px;text-align:center;">售價</td>
-                </tr>
-                ${rows.map(r => `<tr style="border-top:1px solid #f3f4f6;">
-                    <td style="padding:6px 10px;color:#6b7280;">${(r.time||'').slice(0,10)}</td>
-                    <td style="padding:6px 8px;text-align:center;">NT$ ${r.bundlePrice}</td>
-                    <td style="padding:6px 8px;text-align:center;">${r.stems}</td>
-                    <td style="padding:6px 8px;text-align:center;">NT$ ${r.unitCost}</td>
-                    <td style="padding:6px 8px;text-align:center;font-weight:bold;color:#8e9775;">NT$ ${r.salePrice}</td>
-                </tr>`).join('')}
-            </table>
-            </div>
-        </div>`;
-    }).join('');
-}
+window.onload = init;
 </script>
-
-<!-- ══ 本週進花精靈 Modal ══ -->
-<div id="wkImportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-start justify-center p-3 overflow-y-auto">
-  <div class="bg-white rounded-2xl w-full max-w-lg my-4 shadow-2xl">
-    <div class="flex justify-between items-center px-5 pt-5 pb-4 border-b border-gray-100">
-      <div>
-        <h3 class="font-bold text-base text-[#4a4a4a]">🌸 本週進花明細</h3>
-        <p class="text-[10px] text-gray-400 mt-0.5">把價 ÷ 枝數 = 單支成本 → × 4 = 售價</p>
-      </div>
-      <button onclick="closeWkImport()" class="text-gray-300 text-2xl leading-none">✕</button>
-    </div>
-    <!-- 批次套用 -->
-    <div class="px-5 py-3 bg-[#fafaf9] border-b border-gray-100 flex gap-2 items-center">
-      <span class="text-xs text-gray-500 whitespace-nowrap">批次套用</span>
-      <input type="number" id="wkBulkBundle" placeholder="把價 NT$" min="0"
-        class="flex-1 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
-      <input type="number" id="wkBulkStems" placeholder="枝數" min="1"
-        class="w-14 border border-gray-200 rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#8e9775]">
-      <button onclick="applyWkBulk()" class="bg-[#c4a882] text-white text-xs font-bold px-3 py-1.5 rounded-lg whitespace-nowrap">套用</button>
-    </div>
-    <!-- 欄位標題 -->
-    <div class="px-5 py-3">
-      <div class="grid text-[9px] font-bold text-gray-400 uppercase tracking-wider mb-2" style="grid-template-columns:1fr 56px 36px 48px 36px 36px 36px">
-        <div>花材名稱</div><div class="text-center">把價</div><div class="text-center">枝</div>
-        <div class="text-center">售價×4</div><div class="text-center">高雄</div><div class="text-center">台南</div><div class="text-center">誠品</div>
-      </div>
-      <div id="wkImportRows" class="space-y-2 max-h-[50vh] overflow-y-auto"></div>
-    </div>
-    <div class="px-5 pb-5 pt-3 border-t border-gray-100 space-y-2">
-      <div id="wkImportHint" class="text-xs text-gray-400 text-center"></div>
-      <button onclick="submitWkImport()" id="wkImportBtn"
-        class="w-full bg-[#8e9775] text-white py-3 rounded-xl font-bold text-sm">✅ 全部入庫</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══ 新增花材 Modal ══ -->
-<div id="addFlowerModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[400] flex items-center justify-center p-6">
-  <div class="bg-white rounded-2xl w-full max-w-xs shadow-2xl p-6">
-    <div class="flex justify-between items-center mb-4">
-      <h3 class="font-bold text-base">新增花材</h3>
-      <button onclick="closeAddFlowerModal()" class="text-gray-300 text-xl leading-none">✕</button>
-    </div>
-    <div class="space-y-3">
-      <div>
-        <label class="s-label">花材名稱 *</label>
-        <input type="text" id="newFlowerName" placeholder="例：繡球花（藍）" class="s-input">
-      </div>
-      <div>
-        <label class="s-label">類別</label>
-        <input type="text" id="newFlowerCat" placeholder="主花 / 配花 / 葉材…" class="s-input">
-      </div>
-    </div>
-    <button onclick="submitAddFlower()" class="btn-primary mt-4">新增到資料庫</button>
-  </div>
-</div>
-
 </body>
 </html>

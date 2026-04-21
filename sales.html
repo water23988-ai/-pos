@@ -1,0 +1,478 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>拾逅花事 | 銷售紀錄</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        * { font-family: 'Noto Sans TC', -apple-system, sans-serif; box-sizing: border-box; }
+        body { background: #F0E9DF; color: #3D2E1E; overflow-x: hidden; -webkit-font-smoothing: antialiased; margin: 0; }
+
+        /* ── 側邊欄 ── */
+        .side-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; z-index: 200; box-shadow: 2px 0 12px rgba(0,0,0,0.06); }
+        .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; }
+        .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .nav-brand-name { font-size: 14px; font-weight: 800; color: #3d2e1e; }
+        .nav-brand-sub { font-size: 10px; color: #a08060; margin-top: 2px; }
+        .nav-section-label { font-size: 9px; font-weight: 700; color: #b8976a; letter-spacing: 0.12em; text-transform: uppercase; padding: 14px 18px 6px; }
+        .nav-items { flex: 1; padding: 10px 8px; overflow-y: auto; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #7a5c3a; font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 10px; margin-bottom: 2px; transition: all 0.15s; }
+        .nav-item:hover { background: rgba(0,0,0,0.05); color: #3d2e1e; }
+        .nav-item.active { background: rgba(109,119,86,0.15); color: #4d3520; font-weight: 700; }
+        .nav-icon { font-size: 17px; flex-shrink: 0; }
+        .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
+        .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
+        .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
+
+        /* ── 主內容 ── */
+        .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
+        .main-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 24px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .main-header-title { font-size: 16px; font-weight: 800; color: #3D2E1E; }
+        .main-content { padding: 20px; }
+
+        /* ── 通用 ── */
+        .card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); margin-bottom: 16px; }
+        .card-title { font-size: 11px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
+        .f-input { border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
+        .f-input:focus { border-color: #8e9775; background: #FAF7F2; }
+        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-secondary { background: #F5EFE6; color: #7A6550; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 9px 16px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-secondary:hover { background: #EDE5D8; }
+        .chip { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: 500; color: #7A6550; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+
+        /* ── GAS dot ── */
+        .gas-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #C8B89A; flex-shrink: 0; }
+        .gas-dot.ok { background: #8E9775; }
+        .gas-dot.loading { background: #C4A87A; animation: blink 0.8s infinite; }
+        .gas-dot.error { background: #C4928A; }
+        @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── Toast ── */
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #7A6550; color: white; padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
+        #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* ── API Modal ── */
+        .api-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
+        .api-modal.show { display: flex; }
+        .api-modal-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; margin: 16px; border: 1px solid #DDD0BC; }
+
+        /* ── 查詢列 ── */
+        .query-bar { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .store-chips { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 12px; }
+
+        /* ── 統計列 ── */
+        .summary-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 16px; }
+        .sum-card { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 14px 16px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .sum-label { font-size: 10px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 6px; }
+        .sum-val { font-size: 20px; font-weight: 800; }
+        .sum-val.green { color: #6d7756; }
+        .sum-val.blue { color: #8A9BA8; }
+        .sum-val.gold { color: #C4A87A; }
+
+        /* ── 銷售記錄列表 ── */
+        .sale-item { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: all 0.15s; }
+        .sale-item:hover { border-color: #C4A87A; box-shadow: 0 2px 8px rgba(122,101,80,0.1); }
+        .sale-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+        .sale-time { font-size: 12px; color: #A89278; font-weight: 500; }
+        .sale-store-badge { font-size: 10px; font-weight: 700; background: #F5EFE6; color: #7A6550; border-radius: 6px; padding: 3px 8px; }
+        .sale-amount { font-size: 17px; font-weight: 800; color: #6d7756; }
+        .sale-items-text { font-size: 12px; color: #7A6550; margin-top: 4px; line-height: 1.5; }
+        .sale-meta { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+        .sale-tag { font-size: 10px; font-weight: 600; background: #F5EFE6; color: #A89278; border-radius: 6px; padding: 3px 8px; border: 1px solid #EDE5D8; }
+        .sale-voided { opacity: 0.5; }
+        .sale-void-badge { font-size: 10px; font-weight: 700; background: rgba(196,146,138,0.15); color: #C4928A; border-radius: 6px; padding: 3px 8px; }
+
+        /* ── 明細 Modal ── */
+        .detail-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
+        .detail-modal.show { display: flex; }
+        .detail-box { background: #FAF7F2; border-radius: 20px; width: 100%; max-width: 420px; margin: 20px 16px; border: 1px solid #DDD0BC; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; }
+        .detail-header { padding: 20px 20px 16px; border-bottom: 1px solid #EDE5D8; display: flex; align-items: center; justify-content: space-between; }
+        .detail-title { font-size: 15px; font-weight: 800; color: #3D2E1E; }
+        .detail-close { background: none; border: none; font-size: 20px; cursor: pointer; color: #A89278; padding: 4px; }
+        .detail-body { padding: 16px 20px; overflow-y: auto; flex: 1; }
+        .detail-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid #F5EFE6; font-size: 13px; }
+        .detail-row:last-child { border-bottom: none; }
+        .detail-row-label { color: #A89278; font-weight: 500; }
+        .detail-row-val { color: #3D2E1E; font-weight: 600; }
+        .detail-items-list { margin: 12px 0; background: #F5EFE6; border-radius: 10px; padding: 12px 14px; }
+        .detail-item-row { display: flex; justify-content: space-between; font-size: 13px; color: #3D2E1E; padding: 4px 0; }
+        .detail-footer { padding: 14px 20px; border-top: 1px solid #EDE5D8; }
+        .btn-void { width: 100%; background: rgba(196,146,138,0.15); color: #C4928A; border: 1.5px solid rgba(196,146,138,0.3); border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; transition: all 0.15s; }
+        .btn-void:hover { background: rgba(196,146,138,0.25); }
+        .btn-void:disabled { opacity: 0.4; cursor: not-allowed; }
+
+        /* ── 空狀態 ── */
+        .empty-state { text-align: center; padding: 60px 20px; color: #A89278; }
+        .empty-icon { font-size: 40px; margin-bottom: 12px; }
+        .empty-text { font-size: 14px; }
+
+        /* ── Loading ── */
+        .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #DDD0BC; border-top-color: #8e9775; border-radius: 50%; animation: spin 0.7s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body>
+<div id="toast"></div>
+
+<!-- API Modal -->
+<div class="api-modal" id="apiModal">
+    <div class="api-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">⚙️ 連線設定</h3>
+            <button onclick="closeApiModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
+        </div>
+        <label style="font-size:11px;font-weight:600;color:#A89278;letter-spacing:0.04em;display:block;margin-bottom:6px;">API URL</label>
+        <input type="text" id="apiInput" class="f-input" style="width:100%;margin-bottom:14px;" placeholder="貼上 GAS 部署網址">
+        <button onclick="saveApi()" class="btn-primary" style="width:100%;">儲存並連線</button>
+    </div>
+</div>
+
+<!-- 交易明細 Modal -->
+<div class="detail-modal" id="detailModal">
+    <div class="detail-box">
+        <div class="detail-header">
+            <div class="detail-title" id="detailTitle">交易明細</div>
+            <button class="detail-close" onclick="closeDetail()">✕</button>
+        </div>
+        <div class="detail-body" id="detailBody"></div>
+        <div class="detail-footer" id="detailFooter"></div>
+    </div>
+</div>
+
+<!-- 側邊欄 -->
+<nav class="side-nav">
+    <div class="nav-brand">
+        <div class="nav-brand-icon">🌸</div>
+        <div>
+            <div class="nav-brand-name">拾逅花事</div>
+            <div class="nav-brand-sub">Moment Flor · POS</div>
+        </div>
+    </div>
+    <div class="nav-items">
+        <div class="nav-section-label">主要功能</div>
+        <a href="index.html" class="nav-item"><span class="nav-icon">🛒</span>收銀台</a>
+        <a href="sales.html" class="nav-item active"><span class="nav-icon">🔍</span>銷售紀錄</a>
+        <div class="nav-section-label">管理工具</div>
+        <a href="procurement.html" class="nav-item"><span class="nav-icon">🚚</span>進貨管理</a>
+        <a href="products.html" class="nav-item"><span class="nav-icon">🌹</span>商品管理</a>
+        <a href="inventory.html" class="nav-item"><span class="nav-icon">📦</span>庫存管理</a>
+        <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span>後台報表</a>
+    </div>
+    <div class="nav-bottom">
+        <div class="gas-status-bar">
+            <span class="gas-dot" id="gasDot"></span>
+            <span id="gasLabel">—</span>
+            <span>GAS 連線</span>
+            <button onclick="openApiModal()" title="API 設定">⚙️</button>
+        </div>
+    </div>
+</nav>
+
+<!-- 主區域 -->
+<div class="main-area">
+    <!-- Header -->
+    <div class="main-header">
+        <div class="main-header-title">🔍 銷售紀錄</div>
+        <div style="display:flex;align-items:center;gap:10px;">
+            <span id="resultCount" style="font-size:12px;color:#A89278;"></span>
+        </div>
+    </div>
+
+    <!-- 主內容 -->
+    <div class="main-content">
+
+        <!-- 查詢條件 -->
+        <div class="card">
+            <div class="query-bar">
+                <input type="date" id="dateInput" class="f-input" style="width:160px;">
+                <button onclick="setToday()" class="btn-secondary">今天</button>
+                <button onclick="setYesterday()" class="btn-secondary">昨天</button>
+                <button onclick="queryHistory()" class="btn-primary" style="margin-left:auto;">查詢</button>
+            </div>
+            <div class="store-chips" id="storeChips">
+                <button class="chip active" onclick="setStore(this,'全部')">全部點位</button>
+                <button class="chip" onclick="setStore(this,'高雄FOCUS 13')">高雄</button>
+                <button class="chip" onclick="setStore(this,'台南FOCUS')">台南</button>
+                <button class="chip" onclick="setStore(this,'誠品生活台南')">誠品</button>
+                <button class="chip" onclick="setStore(this,'Studio')">Studio</button>
+            </div>
+        </div>
+
+        <!-- 統計摘要 -->
+        <div class="summary-row" id="summaryRow" style="display:none;">
+            <div class="sum-card">
+                <div class="sum-label">總業績</div>
+                <div class="sum-val green" id="sumTotal">—</div>
+            </div>
+            <div class="sum-card">
+                <div class="sum-label">交易筆數</div>
+                <div class="sum-val blue" id="sumCount">—</div>
+            </div>
+            <div class="sum-card">
+                <div class="sum-label">平均客單</div>
+                <div class="sum-val gold" id="sumAvg">—</div>
+            </div>
+        </div>
+
+        <!-- 銷售記錄 -->
+        <div id="salesContainer">
+            <div class="empty-state">
+                <div class="empty-icon">🔍</div>
+                <div class="empty-text">選擇日期後點查詢</div>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+let API_URL      = localStorage.getItem('moment_flor_api') || '';
+let allRecords   = [];
+let currentStore = '全部';
+let currentTx    = null;
+
+// ── API Modal ──
+function openApiModal() {
+    document.getElementById('apiInput').value = API_URL;
+    document.getElementById('apiModal').classList.add('show');
+}
+function closeApiModal() { document.getElementById('apiModal').classList.remove('show'); }
+document.getElementById('apiModal').addEventListener('click', e => { if (e.target === document.getElementById('apiModal')) closeApiModal(); });
+function saveApi() {
+    const v = document.getElementById('apiInput').value.trim();
+    if (!v) return;
+    localStorage.setItem('moment_flor_api', v);
+    API_URL = v;
+    closeApiModal();
+    setGas('ok');
+}
+
+// ── GAS 狀態 ──
+function setGas(state) {
+    const dot = document.getElementById('gasDot');
+    const lbl = document.getElementById('gasLabel');
+    dot.className = 'gas-dot ' + state;
+    lbl.innerText = state === 'loading' ? '同步中' : state === 'ok' ? '正常' : '錯誤';
+}
+
+// ── 日期快捷 ──
+function setToday() {
+    document.getElementById('dateInput').value = toDateStr(new Date());
+}
+function setYesterday() {
+    const d = new Date(); d.setDate(d.getDate() - 1);
+    document.getElementById('dateInput').value = toDateStr(d);
+}
+function toDateStr(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// ── 點位篩選 ──
+function setStore(btn, store) {
+    document.querySelectorAll('#storeChips .chip').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    currentStore = store;
+    renderRecords();
+}
+
+// ── 查詢 ──
+async function queryHistory() {
+    const date = document.getElementById('dateInput').value;
+    if (!date) { showToast('請先選擇日期'); return; }
+    if (!API_URL) { showToast('請先設定 API 網址'); openApiModal(); return; }
+
+    setGas('loading');
+    document.getElementById('salesContainer').innerHTML = '<div class="empty-state"><div class="spinner"></div></div>';
+    document.getElementById('summaryRow').style.display = 'none';
+
+    try {
+        const res  = await fetch(`${API_URL}?action=getHistory&date=${date}`);
+        const data = await res.json();
+        allRecords = Array.isArray(data) ? data : (data.records || data.data || []);
+        setGas('ok');
+        renderRecords();
+    } catch(e) {
+        setGas('error');
+        document.getElementById('salesContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">❌</div>
+                <div class="empty-text" style="color:#C4928A;">載入失敗，請確認 API 連線</div>
+                <button onclick="queryHistory()" class="btn-secondary" style="margin-top:16px;">重試</button>
+            </div>`;
+    }
+}
+
+// ── 渲染紀錄 ──
+function renderRecords() {
+    let list = allRecords;
+    if (currentStore !== '全部') list = list.filter(r => (r.store || r.點位 || '') === currentStore);
+
+    // 摘要
+    const valid  = list.filter(r => !r.voided && !r.isVoided);
+    const total  = valid.reduce((s,r) => s + Number(r.total || r.amount || r.金額 || 0), 0);
+    const count  = valid.length;
+    const avg    = count ? Math.round(total / count) : 0;
+
+    document.getElementById('sumTotal').innerText = 'NT$ ' + total.toLocaleString();
+    document.getElementById('sumCount').innerText = count + ' 筆';
+    document.getElementById('sumAvg').innerText   = 'NT$ ' + avg.toLocaleString();
+    document.getElementById('summaryRow').style.display = 'grid';
+    document.getElementById('resultCount').innerText = list.length + ' 筆記錄';
+
+    if (!list.length) {
+        document.getElementById('salesContainer').innerHTML = `
+            <div class="empty-state">
+                <div class="empty-icon">🌸</div>
+                <div class="empty-text">這天沒有符合的銷售記錄</div>
+            </div>`;
+        return;
+    }
+
+    document.getElementById('salesContainer').innerHTML = list.map(r => saleItemHtml(r)).join('');
+}
+
+function saleItemHtml(r) {
+    const id      = r.id || r.txId || r.transactionId || '';
+    const time    = r.time || r.createdAt || r.時間 || '';
+    const store   = r.store || r.點位 || '';
+    const amount  = Number(r.total || r.amount || r.金額 || 0);
+    const payment = r.payment || r.paymentMethod || r.付款方式 || '';
+    const source  = r.source || r.客源 || '';
+    const voided  = r.voided || r.isVoided || false;
+    const items   = r.items || r.商品 || [];
+
+    const itemsText = Array.isArray(items) && items.length
+        ? items.map(i => `${i.name || i.商品名稱 || ''}${i.qty > 1 ? ' ×'+i.qty : ''}`).join('、')
+        : (r.itemsText || r.商品明細 || '');
+
+    const jsonStr = escHtml(JSON.stringify(r));
+
+    return `<div class="sale-item ${voided ? 'sale-voided' : ''}" onclick="openDetail('${jsonStr}')">
+        <div class="sale-item-top">
+            <div style="display:flex;align-items:center;gap:8px;">
+                <span class="sale-time">${escHtml(String(time))}</span>
+                <span class="sale-store-badge">${escHtml(store)}</span>
+                ${voided ? '<span class="sale-void-badge">已退款</span>' : ''}
+            </div>
+            <div class="sale-amount">NT$ ${amount.toLocaleString()}</div>
+        </div>
+        ${itemsText ? `<div class="sale-items-text">${escHtml(String(itemsText))}</div>` : ''}
+        <div class="sale-meta">
+            ${payment ? `<span class="sale-tag">${escHtml(payment)}</span>` : ''}
+            ${source  ? `<span class="sale-tag">${escHtml(source)}</span>`  : ''}
+        </div>
+    </div>`;
+}
+
+// ── 明細 Modal ──
+function openDetail(jsonStr) {
+    let r;
+    try { r = JSON.parse(jsonStr); } catch(e) { return; }
+    currentTx = r;
+
+    const id      = r.id || r.txId || r.transactionId || '—';
+    const time    = r.time || r.createdAt || r.時間 || '—';
+    const store   = r.store || r.點位 || '—';
+    const amount  = Number(r.total || r.amount || r.金額 || 0);
+    const payment = r.payment || r.paymentMethod || r.付款方式 || '—';
+    const source  = r.source || r.客源 || '—';
+    const member  = r.member || r.memberName || r.會員 || '—';
+    const voided  = r.voided || r.isVoided || false;
+    const items   = r.items || r.商品 || [];
+
+    document.getElementById('detailTitle').innerText = '交易明細 ' + (typeof time === 'string' ? time.slice(0,8) : '');
+
+    let itemsHtml = '';
+    if (Array.isArray(items) && items.length) {
+        itemsHtml = `<div class="detail-items-list">` +
+            items.map(i => `<div class="detail-item-row">
+                <span>${escHtml(i.name || i.商品名稱 || '')}${i.qty > 1 ? ' ×'+i.qty : ''}</span>
+                <span style="color:#8e9775;font-weight:700;">NT$ ${Number(i.subtotal || i.price*i.qty || i.price || 0).toLocaleString()}</span>
+            </div>`).join('') +
+            `</div>`;
+    }
+
+    document.getElementById('detailBody').innerHTML = `
+        <div class="detail-row"><span class="detail-row-label">交易編號</span><span class="detail-row-val" style="font-size:11px;color:#A89278;">${escHtml(String(id))}</span></div>
+        <div class="detail-row"><span class="detail-row-label">時間</span><span class="detail-row-val">${escHtml(String(time))}</span></div>
+        <div class="detail-row"><span class="detail-row-label">點位</span><span class="detail-row-val">${escHtml(store)}</span></div>
+        <div class="detail-row"><span class="detail-row-label">付款方式</span><span class="detail-row-val">${escHtml(payment)}</span></div>
+        <div class="detail-row"><span class="detail-row-label">客源</span><span class="detail-row-val">${escHtml(source)}</span></div>
+        <div class="detail-row"><span class="detail-row-label">會員</span><span class="detail-row-val">${escHtml(String(member))}</span></div>
+        ${itemsHtml}
+        <div class="detail-row" style="padding-top:10px;"><span class="detail-row-label" style="font-weight:700;color:#3D2E1E;">合計</span><span class="detail-row-val" style="font-size:18px;color:#6d7756;">NT$ ${amount.toLocaleString()}</span></div>
+    `;
+
+    document.getElementById('detailFooter').innerHTML = voided
+        ? `<div style="text-align:center;font-size:13px;color:#C4928A;font-weight:600;padding:8px 0;">此筆交易已退款</div>`
+        : `<button class="btn-void" id="voidBtn" onclick="confirmVoid()">執行退款</button>`;
+
+    document.getElementById('detailModal').classList.add('show');
+}
+
+function closeDetail() {
+    document.getElementById('detailModal').classList.remove('show');
+    currentTx = null;
+}
+document.getElementById('detailModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('detailModal')) closeDetail();
+});
+
+// ── 退款 ──
+async function confirmVoid() {
+    if (!currentTx) return;
+    if (!confirm('確定要退款此筆交易？此操作無法復原。')) return;
+    if (!API_URL) { showToast('請先設定 API 網址'); return; }
+
+    const btn = document.getElementById('voidBtn');
+    btn.disabled = true; btn.innerText = '退款中...';
+    setGas('loading');
+
+    const id = currentTx.id || currentTx.txId || currentTx.transactionId;
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'voidTransaction', data: { id } }) });
+        const result = await res.json();
+        if (result.success) {
+            setGas('ok');
+            showToast('✅ 退款成功');
+            closeDetail();
+            queryHistory();
+        } else {
+            setGas('error');
+            showToast('退款失敗：' + (result.error || '未知錯誤'));
+            btn.disabled = false; btn.innerText = '執行退款';
+        }
+    } catch(e) {
+        setGas('error');
+        showToast('連線失敗');
+        btn.disabled = false; btn.innerText = '執行退款';
+    }
+}
+
+// ── 工具 ──
+function escHtml(s) {
+    if (typeof s !== 'string') s = String(s);
+    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+let _toastTimer;
+function showToast(msg, dur=2500) {
+    const el = document.getElementById('toast');
+    el.innerText = msg;
+    el.classList.add('show');
+    clearTimeout(_toastTimer);
+    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
+}
+
+// ── 初始化 ──
+window.onload = function() {
+    setToday();
+    if (!API_URL) { setGas('error'); document.getElementById('gasLabel').innerText = '未設定'; }
+    else setGas('ok');
+};
+</script>
+</body>
+</html>

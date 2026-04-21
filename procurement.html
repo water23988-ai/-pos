@@ -4,223 +4,347 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>拾逅花事 | 進貨管理</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
-        * { font-family: 'Noto Serif TC', serif; }
-        body { background: #fcfbf9; color: #4a4a4a; }
-        .tab-btn { padding: 8px 18px; border-radius: 20px; border: 2px solid #e5e7eb; background: white; font-size: 13px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
-        .tab-btn.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
-        .s-input  { width: 100%; border: 2px solid #e8ddd0; border-radius: 10px; padding: 9px 12px; font-size: 13px; outline: none; background: white; transition: border-color 0.2s; font-family: 'Noto Serif TC', serif; }
-        .s-input:focus  { border-color: #8e9775; }
-        .s-select { width: 100%; border: 2px solid #e8ddd0; border-radius: 10px; padding: 9px 10px; font-size: 13px; outline: none; background: white; font-family: 'Noto Serif TC', serif; }
-        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 13px 20px; font-size: 14px; font-weight: bold; cursor: pointer; width: 100%; transition: opacity 0.2s; font-family: 'Noto Serif TC', serif; }
-        .btn-primary:active  { opacity: 0.8; }
-        .btn-primary:disabled { background: #c4b8ac; cursor: not-allowed; }
-        .src-btn { border: 2px solid #e5e7eb; border-radius: 20px; padding: 6px 14px; font-size: 12px; background: white; color: #9ca3af; cursor: pointer; transition: all 0.2s; font-family: 'Noto Serif TC', serif; white-space: nowrap; }
-        .src-btn.active { background: #f1f3eb; border-color: #8e9775; color: #6d7756; font-weight: bold; }
-        .gas-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: #9ca3af; }
-        .gas-dot.ok      { background: #22c55e; }
-        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
-        .gas-dot.error   { background: #ef4444; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+        * { font-family: 'Noto Sans TC', -apple-system, sans-serif; box-sizing: border-box; }
+        body { background: #F0E9DF; color: #3D2E1E; overflow-x: hidden; -webkit-font-smoothing: antialiased; margin: 0; }
+
+        /* 側邊欄 */
+        .side-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; z-index: 200; box-shadow: 2px 0 12px rgba(0,0,0,0.06); }
+        .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; }
+        .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+        .nav-brand-name { font-size: 14px; font-weight: 800; color: #3d2e1e; }
+        .nav-brand-sub { font-size: 10px; color: #a08060; margin-top: 2px; }
+        .nav-section-label { font-size: 9px; font-weight: 700; color: #b8976a; letter-spacing: 0.12em; text-transform: uppercase; padding: 14px 18px 6px; }
+        .nav-items { flex: 1; padding: 10px 8px; overflow-y: auto; }
+        .nav-item { display: flex; align-items: center; gap: 10px; padding: 10px 12px; color: #7a5c3a; font-size: 13px; font-weight: 500; text-decoration: none; border-radius: 10px; margin-bottom: 2px; transition: all 0.15s; }
+        .nav-item:hover { background: rgba(0,0,0,0.05); color: #3d2e1e; }
+        .nav-item.active { background: rgba(109,119,86,0.15); color: #4d3520; font-weight: 700; }
+        .nav-icon { font-size: 17px; flex-shrink: 0; }
+        .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
+        .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
+        .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
+
+        /* 主內容 */
+        .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
+        .main-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 24px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .main-header-title { font-size: 16px; font-weight: 800; color: #3D2E1E; }
+        .main-header-store { font-size: 12px; color: #7A6550; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 20px; padding: 5px 14px; font-weight: 600; }
+        .main-content { padding: 20px 20px 80px; }
+
+        /* 據點 chips */
+        .store-chips { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 12px 24px; display: flex; align-items: center; gap: 10px; }
+        .store-chip-label { font-size: 10px; font-weight: 700; color: #A89278; letter-spacing: 0.1em; text-transform: uppercase; margin-right: 4px; }
+
+        /* 雙欄佈局 */
+        .two-col { display: grid; grid-template-columns: 1fr 400px; gap: 20px; align-items: start; }
+
+        /* 通用卡片 */
+        .card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); margin-bottom: 16px; }
+        .card-title { font-size: 11px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 14px; }
+
+        /* 表單元素 */
+        .f-input { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
+        .f-input:focus { border-color: #8e9775; background: #FAF7F2; box-shadow: 0 0 0 3px rgba(142,151,117,0.1); }
+        .f-select { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; }
+        .f-label { font-size: 11px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+
+        /* 按鈕 */
+        .btn-primary { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 24px; font-size: 14px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
+        .btn-primary:hover { opacity: 0.9; }
+        .btn-primary:disabled { background: #C8B89A; cursor: not-allowed; }
+        .btn-secondary { background: #F5EFE6; color: #7A6550; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 9px 18px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s; }
+        .btn-secondary:hover { background: #EDE5D8; }
+        .btn-ghost { background: none; color: #A89278; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 9px 16px; font-size: 13px; cursor: pointer; }
+
+        /* Chips/Tags */
+        .chip { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 20px; padding: 7px 14px; font-size: 13px; font-weight: 500; color: #7A6550; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+
+        /* GAS dot */
+        .gas-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #C8B89A; flex-shrink: 0; }
+        .gas-dot.ok { background: #8E9775; }
+        .gas-dot.loading { background: #C4A87A; animation: blink 0.8s infinite; }
+        .gas-dot.error { background: #C4928A; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
-        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px; font-size: 13px; z-index: 500; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
+
+        /* Toast */
+        #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #7A6550; color: white; padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .item-card { background: white; border: 1px solid #e5e7eb; border-radius: 14px; padding: 14px; margin-bottom: 10px; }
-        .calc-row { background: #f8faf6; border-radius: 8px; padding: 8px 10px; margin-top: 8px; display: flex; gap: 8px; }
+
+        /* 花材卡片 */
+        .item-card { background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 14px; padding: 14px 16px; margin-bottom: 12px; position: relative; }
+        .item-card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+        .item-card-num { font-size: 11px; font-weight: 700; color: #8E9775; }
+        .item-card-del { background: none; border: none; color: #C4928A; font-size: 20px; cursor: pointer; line-height: 1; padding: 0 4px; }
+        .calc-row { background: #EDE5D8; border-radius: 10px; padding: 10px 12px; margin-top: 10px; display: flex; gap: 8px; font-size: 12px; }
         .calc-pill { text-align: center; flex: 1; }
-        .calc-pill .val { font-weight: bold; font-size: 13px; color: #6d7756; }
-        .calc-pill .lbl { color: #9ca3af; font-size: 10px; }
-        .batch-row { background: white; border: 1px solid #e5e7eb; border-radius: 12px; padding: 12px 14px; margin-bottom: 8px; }
+        .calc-pill .val { font-weight: 700; font-size: 14px; color: #6d7756; }
+        .calc-pill .lbl { color: #A89278; font-size: 10px; margin-top: 2px; }
+        .calc-divider { width: 1px; background: #DDD0BC; }
+
+        /* 合計 bar */
+        .total-bar { background: #f0f3ec; border: 1.5px solid #8e9775; border-radius: 14px; padding: 14px 18px; margin-top: 4px; }
+
+        /* 空提示 */
+        .empty-hint { text-align: center; color: #A89278; font-size: 13px; padding: 32px 0; }
+
+        /* 進貨紀錄 */
+        .batch-row { background: #FAF7F2; border: 1px solid #DDD0BC; border-radius: 14px; padding: 14px 16px; margin-bottom: 10px; cursor: pointer; transition: border-color 0.15s; }
+        .batch-row:hover { border-color: #C4A87A; }
         .batch-row.expanded { border-color: #8e9775; }
-        .item-detail-row { font-size: 12px; padding: 5px 0; border-bottom: 1px solid #f3f4f6; display: flex; justify-content: space-between; align-items: center; }
-        .qty-input { border: 2px solid #e8ddd0; border-radius: 8px; padding: 7px 6px; font-size: 13px; outline: none; background: white; transition: border-color 0.2s; font-family: 'Noto Serif TC', serif; text-align: center; width: 100%; }
-        .qty-input:focus { border-color: #8e9775; }
-        .store-label { font-size: 10px; color: #9ca3af; font-weight: bold; text-align: center; margin-bottom: 3px; }
+        .item-detail-row { font-size: 12px; padding: 7px 0; border-bottom: 1px solid #EDE5D8; display: flex; justify-content: space-between; align-items: center; }
+        .item-detail-row:last-child { border-bottom: none; }
+
+        /* 固定底部送出 bar */
+        .checkout-bar { position: fixed; left: 220px; right: 0; bottom: 0; background: #7A6550; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; box-shadow: 0 -2px 12px rgba(61,46,30,0.15); }
+        .checkout-bar-info { color: rgba(255,255,255,0.7); font-size: 13px; }
+        .checkout-bar-total { color: white; font-size: 18px; font-weight: 800; }
+        .checkout-bar-btn { background: white; color: #7A6550; border: none; border-radius: 12px; padding: 12px 28px; font-size: 14px; font-weight: 800; cursor: pointer; transition: opacity 0.15s; }
+        .checkout-bar-btn:hover { opacity: 0.9; }
+        .checkout-bar-btn:disabled { background: rgba(255,255,255,0.4); cursor: not-allowed; color: rgba(255,255,255,0.7); }
+
+        /* API Modal */
+        .api-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
+        .api-modal.show { display: flex; }
+        .api-modal-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; margin: 16px; border: 1px solid #DDD0BC; }
+
+        /* 三欄數字輸入 */
+        .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 10px; }
+        .f-input-sm { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 8px 10px; font-size: 13px; outline: none; background: #FAF7F2; color: #3D2E1E; transition: all 0.15s; }
+        .f-input-sm:focus { border-color: #8e9775; box-shadow: 0 0 0 3px rgba(142,151,117,0.1); }
+        .f-label-xs { font-size: 10px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; display: block; margin-bottom: 5px; }
+
+        /* 右欄固定 */
+        .right-col-sticky { position: sticky; top: 78px; }
     </style>
 </head>
 <body>
 <div id="toast"></div>
 
-<!-- Header -->
-<div class="bg-white border-b-2 border-[#8e9775] px-4 py-3 flex justify-between items-center sticky top-0 z-40 shadow-sm">
+<!-- API Modal -->
+<div class="api-modal" id="apiModal">
+    <div class="api-modal-box">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">⚙️ 連線設定</h3>
+            <button onclick="closeApiModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
+        </div>
+        <label class="f-label">API URL</label>
+        <input type="text" id="apiInput" class="f-input" style="margin-bottom:14px;" placeholder="貼上 GAS 部署網址">
+        <button onclick="saveApi()" class="btn-primary" style="width:100%;">儲存並連線</button>
+    </div>
+</div>
+
+<!-- 側邊欄 -->
+<nav class="side-nav" id="sideNav">
+    <div class="nav-brand">
+        <div class="nav-brand-icon">🌸</div>
+        <div>
+            <div class="nav-brand-name">拾逅花事</div>
+            <div class="nav-brand-sub">Moment Flor · POS</div>
+        </div>
+    </div>
+    <div class="nav-items">
+        <div class="nav-section-label">主要功能</div>
+        <a href="index.html" class="nav-item"><span class="nav-icon">🛒</span>收銀台</a>
+        <a href="sales.html" class="nav-item"><span class="nav-icon">🔍</span>銷售紀錄</a>
+        <div class="nav-section-label">管理工具</div>
+        <a href="procurement.html" class="nav-item active"><span class="nav-icon">🚚</span>進貨管理</a>
+        <a href="products.html" class="nav-item"><span class="nav-icon">🌹</span>商品管理</a>
+        <a href="inventory.html" class="nav-item"><span class="nav-icon">📦</span>庫存管理</a>
+        <a href="dashboard.html" class="nav-item"><span class="nav-icon">📊</span>後台報表</a>
+    </div>
+    <div class="nav-bottom">
+        <div class="gas-status-bar">
+            <span class="gas-dot" id="gasDot"></span>
+            <span id="gasLabel">—</span>
+            <span>GAS 連線</span>
+            <button onclick="openApiModal()" title="API 設定">⚙️</button>
+        </div>
+    </div>
+</nav>
+
+<!-- 主區域 -->
+<div class="main-area">
+    <!-- Header -->
+    <div class="main-header">
+        <div class="main-header-title">🚚 進貨管理</div>
+        <div class="main-header-store" id="storeLabel">請選擇據點</div>
+    </div>
+
+    <!-- 據點選擇 -->
+    <div class="store-chips">
+        <span class="store-chip-label">據點</span>
+        <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="chip">高雄 FOCUS</button>
+        <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="chip">台南 FOCUS</button>
+        <button onclick="setStore('誠品生活台南')" id="btn-es" class="chip">誠品台南</button>
+    </div>
+
+    <!-- 主內容 -->
+    <div class="main-content">
+        <div class="two-col">
+
+            <!-- 左欄 -->
+            <div>
+                <!-- 供應商 -->
+                <div class="card">
+                    <div class="card-title">供應商</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;" id="srcBtns">
+                        <button class="chip active" onclick="setSrc(this,'高雄深綠')">高雄深綠</button>
+                        <button class="chip" onclick="setSrc(this,'台南花市')">台南花市</button>
+                        <button class="chip" onclick="setSrc(this,'台北花誠')">台北花誠</button>
+                        <button class="chip" onclick="setSrc(this,'自訂')">自訂…</button>
+                    </div>
+                    <input id="srcCustom" type="text" placeholder="輸入供應商名稱" class="f-input" style="margin-top:12px;display:none;" oninput="selectedSource=this.value">
+                </div>
+
+                <!-- 日期 + 備註 -->
+                <div class="card">
+                    <div class="card-title">進貨資訊</div>
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+                        <div>
+                            <label class="f-label">進貨日期</label>
+                            <input id="procDate" type="date" class="f-input">
+                        </div>
+                        <div>
+                            <label class="f-label">備註</label>
+                            <input id="procNote" type="text" placeholder="選填" class="f-input">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 花材清單 -->
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                        <div class="card-title" style="margin-bottom:0;">花材清單</div>
+                        <button onclick="addItemRow()" class="btn-secondary" style="font-size:13px;padding:7px 16px;">＋ 新增品項</button>
+                    </div>
+                    <div id="itemList"></div>
+                    <p id="emptyHint" class="empty-hint">點「新增品項」開始輸入進貨花材</p>
+
+                    <!-- 合計 -->
+                    <div id="totalBar" class="total-bar" style="display:none;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;">
+                            <span style="font-size:13px;color:#7A6550;font-weight:600;">本批總花費</span>
+                            <span id="totalCostDisplay" style="font-size:20px;font-weight:800;color:#6d7756;">NT$ 0</span>
+                        </div>
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:4px;">
+                            <span style="font-size:11px;color:#A89278;">品項數</span>
+                            <span id="totalItemsDisplay" style="font-size:11px;color:#7A6550;">0 項</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 右欄 -->
+            <div class="right-col-sticky">
+                <div class="card">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                        <div class="card-title" style="margin-bottom:0;">進貨紀錄</div>
+                        <button onclick="loadBatches()" class="btn-secondary" style="font-size:12px;padding:6px 14px;">重新載入</button>
+                    </div>
+                    <div id="batchList"><p class="empty-hint" style="padding:24px 0;">切換到此分頁後自動載入</p></div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- 固定底部送出 bar -->
+<div class="checkout-bar">
     <div>
-        <h1 class="text-base font-bold text-[#8e9775]">🚚 拾逅花事 | 進貨管理</h1>
-        <p id="statusInfo" class="text-[10px] text-gray-400 italic">連接中...</p>
+        <div class="checkout-bar-info" id="barItemCount">尚未新增品項</div>
+        <div class="checkout-bar-total" id="barTotal">NT$ 0</div>
     </div>
-    <div class="flex items-center gap-2">
-        <span class="gas-dot" id="gasDot"></span>
-        <nav class="flex gap-1">
-            <a href="index.html"     class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">POS</a>
-            <a href="products.html"  class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">商品</a>
-            <a href="inventory.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">盤點</a>
-            <a href="dashboard.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">後台</a>
-        </nav>
-    </div>
+    <button id="submitBtn" onclick="submitProcurement()" class="checkout-bar-btn">送出進貨</button>
 </div>
 
-<!-- API 設定 -->
-<div id="apiBar" class="hidden bg-amber-50 border-b border-amber-200 px-4 py-2">
-    <p class="text-xs text-amber-700 mb-1">尚未設定 API 網址</p>
-    <div class="flex gap-2">
-        <input id="apiInput" type="text" placeholder="貼上 GAS 部署網址" class="flex-1 border border-amber-300 rounded-lg px-3 py-1.5 text-xs outline-none">
-        <button onclick="saveApi()" class="bg-amber-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold">儲存</button>
-    </div>
-</div>
-
-<!-- Tabs -->
-<div class="px-4 pt-3 pb-0 flex gap-2 overflow-x-auto no-scrollbar border-b border-gray-100">
-    <button onclick="switchTab('add')" id="tab-add" class="tab-btn active">＋ 新增進貨</button>
-    <button onclick="switchTab('log')" id="tab-log" class="tab-btn">📋 進貨紀錄</button>
-</div>
-
-<!-- ════════ 新增進貨 Tab ════════ -->
-<div id="view-add" class="px-4 py-4 pb-32">
-
-    <!-- 供應商 -->
-    <div class="mb-4">
-        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-2">供應商</p>
-        <div class="flex flex-wrap gap-2" id="srcBtns">
-            <button class="src-btn active" data-src="高雄深綠"  onclick="setSrc(this,'高雄深綠')">高雄深綠</button>
-            <button class="src-btn"        data-src="台南花市"  onclick="setSrc(this,'台南花市')">台南花市</button>
-            <button class="src-btn"        data-src="台北花誠"  onclick="setSrc(this,'台北花誠')">台北花誠</button>
-            <button class="src-btn"        data-src="自訂"      onclick="setSrc(this,'自訂')">自訂…</button>
-        </div>
-        <input id="srcCustom" type="text" placeholder="輸入供應商名稱" class="s-input mt-2 hidden" oninput="selectedSource=this.value">
-    </div>
-
-    <!-- 日期 + 備註 -->
-    <div class="grid grid-cols-2 gap-3 mb-4">
-        <div>
-            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">進貨日期</p>
-            <input id="procDate" type="date" class="s-input">
-        </div>
-        <div>
-            <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">備註</p>
-            <input id="procNote" type="text" placeholder="選填" class="s-input">
-        </div>
-    </div>
-
-    <!-- 花材清單標題 -->
-    <div class="flex justify-between items-center mb-2">
-        <p class="text-[10px] text-gray-400 font-bold uppercase tracking-widest">花材清單</p>
-        <span class="text-[10px] text-gray-300">各據點分別填入把數</span>
-    </div>
-
-    <!-- 品項列表（由上往下新增）-->
-    <div id="itemList"></div>
-    <p id="emptyHint" class="text-center text-gray-300 text-xs py-6">點下方「新增花材」開始輸入</p>
-
-    <!-- 新增花材按鈕（固定在列表底部）-->
-    <button onclick="addItemRow()"
-        style="width:100%;background:#f1f3eb;border:1px dashed #c6cdb5;border-radius:12px;padding:12px;font-size:13px;color:#6d7756;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;margin-bottom:12px;">
-        ＋ 新增花材
-    </button>
-
-    <!-- 合計 -->
-    <div id="totalBar" class="hidden bg-[#f1f3eb] border border-[#d4dbc6] rounded-2xl p-4 mb-4">
-        <div class="flex justify-between items-center">
-            <span class="text-sm text-gray-600">本批總花費</span>
-            <span id="totalCostDisplay" class="text-xl font-bold text-[#6d7756]">NT$ 0</span>
-        </div>
-        <div class="flex justify-between items-center mt-1">
-            <span class="text-xs text-gray-400">品項數</span>
-            <span id="totalItemsDisplay" class="text-xs text-gray-500">0 項</span>
-        </div>
-    </div>
-
-    <!-- 送出 -->
-    <button id="submitBtn" onclick="submitProcurement()" class="btn-primary">送出進貨</button>
-</div>
-
-<!-- ════════ 進貨紀錄 Tab ════════ -->
-<div id="view-log" class="hidden px-4 py-4 pb-20">
-    <button onclick="loadBatches()"
-        style="background:#f1f3eb;border:none;border-radius:20px;padding:7px 18px;font-size:12px;color:#6d7756;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;margin-bottom:12px;">
-        重新載入
-    </button>
-    <div id="batchList"><p class="text-center text-gray-300 text-xs py-10">載入中...</p></div>
-</div>
+<!-- statusInfo 隱藏元素（JS 用） -->
+<span id="statusInfo" style="display:none;"></span>
 
 <script>
 // ══ 設定 ══
-let API_URL        = localStorage.getItem('moment_flor_api') || '';
+let API_URL      = localStorage.getItem('moment_flor_api') || '';
+let currentStore = '';
 let selectedSource = '高雄深綠';
 let flowerLibrary  = [];
-let procItems      = [];
-// procItems 結構: { flowerName, category, stemsPerBunch, pricePerBunch, qtyKH, qtyTN, qtyES }
+let procItems      = [];   // [{ flowerName, category, stemsPerBunch, bunchesQty, pricePerBunch }]
+let _expandedBatch = null;
+let _batchData     = [];
 
-let _expandedBatch   = null;
-let _batchData       = [];
-let _flowerHistories = {};
-let _histTimers      = {};
+// ══ API Modal ══
+function openApiModal() {
+    document.getElementById('apiInput').value = API_URL;
+    document.getElementById('apiModal').classList.add('show');
+}
+function closeApiModal() {
+    document.getElementById('apiModal').classList.remove('show');
+}
+document.getElementById('apiModal').addEventListener('click', function(e) {
+    if (e.target === this) closeApiModal();
+});
 
 // ══ API ══
 function setGas(state) {
-    document.getElementById('gasDot').className = 'gas-dot ' + state;
-    const info = document.getElementById('statusInfo');
-    if (state === 'loading') info.innerText = '同步中...';
-    if (state === 'ok')      info.innerText = '✅ 連線正常';
-    if (state === 'error')   info.innerText = '❌ 連線失敗';
+    const dot   = document.getElementById('gasDot');
+    const label = document.getElementById('gasLabel');
+    const info  = document.getElementById('statusInfo');
+    dot.className = 'gas-dot ' + state;
+    if (state === 'loading') { label.innerText = '同步中'; if(info) info.innerText = '同步中...'; }
+    if (state === 'ok')      { label.innerText = '正常';   if(info) info.innerText = '✅ 連線正常'; }
+    if (state === 'error')   { label.innerText = '錯誤';   if(info) info.innerText = '❌ API 連線錯誤'; }
 }
+
 function saveApi() {
     const v = document.getElementById('apiInput').value.trim();
     if (!v) return;
     localStorage.setItem('moment_flor_api', v);
     API_URL = v;
-    document.getElementById('apiBar').classList.add('hidden');
+    closeApiModal();
     init();
+}
+
+// ══ 據點 ══
+function setStore(s) {
+    currentStore = s;
+    ['kh','tn','es'].forEach(k => document.getElementById('btn-'+k).classList.remove('active'));
+    const map = { '高雄FOCUS 13':'btn-kh', '台南FOCUS':'btn-tn', '誠品生活台南':'btn-es' };
+    if (map[s]) document.getElementById(map[s]).classList.add('active');
+    document.getElementById('storeLabel').innerText = s;
 }
 
 // ══ 供應商 ══
 function setSrc(btn, src) {
-    document.querySelectorAll('.src-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    const ci = document.getElementById('srcCustom');
-    if (src === '自訂') {
-        ci.classList.remove('hidden');
-        selectedSource = ci.value || '';
-        ci.focus();
-    } else {
-        ci.classList.add('hidden');
-        selectedSource = src;
-    }
-}
-function setSrcByValue(src) {
-    const btns = document.querySelectorAll('.src-btn');
-    let found = false;
-    btns.forEach(b => {
-        b.classList.remove('active');
-        if (b.dataset.src === src) { b.classList.add('active'); selectedSource = src; found = true; }
+    document.querySelectorAll('.chip').forEach(b => {
+        if (b.closest('#srcBtns')) b.classList.remove('active');
     });
-    if (!found) {
-        btns.forEach(b => { if (b.dataset.src === '自訂') b.classList.add('active'); });
-        const ci = document.getElementById('srcCustom');
-        ci.classList.remove('hidden');
-        ci.value = src;
+    btn.classList.add('active');
+    const customInput = document.getElementById('srcCustom');
+    if (src === '自訂') {
+        customInput.style.display = '';
+        selectedSource = customInput.value || '';
+        customInput.focus();
+    } else {
+        customInput.style.display = 'none';
         selectedSource = src;
     }
 }
 
-// ══ Tab ══
+// ══ Tab（保留舊 switchTab 供向後相容） ══
 function switchTab(t) {
-    ['add','log'].forEach(id => {
-        document.getElementById('view-'+id).classList.toggle('hidden', id !== t);
-        document.getElementById('tab-'+id).classList.toggle('active',  id === t);
-    });
     if (t === 'log') loadBatches();
 }
 
-// ══ 花材庫 ══
+// ══ 花材庫建議 ══
 async function loadFlowerLibrary() {
     if (!API_URL) return;
     try {
         const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
         flowerLibrary = await res.json();
-        if (!Array.isArray(flowerLibrary)) flowerLibrary = [];
     } catch(e) {}
 }
+
 function flowerOptions() {
     const cats = [...new Set(flowerLibrary.map(f => f.category))];
     return cats.map(cat => {
@@ -229,14 +353,19 @@ function flowerOptions() {
     }).join('');
 }
 
-// ══ 新增 / 移除品項 ══
+// ══ 花材清單 CRUD ══
 function addItemRow() {
-    procItems.unshift({ flowerName:'', category:'主花', stemsPerBunch:0, pricePerBunch:0, qtyKH:0, qtyTN:0, qtyES:0 });
+    const idx = procItems.length;
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, bunchesQty:0, pricePerBunch:0 });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
-    // 新品項在最上方，捲回頂端
-    document.getElementById('itemList').scrollIntoView({ behavior:'smooth', block:'start' });
+    // 自動捲到新加的卡片
+    setTimeout(() => {
+        const cards = document.querySelectorAll('.item-card');
+        if (cards.length) cards[cards.length-1].scrollIntoView({ behavior:'smooth', block:'nearest' });
+    }, 100);
 }
+
 function removeItemRow(idx) {
     procItems.splice(idx, 1);
     if (procItems.length === 0) document.getElementById('emptyHint').style.display = '';
@@ -244,249 +373,158 @@ function removeItemRow(idx) {
     updateTotal();
 }
 
-// ══ 花材歷史查詢 ══
 function onFlowerSelect(idx, selectEl) {
     const opt = selectEl.options[selectEl.selectedIndex];
     procItems[idx].flowerName = opt.value;
     procItems[idx].category   = opt.getAttribute('data-cat') || '主花';
+    // 同步分類顯示
     const catEl = document.getElementById(`cat-${idx}`);
     if (catEl) catEl.value = procItems[idx].category;
-    if (opt.value) fetchAndShowHistory(idx, opt.value);
-}
-function onFlowerNameInput(idx, val) {
-    procItems[idx].flowerName = val;
-    clearTimeout(_histTimers[idx]);
-    const histEl = document.getElementById(`hist-${idx}`);
-    if (!val) { if (histEl) histEl.innerHTML = ''; return; }
-    _histTimers[idx] = setTimeout(() => fetchAndShowHistory(idx, val), 700);
-}
-async function fetchAndShowHistory(idx, flowerName) {
-    if (!flowerName || !API_URL) return;
-    const histEl = document.getElementById(`hist-${idx}`);
-    if (!histEl) return;
-    if (_flowerHistories[flowerName]) { renderHistPanel(idx, flowerName, _flowerHistories[flowerName]); return; }
-    histEl.innerHTML = '<p style="font-size:11px;color:#c4b8ac;padding:4px 0;">查詢歷史中...</p>';
-    try {
-        const res  = await fetch(`${API_URL}?action=getFlowerProcHistory&name=${encodeURIComponent(flowerName)}`);
-        const data = await res.json();
-        _flowerHistories[flowerName] = Array.isArray(data) ? data : [];
-        renderHistPanel(idx, flowerName, _flowerHistories[flowerName]);
-    } catch(e) { if (histEl) histEl.innerHTML = ''; }
-}
-function renderHistPanel(idx, flowerName, hist) {
-    const histEl = document.getElementById(`hist-${idx}`);
-    if (!histEl) return;
-    if (!hist.length) { histEl.innerHTML = '<p style="font-size:11px;color:#c4b8ac;margin-top:6px;">尚無進貨紀錄</p>'; return; }
-    const enc = encodeURIComponent(flowerName);
-    histEl.innerHTML = `
-        <div style="border-top:1px solid #f0ece6;margin-top:8px;padding-top:8px;">
-          <p style="font-size:10px;color:#9ca3af;font-weight:bold;margin-bottom:5px;">以往進貨紀錄（點「用這筆」帶入）</p>
-          ${hist.slice(0,5).map((h,i) => `
-          <div style="background:#f8faf6;border:1px solid #e2ebd6;border-radius:9px;padding:8px 10px;margin-bottom:5px;display:flex;justify-content:space-between;align-items:center;gap:8px;">
-            <div style="flex:1;min-width:0;">
-              <div style="font-size:12px;font-weight:bold;">${h.source||'—'} <span style="font-size:10px;color:#9ca3af;font-weight:normal;">${String(h.date||'').slice(0,10)}</span></div>
-              <div style="font-size:11px;color:#6d7756;margin-top:2px;">每把 NT$<strong>${h.pricePerBunch}</strong> · ${h.stemsPerBunch}枝/把 · 單支 ${Number(h.costPerStem).toFixed(1)}</div>
-            </div>
-            <button onclick="copyHistEntry(${idx},${i},'${enc}')"
-              style="flex-shrink:0;background:#8e9775;color:white;border:none;border-radius:8px;padding:5px 10px;font-size:11px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">
-              用這筆
-            </button>
-          </div>`).join('')}
-        </div>`;
-}
-function copyHistEntry(idx, histIdx, encodedName) {
-    const name = decodeURIComponent(encodedName);
-    const h    = (_flowerHistories[name] || [])[histIdx];
-    if (!h) return;
-    procItems[idx].stemsPerBunch = h.stemsPerBunch;
-    procItems[idx].pricePerBunch = h.pricePerBunch;
-    if (h.source) setSrcByValue(h.source);
-    renderItemList();
-    setTimeout(() => fetchAndShowHistory(idx, name), 80);
-    showToast(`✅ 已帶入 ${h.source} 的進貨資料，請填入各據點把數`);
 }
 
-// ══ 欄位變更 ══
 function onFieldChange(idx, field, val) {
-    procItems[idx][field] = (field === 'flowerName' || field === 'category') ? val : Number(val) || 0;
+    procItems[idx][field] = field === 'flowerName' || field === 'category' ? val : Number(val) || 0;
     updateCalc(idx);
     updateTotal();
 }
+
 function updateCalc(idx) {
     const item = procItems[idx];
     const spb  = Number(item.stemsPerBunch) || 0;
+    const bq   = Number(item.bunchesQty)    || 0;
     const ppb  = Number(item.pricePerBunch) || 0;
-    const kh   = Number(item.qtyKH) || 0;
-    const tn   = Number(item.qtyTN) || 0;
-    const es   = Number(item.qtyES) || 0;
-    const totalBunches = kh + tn + es;
-    const totalStems   = spb * totalBunches;
-    const costPerStem  = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
-    const sugg         = Math.round(costPerStem * 3.8);
-    const itemTotal    = ppb * totalBunches;
+    const totalStems     = spb * bq;
+    const costPerStem    = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
+    const suggestedPrice = Math.round(costPerStem * 3.8);
+    const itemCost       = ppb * bq;
 
-    const set = (id, val) => { const el = document.getElementById(id); if (el) el.innerText = val; };
-    set(`calc-stems-${idx}`, totalStems || '—');
-    set(`calc-cost-${idx}`,  costPerStem > 0 ? costPerStem.toFixed(1) : '—');
-    set(`calc-sugg-${idx}`,  sugg > 0 ? sugg : '—');
-    set(`calc-total-${idx}`, itemTotal > 0 ? 'NT$ ' + itemTotal.toLocaleString() : '—');
+    const stemEl = document.getElementById(`calc-stems-${idx}`);
+    const costEl = document.getElementById(`calc-cost-${idx}`);
+    const suggEl = document.getElementById(`calc-sugg-${idx}`);
+    const totEl  = document.getElementById(`calc-total-${idx}`);
+    if (stemEl) stemEl.innerText = totalStems;
+    if (costEl) costEl.innerText = costPerStem.toFixed(1);
+    if (suggEl) suggEl.innerText = suggestedPrice;
+    if (totEl)  totEl.innerText  = 'NT$ ' + itemCost.toLocaleString();
 }
+
 function updateTotal() {
-    let total = 0;
-    procItems.forEach(item => {
-        const bunches = (Number(item.qtyKH)||0) + (Number(item.qtyTN)||0) + (Number(item.qtyES)||0);
-        total += (Number(item.pricePerBunch)||0) * bunches;
-    });
+    const total = procItems.reduce((s, item) => {
+        return s + (Number(item.pricePerBunch)||0) * (Number(item.bunchesQty)||0);
+    }, 0);
     const bar = document.getElementById('totalBar');
     if (procItems.length > 0) {
-        bar.classList.remove('hidden');
+        bar.style.display = '';
         document.getElementById('totalCostDisplay').innerText = 'NT$ ' + total.toLocaleString();
         document.getElementById('totalItemsDisplay').innerText = procItems.length + ' 項';
     } else {
-        bar.classList.add('hidden');
+        bar.style.display = 'none';
     }
+    // 更新底部 bar
+    document.getElementById('barItemCount').innerText = procItems.length > 0 ? `${procItems.length} 項花材` : '尚未新增品項';
+    document.getElementById('barTotal').innerText = 'NT$ ' + total.toLocaleString();
 }
 
-// ══ 渲染品項列表 ══
 function renderItemList() {
-    const el   = document.getElementById('itemList');
+    const el = document.getElementById('itemList');
     const opts = flowerOptions();
     el.innerHTML = procItems.map((item, idx) => `
     <div class="item-card" id="icard-${idx}">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-            <span style="font-size:11px;font-weight:bold;color:#8e9775;">品項 ${idx+1}</span>
-            <button onclick="removeItemRow(${idx})" style="background:none;border:none;color:#f87171;font-size:20px;cursor:pointer;line-height:1;padding:0;">×</button>
+        <div class="item-card-header">
+            <span class="item-card-num">品項 ${idx+1}</span>
+            <button onclick="removeItemRow(${idx})" class="item-card-del">×</button>
         </div>
 
-        <!-- 花材名稱 + 類別 -->
-        <div style="display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-bottom:8px;">
-            <div>
-                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">花材名稱</p>
-                ${opts ? `<select onchange="onFlowerSelect(${idx},this)" class="s-select" style="margin-bottom:4px;font-size:12px;">
-                    <option value="">— 從花材庫選取 —</option>${opts}
-                </select>` : ''}
-                <input type="text" placeholder="或手動輸入" class="s-input" style="font-size:12px;"
-                    value="${item.flowerName}"
-                    oninput="onFlowerNameInput(${idx},this.value)">
-                <div id="hist-${idx}"></div>
-            </div>
-            <div>
-                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">類別</p>
-                <select id="cat-${idx}" class="s-select" style="font-size:12px;" onchange="onFieldChange(${idx},'category',this.value)">
-                    <option value="主花" ${item.category==='主花'?'selected':''}>主花</option>
-                    <option value="配花" ${item.category==='配花'?'selected':''}>配花</option>
-                    <option value="葉材" ${item.category==='葉材'?'selected':''}>葉材</option>
-                    <option value="其他" ${item.category==='其他'?'selected':''}>其他</option>
-                </select>
-            </div>
+        <!-- 花材名稱 -->
+        <div style="margin-bottom:10px;">
+            <label class="f-label-xs">花材名稱</label>
+            ${opts ? `
+            <select onchange="onFlowerSelect(${idx},this);onFieldChange(${idx},'flowerName',this.value)" class="f-select" style="margin-bottom:6px;border:1.5px solid #DDD0BC;border-radius:10px;padding:9px 12px;font-size:13px;outline:none;background:#FAF7F2;color:#3D2E1E;">
+                <option value="">— 從花材庫選取 —</option>
+                ${opts}
+            </select>` : ''}
+            <input type="text" placeholder="或手動輸入花材名稱" class="f-input-sm"
+                value="${item.flowerName}"
+                oninput="onFieldChange(${idx},'flowerName',this.value)">
         </div>
 
-        <!-- 每把枝數 + 每把價格 -->
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+        <!-- 分類 -->
+        <div style="margin-bottom:10px;">
+            <label class="f-label-xs">分類</label>
+            <select id="cat-${idx}" class="f-select" style="border:1.5px solid #DDD0BC;border-radius:10px;padding:9px 12px;font-size:13px;outline:none;background:#FAF7F2;color:#3D2E1E;" onchange="onFieldChange(${idx},'category',this.value)">
+                <option value="主花" ${item.category==='主花'?'selected':''}>主花</option>
+                <option value="配花" ${item.category==='配花'?'selected':''}>配花</option>
+                <option value="葉材" ${item.category==='葉材'?'selected':''}>葉材</option>
+                <option value="其他" ${item.category==='其他'?'selected':''}>其他</option>
+            </select>
+        </div>
+
+        <!-- 數量資訊 -->
+        <div class="grid-3">
             <div>
-                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">每把枝數</p>
-                <input type="number" min="1" placeholder="枝" class="s-input" style="font-size:13px;padding:8px 10px;"
+                <label class="f-label-xs">每把枝數</label>
+                <input type="number" min="1" placeholder="枝" class="f-input-sm"
                     value="${item.stemsPerBunch||''}"
                     oninput="onFieldChange(${idx},'stemsPerBunch',this.value)">
             </div>
             <div>
-                <p style="font-size:10px;color:#9ca3af;margin-bottom:4px;">每把價格（NT$）</p>
-                <input type="number" min="0" placeholder="NT$" class="s-input" style="font-size:13px;padding:8px 10px;"
+                <label class="f-label-xs">購入把數</label>
+                <input type="number" min="1" placeholder="把" class="f-input-sm"
+                    value="${item.bunchesQty||''}"
+                    oninput="onFieldChange(${idx},'bunchesQty',this.value)">
+            </div>
+            <div>
+                <label class="f-label-xs">每把單價</label>
+                <input type="number" min="0" placeholder="NT$" class="f-input-sm"
                     value="${item.pricePerBunch||''}"
                     oninput="onFieldChange(${idx},'pricePerBunch',this.value)">
             </div>
         </div>
 
-        <!-- 各據點進貨把數 -->
-        <div style="background:#f8faf6;border-radius:10px;padding:10px;margin-bottom:8px;">
-            <p style="font-size:10px;color:#9ca3af;font-weight:bold;margin-bottom:6px;">各據點進貨把數</p>
-            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;">
-                <div>
-                    <p class="store-label">高雄 FOCUS</p>
-                    <input type="number" min="0" placeholder="0" class="qty-input"
-                        value="${item.qtyKH||''}"
-                        oninput="onFieldChange(${idx},'qtyKH',this.value)">
-                </div>
-                <div>
-                    <p class="store-label">台南 FOCUS</p>
-                    <input type="number" min="0" placeholder="0" class="qty-input"
-                        value="${item.qtyTN||''}"
-                        oninput="onFieldChange(${idx},'qtyTN',this.value)">
-                </div>
-                <div>
-                    <p class="store-label">誠品台南</p>
-                    <input type="number" min="0" placeholder="0" class="qty-input"
-                        value="${item.qtyES||''}"
-                        oninput="onFieldChange(${idx},'qtyES',this.value)">
-                </div>
-            </div>
-        </div>
-
-        <!-- 自動計算 -->
+        <!-- 自動計算結果 -->
         <div class="calc-row">
             <div class="calc-pill">
-                <div class="val" id="calc-stems-${idx}">—</div>
+                <div class="val" id="calc-stems-${idx}">0</div>
                 <div class="lbl">總枝數</div>
             </div>
-            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-divider"></div>
             <div class="calc-pill">
-                <div class="val" id="calc-cost-${idx}">—</div>
+                <div class="val" id="calc-cost-${idx}">0</div>
                 <div class="lbl">單支成本</div>
             </div>
-            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-divider"></div>
             <div class="calc-pill">
-                <div class="val" id="calc-sugg-${idx}">—</div>
+                <div class="val" id="calc-sugg-${idx}">0</div>
                 <div class="lbl">建議售價</div>
             </div>
-            <div style="width:1px;background:#e5e7eb;"></div>
+            <div class="calc-divider"></div>
             <div class="calc-pill">
-                <div class="val" id="calc-total-${idx}" style="font-size:11px;">—</div>
+                <div class="val" id="calc-total-${idx}" style="font-size:12px;">NT$ 0</div>
                 <div class="lbl">小計</div>
             </div>
         </div>
     </div>`).join('');
 
+    // 重新計算所有卡片
     procItems.forEach((_, i) => updateCalc(i));
     updateTotal();
 }
 
 // ══ 送出進貨 ══
 async function submitProcurement() {
-    if (!API_URL)        return alert('請先設定 API 網址');
+    if (!API_URL) return alert('請先設定 API 網址');
+    if (!currentStore) return alert('請先選擇進貨據點');
     if (!selectedSource) return alert('請選擇供應商');
     if (procItems.length === 0) return alert('請至少新增一項花材');
 
+    // 驗證必填
     for (let i = 0; i < procItems.length; i++) {
         const it = procItems[i];
-        if (!it.flowerName)                               return alert(`品項 ${i+1}：請輸入花材名稱`);
-        if (!it.stemsPerBunch || it.stemsPerBunch <= 0)   return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把枝數`);
-        if (!it.pricePerBunch || it.pricePerBunch <= 0)   return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把價格`);
-        const totalBunches = (Number(it.qtyKH)||0) + (Number(it.qtyTN)||0) + (Number(it.qtyES)||0);
-        if (totalBunches <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請至少填入一個據點的進貨把數`);
+        if (!it.flowerName) return alert(`品項 ${i+1}：請輸入花材名稱`);
+        if (!it.stemsPerBunch || it.stemsPerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把枝數`);
+        if (!it.bunchesQty   || it.bunchesQty   <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入購入把數`);
+        if (!it.pricePerBunch|| it.pricePerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把單價`);
     }
-
-    // 展開：每個花材 × 每個有填把數的據點 → 一筆 item
-    const expandedItems = [];
-    const storeMap = [
-        { key: 'qtyKH', store: '高雄FOCUS 13' },
-        { key: 'qtyTN', store: '台南FOCUS' },
-        { key: 'qtyES', store: '誠品生活台南' },
-    ];
-    procItems.forEach(item => {
-        storeMap.forEach(s => {
-            const qty = Number(item[s.key]) || 0;
-            if (qty > 0) {
-                expandedItems.push({
-                    flowerName   : item.flowerName,
-                    category     : item.category,
-                    stemsPerBunch: Number(item.stemsPerBunch),
-                    bunchesQty   : qty,
-                    pricePerBunch: Number(item.pricePerBunch),
-                    store        : s.store,
-                });
-            }
-        });
-    });
 
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.innerText = '送出中...';
@@ -497,10 +535,16 @@ async function submitProcurement() {
             action: 'addProcurement',
             data: {
                 source: selectedSource,
-                store : '',   // 多點位，以 item.store 為準
+                store : currentStore,
                 date  : document.getElementById('procDate').value || '',
                 note  : document.getElementById('procNote').value.trim(),
-                items : expandedItems,
+                items : procItems.map(it => ({
+                    flowerName   : it.flowerName,
+                    category     : it.category,
+                    stemsPerBunch: Number(it.stemsPerBunch),
+                    bunchesQty   : Number(it.bunchesQty),
+                    pricePerBunch: Number(it.pricePerBunch),
+                })),
             }
         };
         const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify(payload) });
@@ -508,13 +552,12 @@ async function submitProcurement() {
 
         if (result.success) {
             setGas('ok');
-            showToast(`✅ 進貨完成！${result.totalItems} 筆 · NT$ ${(result.totalCost||0).toLocaleString()}`);
+            showToast(`✅ 進貨完成！${result.totalItems} 項 · NT$ ${(result.totalCost||0).toLocaleString()}`);
             procItems = [];
-            renderItemList();
+            document.getElementById('itemList').innerHTML = '';
             document.getElementById('emptyHint').style.display = '';
             document.getElementById('procNote').value = '';
             document.getElementById('totalBar').classList.add('hidden');
-            _flowerHistories = {}; // 清快取，下次重新查
         } else {
             setGas('error');
             alert('送出失敗：' + (result.error || '未知錯誤'));
@@ -530,7 +573,7 @@ async function submitProcurement() {
 async function loadBatches() {
     if (!API_URL) return;
     const el = document.getElementById('batchList');
-    el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
+    el.innerHTML = '<p class="empty-hint" style="padding:24px 0;">載入中...</p>';
     setGas('loading');
     try {
         const res = await fetch(`${API_URL}?action=getProcurementBatches`);
@@ -539,37 +582,30 @@ async function loadBatches() {
         renderBatches();
     } catch(e) {
         setGas('error');
-        el.innerHTML = '<p style="text-align:center;color:#f87171;font-size:12px;padding:32px 0;">載入失敗</p>';
+        el.innerHTML = '<p class="empty-hint" style="color:#C4928A;padding:24px 0;">載入失敗</p>';
     }
 }
 
 function renderBatches() {
     const el = document.getElementById('batchList');
     if (!_batchData.length) {
-        el.innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">尚無進貨紀錄</p>';
+        el.innerHTML = '<p class="empty-hint" style="padding:24px 0;">尚無進貨紀錄</p>';
         return;
     }
     el.innerHTML = _batchData.map(b => `
-    <div class="batch-row ${_expandedBatch===b.batchId?'expanded':''}">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;cursor:pointer;" onclick="toggleBatch('${b.batchId}')">
+    <div class="batch-row ${_expandedBatch===b.batchId?'expanded':''}" onclick="toggleBatch('${b.batchId}')">
+        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
             <div>
-                <p style="font-weight:bold;font-size:13px;">${b.source || '—'}</p>
-                <p style="font-size:11px;color:#9ca3af;margin-top:2px;">${String(b.date||'').slice(0,10)} · ${b.totalItems}項</p>
+                <p style="font-weight:700;font-size:13px;color:#3D2E1E;">${b.source || '—'}</p>
+                <p style="font-size:11px;color:#A89278;margin-top:3px;">${String(b.date||'').slice(0,10)} · ${b.store||''} · ${b.totalItems}項</p>
             </div>
             <div style="text-align:right;">
-                <p style="font-weight:bold;color:#6d7756;font-size:14px;">NT$ ${Number(b.totalCost).toLocaleString()}</p>
-                <p style="font-size:10px;color:#c4b8ac;">${_expandedBatch===b.batchId?'▲':'▼'}</p>
+                <p style="font-weight:700;color:#6d7756;font-size:14px;">NT$ ${Number(b.totalCost).toLocaleString()}</p>
+                <p style="font-size:10px;color:#C4A87A;margin-top:2px;">${_expandedBatch===b.batchId?'▲ 收合':'▼ 展開'}</p>
             </div>
         </div>
-        ${_expandedBatch === b.batchId ? `
-        <div style="margin-top:10px;border-top:1px solid #f3f4f6;padding-top:8px;" id="detail-${b.batchId}">
-            <p style="font-size:11px;color:#9ca3af;padding:8px 0;">載入品項中...</p>
-        </div>
-        <div style="margin-top:8px;display:flex;justify-content:flex-end;">
-            <button onclick="deleteBatch('${b.batchId}','${(b.source||'').replace(/'/g,'')}','${String(b.date||'').slice(0,10)}')"
-                style="background:#fee2e2;color:#dc2626;border:none;border-radius:8px;padding:6px 14px;font-size:11px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">
-                刪除這批進貨
-            </button>
+        ${_expandedBatch === b.batchId ? `<div id="detail-${b.batchId}" style="margin-top:10px;border-top:1px solid #EDE5D8;padding-top:10px;">
+            <p style="font-size:11px;color:#A89278;padding:8px 0;">載入品項中...</p>
         </div>` : ''}
     </div>`).join('');
 
@@ -588,47 +624,26 @@ async function loadBatchItems(batchId) {
         const res   = await fetch(`${API_URL}?action=getProcurementItems&batchId=${encodeURIComponent(batchId)}`);
         const items = await res.json();
         if (!Array.isArray(items) || !items.length) {
-            el.innerHTML = '<p style="font-size:12px;color:#9ca3af;padding:8px 0;">無品項資料</p>';
+            el.innerHTML = '<p style="font-size:12px;color:#A89278;padding:8px 0;">無品項資料</p>';
             return;
         }
         el.innerHTML = items.map(it => `
-        <div style="font-size:12px;padding:6px 0;border-bottom:1px solid #f3f4f6;display:flex;justify-content:space-between;align-items:center;">
+        <div class="item-detail-row">
             <div>
-                <span style="font-weight:bold;">${it.flowerName}</span>
-                <span style="font-size:10px;color:#9ca3af;margin-left:5px;">${it.category}</span>
-                <span style="font-size:10px;background:#f1f3eb;color:#6d7756;border-radius:6px;padding:1px 6px;margin-left:4px;">${it.store||''}</span>
+                <span style="font-size:13px;font-weight:700;color:#3D2E1E;">${it.flowerName}</span>
+                <span style="font-size:10px;color:#A89278;margin-left:6px;">${it.category}</span>
             </div>
-            <div style="text-align:right;">
-                <span style="color:#6d7756;font-weight:bold;">${it.totalStems}枝</span>
-                <span style="color:#9ca3af;margin-left:6px;font-size:11px;">成本 ${Number(it.costPerStem).toFixed(1)}</span>
+            <div style="text-align:right;font-size:12px;">
+                <span style="color:#6d7756;font-weight:700;">${it.totalStems}枝</span>
+                <span style="color:#A89278;margin-left:6px;">成本 ${Number(it.costPerStem).toFixed(1)}</span>
+                <span style="background:#f0f3ec;color:#6d7756;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:11px;">建議 NT$${it.suggestedPrice}</span>
             </div>
         </div>
-        <div style="font-size:11px;color:#9ca3af;padding-bottom:4px;">
-            ${it.bunchesQty}把 × ${it.stemsPerBunch}枝/把 · 每把 NT$${it.pricePerBunch} · 建議 NT$${it.suggestedPrice}
+        <div style="font-size:11px;color:#A89278;padding-bottom:6px;">
+            ${it.bunchesQty}把 × ${it.stemsPerBunch}枝/把 · 每把 NT$${it.pricePerBunch}
         </div>`).join('');
     } catch(e) {
-        el.innerHTML = '<p style="font-size:12px;color:#f87171;padding:8px 0;">載入失敗</p>';
-    }
-}
-
-async function deleteBatch(batchId, source, date) {
-    if (!confirm(`確定刪除「${source}」${date} 這批進貨紀錄？\n\n注意：此操作不會還原已入庫的庫存，請手動在盤點頁調整。`)) return;
-    setGas('loading');
-    try {
-        const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'deleteProcurementBatch', data:{ batchId } }) });
-        const result = await res.json();
-        if (result.success) {
-            setGas('ok');
-            showToast('🗑 進貨紀錄已刪除');
-            _expandedBatch = null;
-            loadBatches();
-        } else {
-            setGas('error');
-            alert('刪除失敗：' + (result.error || ''));
-        }
-    } catch(e) {
-        setGas('error');
-        alert('連線失敗');
+        el.innerHTML = '<p style="font-size:12px;color:#C4928A;padding:8px 0;">載入失敗</p>';
     }
 }
 
@@ -645,16 +660,21 @@ function showToast(msg, dur=2500) {
 // ══ 初始化 ══
 async function init() {
     if (!API_URL) {
-        document.getElementById('apiBar').classList.remove('hidden');
-        document.getElementById('statusInfo').innerText = '請設定 API';
+        setGas('error');
+        document.getElementById('gasLabel').innerText = '未設定';
         return;
     }
     setGas('loading');
+    // 設定今天日期
     const today = new Intl.DateTimeFormat('sv-SE', { timeZone:'Asia/Taipei' }).format(new Date());
     document.getElementById('procDate').value = today;
+    // 設定預設據點
+    setStore('高雄FOCUS 13');
+    // 載入花材庫
     await loadFlowerLibrary();
     setGas('ok');
-    document.getElementById('statusInfo').innerText = '✅ 連線正常';
+    // 載入進貨紀錄
+    loadBatches();
 }
 
 window.onload = init;

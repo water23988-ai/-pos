@@ -6,52 +6,189 @@
     <title>拾逅花事 | POS</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@400;700&display=swap');
-        * { font-family: 'Noto Serif TC', serif; }
-        body { background-color: #fcfbf9; color: #4a4a4a; overflow-x: hidden; }
-        .btn-action { border: 2px solid #e5e7eb; background: white; border-radius: 12px; padding: 14px 8px; font-size: 14px; transition: all 0.2s; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-        .btn-action.active { border-color: #8e9775; background-color: #f1f3eb; color: #6d7756; font-weight: bold; }
-        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 300; align-items: center; justify-content: center; }
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+
+        /* ════ 莫蘭迪色盤 ════
+           主背景   #F0E9DF  奶油暖白
+           卡片底   #FAF7F2  柔白
+           淺底     #F5EFE6  米色
+           邊框     #DDD0BC  暖米邊
+           主文字   #3D2E1E  深暖棕
+           副文字   #7A6550  中暖棕
+           弱文字   #A89278  暖灰棕
+           品牌綠   #8E9775 / #6D7756
+           暖金     #C4A87A
+           莫蘭迪藍 #8A9BA8
+           莫蘭迪玫 #C4928A
+           結帳棕   #7A6550
+        ══════════════════════════ */
+
+        /* ── 全局基礎 ── */
+        * { font-family: 'Noto Sans TC', -apple-system, sans-serif; box-sizing: border-box; }
+        body { background: #F0E9DF; color: #3D2E1E; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+        input, button, select, textarea { font-family: 'Noto Sans TC', -apple-system, sans-serif; }
+
+        /* ── Modal ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 300; align-items: center; justify-content: center; }
         .modal-overlay.show { display: flex; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        input, button, select, textarea { font-family: 'Noto Serif TC', serif; }
-        #posView { padding-bottom: 140px; }
-        .checkout-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: #2e2926; color: white; padding: 16px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -4px 20px rgba(0,0,0,0.3); padding-bottom: calc(16px + env(safe-area-inset-bottom)); }
-        .cart-item { display: flex; align-items: center; justify-content: space-between; background: #fafaf9; border: 1px solid #f3f4f6; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
-        .cart-item-name { font-size: 13px; font-weight: bold; flex: 1; }
-        .qty-btn { width: 32px; height: 32px; border-radius: 50%; border: 1px solid #e5e7eb; background: white; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
-        .qty-btn.plus { background: #8e9775; border-color: #8e9775; color: white; }
-        .qty-val { font-size: 15px; font-weight: bold; min-width: 22px; text-align: center; cursor: pointer; }
-        .source-chip { border: 1.5px solid #e5e7eb; background: white; border-radius: 20px; padding: 6px 10px; font-size: 11px; cursor: pointer; transition: all 0.2s; }
-        .source-chip.active { border-color: #8e9775; background: #f1f3eb; color: #6d7756; font-weight: bold; }
-        #studioView { padding-bottom: 100px; background: #fdf8f3; min-height: 100vh; }
-        .studio-bar { position: fixed; bottom: 0; left: 0; right: 0; z-index: 100; background: #3d2f1e; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 -4px 20px rgba(0,0,0,0.3); padding-bottom: calc(14px + env(safe-area-inset-bottom)); }
-        .s-input { width: 100%; border: 2px solid #e8ddd0; border-radius: 12px; padding: 12px 14px; font-size: 14px; outline: none; background: white; color: #4a4a4a; transition: border-color 0.2s; }
-        .s-input:focus { border-color: #c4a882; }
-        .s-label { font-size: 10px; font-weight: bold; color: #a09080; letter-spacing: 0.08em; text-transform: uppercase; display: block; margin-bottom: 6px; }
-        .s-card { background: white; border-radius: 16px; border: 1px solid #ede3d8; padding: 16px; margin-bottom: 12px; }
-        .s-tag-btn { border: 1.5px solid #e8ddd0; border-radius: 20px; padding: 6px 12px; font-size: 12px; cursor: pointer; background: white; transition: all 0.2s; color: #8a7060; }
-        .s-tag-btn.active { border-color: #c4a882; background: #fdf1e4; color: #8a5a2a; font-weight: bold; }
-        .s-item-row { display: flex; align-items: center; justify-content: space-between; background: #fdf8f3; border: 1px solid #ede3d8; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
 
-        /* ── Toast 提示 ── */
-        #toast {
-            position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px);
-            background: #2e2926; color: white; padding: 10px 20px; border-radius: 20px;
-            font-size: 13px; z-index: 9999; opacity: 0; transition: all 0.25s ease;
-            pointer-events: none; white-space: nowrap;
-        }
+        /* ── Toast ── */
+        #toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(12px); background: #7A6550; color: white; padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.25s ease; pointer-events: none; white-space: nowrap; box-shadow: 0 4px 20px rgba(0,0,0,0.15); }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* ── GAS 連線狀態指示器 ── */
-        .gas-dot {
-            width: 8px; height: 8px; border-radius: 50%; display: inline-block;
-            background: #9ca3af; transition: background 0.3s;
-        }
-        .gas-dot.ok      { background: #22c55e; }
-        .gas-dot.loading { background: #f59e0b; animation: blink 0.8s infinite; }
-        .gas-dot.error   { background: #ef4444; }
+        /* ── GAS 狀態點 ── */
+        .gas-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #C8B89A; transition: background 0.3s; }
+        .gas-dot.ok      { background: #8E9775; }
+        .gas-dot.loading { background: #C4A87A; animation: blink 0.8s infinite; }
+        .gas-dot.error   { background: #C4928A; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+        /* ── Header (legacy, not used in new layout) ── */
+        .app-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 16px; height: 56px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
+        .app-header-left { display: flex; align-items: center; gap: 10px; }
+        .app-logo { width: 34px; height: 34px; background: linear-gradient(135deg, #a8bfa0, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+        .app-title { font-size: 15px; font-weight: 700; color: #3D2E1E; letter-spacing: -0.3px; }
+        .app-subtitle { font-size: 11px; color: #A89278; margin-top: 1px; }
+        .header-icon-btn { width: 36px; height: 36px; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 9px; display: flex; align-items: center; justify-content: center; font-size: 16px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: background 0.15s; }
+        .header-icon-btn:active { background: #EDE5D8; }
+
+        /* ── 通用卡片 ── */
+        .pos-card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .card-title { font-size: 11px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 12px; display: flex; align-items: center; gap: 6px; }
+        .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+        .card-title-row .card-title { margin-bottom: 0; }
+
+        /* ── 今日據點顯示 ── */
+        .store-display-bar { display: flex; align-items: center; justify-content: space-between; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 12px; padding: 12px 14px; }
+        .store-display-name { font-size: 15px; font-weight: 700; color: #3D2E1E; }
+        .store-display-sub { font-size: 11px; color: #A89278; margin-top: 2px; }
+        .store-switch-btn { font-size: 12px; font-weight: 600; color: #6d7756; background: #FAF7F2; border: 1px solid #DDD0BC; padding: 6px 14px; border-radius: 8px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: all 0.15s; }
+        .store-switch-btn:active { background: #EDE5D8; }
+
+        /* ── 客源 Chips ── */
+        .source-chip { border: 1px solid #DDD0BC; background: #FAF7F2; border-radius: 20px; padding: 8px 14px; font-size: 13px; font-weight: 500; color: #7A6550; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+        .source-chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+        .source-chip:active { transform: scale(0.96); }
+
+        /* ── 會員搜尋 ── */
+        .member-search-input { flex: 1; border: 1px solid #DDD0BC; border-radius: 10px; padding: 11px 14px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
+        .member-search-input:focus { border-color: #8e9775; background: #FAF7F2; }
+        .member-search-btn { background: #6d7756; color: white; border: none; border-radius: 10px; padding: 11px 18px; font-size: 14px; font-weight: 600; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
+        .member-search-btn:active { opacity: 0.85; }
+
+        /* ── 購物車動作按鈕 ── */
+        .cart-action-primary { font-size: 13px; font-weight: 600; background: #6d7756; color: white; border: none; padding: 8px 16px; border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; }
+        .cart-action-primary:active { opacity: 0.8; }
+        .cart-action-secondary { font-size: 13px; font-weight: 600; color: #6d7756; background: #f0f3ec; border: 1px solid #c6d0bc; padding: 8px 14px; border-radius: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+        .cart-action-ghost { font-size: 12px; color: #A89278; background: none; border: 1px solid #DDD0BC; padding: 7px 12px; border-radius: 8px; cursor: pointer; }
+
+        /* ── 購物車商品列 ── */
+        .cart-item { display: flex; align-items: center; justify-content: space-between; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 11px; padding: 10px 12px; margin-bottom: 7px; transition: background 0.15s; }
+        .cart-item:active { background: #EDE5D8; }
+        .cart-item-name { font-size: 13px; font-weight: 600; flex: 1; color: #3D2E1E; }
+        .qty-btn { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #DDD0BC; background: #FAF7F2; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; transition: all 0.12s; color: #7A6550; }
+        .qty-btn:active { transform: scale(0.92); }
+        .qty-btn.plus { background: #6d7756; border-color: #6d7756; color: white; }
+        .qty-val { font-size: 14px; font-weight: 700; min-width: 22px; text-align: center; cursor: pointer; color: #3D2E1E; }
+
+        /* ── 結帳底部 Bar ── */
+        .checkout-total { font-size: 22px; font-weight: 800; color: #C4A87A; letter-spacing: -0.5px; }
+        .checkout-summary { font-size: 11px; color: #A89278; margin-bottom: 3px; }
+        .checkout-main-btn { background: #8e9775; color: white; border: none; border-radius: 12px; padding: 12px 22px; font-size: 15px; font-weight: 700; cursor: pointer; -webkit-tap-highlight-color: transparent; transition: opacity 0.15s; letter-spacing: -0.2px; }
+        .checkout-main-btn:active { opacity: 0.85; }
+
+        /* ── Studio 表單 ── */
+        .s-card { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 16px; margin-bottom: 10px; }
+        .s-label { font-size: 11px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; text-transform: uppercase; display: block; margin-bottom: 6px; }
+        .s-input { width: 100%; border: 1px solid #DDD0BC; border-radius: 10px; padding: 11px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
+        .s-input:focus { border-color: #8e9775; background: #FAF7F2; box-shadow: 0 0 0 3px rgba(142,151,117,0.12); }
+        .s-tag-btn { border: 1px solid #DDD0BC; border-radius: 20px; padding: 7px 13px; font-size: 12px; font-weight: 500; cursor: pointer; background: #FAF7F2; transition: all 0.15s; color: #7A6550; -webkit-tap-highlight-color: transparent; }
+        .s-tag-btn.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+        .s-tag-btn:active { transform: scale(0.96); }
+        .s-item-row { display: flex; align-items: center; justify-content: space-between; background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 10px; padding: 10px 12px; margin-bottom: 6px; }
+
+        /* ── 付款卡片 ── */
+        .pay-card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 9px; margin-bottom: 16px; }
+        .pay-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 15px 8px; border: 1.5px solid #DDD0BC; border-radius: 14px; background: #FAF7F2; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+        .pay-card .pay-emoji { font-size: 26px; }
+        .pay-card .pay-label { font-size: 13px; font-weight: 600; color: #7A6550; }
+        .pay-card:active { transform: scale(0.96); }
+        .pay-card.active { border-color: #8e9775; background: #f0f3ec; box-shadow: 0 0 0 3px rgba(142,151,117,0.12); }
+        .pay-card.active .pay-label { color: #4d6145; }
+        .btn-action { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 12px; padding: 14px 8px; font-size: 14px; transition: all 0.15s; cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; -webkit-tap-highlight-color: transparent; }
+        .btn-action.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
+
+        /* ── 快速折扣 Chips ── */
+        .qd-row { display: flex; gap: 7px; flex-wrap: wrap; margin-bottom: 10px; }
+        .qd-chip { padding: 7px 13px; border: 1px solid #DDD0BC; border-radius: 20px; font-size: 12px; font-weight: 600; color: #7A6550; background: #FAF7F2; cursor: pointer; transition: all 0.15s; -webkit-tap-highlight-color: transparent; }
+        .qd-chip:active { transform: scale(0.95); }
+        .qd-chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; }
+        .qd-chip.red { border-color: #C4928A; color: #9B5E58; }
+        .qd-chip.red.active { background: #F5E8E6; }
+
+        /* ── 側邊導覽（原 bottom-nav 改版） ── */
+        .bottom-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; z-index: 200; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; box-shadow: 2px 0 16px rgba(0,0,0,0.08); }
+        .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+        .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+        .nav-brand-name { font-size: 14px; font-weight: 800; color: #3d2e1e; letter-spacing: -0.3px; }
+        .nav-brand-sub { font-size: 10px; color: #a08060; margin-top: 2px; }
+        .nav-section-label { font-size: 9px; font-weight: 700; color: #b8976a; letter-spacing: 0.12em; text-transform: uppercase; padding: 14px 18px 6px; }
+        .nav-items { flex: 1; padding: 10px 8px; overflow-y: auto; }
+        .bottom-nav a, .bottom-nav button { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 10px; padding: 10px 12px; background: none; border: none; cursor: pointer; color: #7a5c3a; font-family: 'Noto Sans TC', sans-serif; font-size: 13px; font-weight: 500; text-decoration: none; transition: all 0.15s; -webkit-tap-highlight-color: transparent; width: 100%; text-align: left; border-radius: 10px; margin-bottom: 2px; }
+        .bottom-nav a .nav-icon, .bottom-nav button .nav-icon { font-size: 17px; line-height: 1; transition: transform 0.15s; flex-shrink: 0; }
+        .bottom-nav a.active, .bottom-nav button.active { color: #4d3520; font-weight: 700; background: rgba(109,119,86,0.15); }
+        .bottom-nav a.active .nav-icon, .bottom-nav button.active .nav-icon { transform: scale(1.1); }
+        .bottom-nav a:hover, .bottom-nav button:hover { background: rgba(0,0,0,0.05); color: #3d2e1e; }
+        .bottom-nav a:active, .bottom-nav button:active { background: rgba(0,0,0,0.08); }
+        .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); flex-shrink: 0; }
+        /* ── 主內容區 ── */
+        .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; background: #F0E9DF; }
+        /* ── 主 Header ── */
+        .main-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 24px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; flex-shrink: 0; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .main-header-left { display: flex; align-items: center; gap: 16px; }
+        .main-header-title { font-size: 16px; font-weight: 800; color: #3D2E1E; letter-spacing: -0.3px; }
+        /* ── 頂部摘要卡片 ── */
+        .dashboard-strip { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; padding: 16px 20px 0; flex-shrink: 0; }
+        .ds-card { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 14px 16px; transition: box-shadow 0.15s; }
+        .ds-card:hover { box-shadow: 0 4px 12px rgba(122,101,80,0.08); }
+        .ds-card-num { font-size: 24px; font-weight: 800; color: #3D2E1E; letter-spacing: -1px; }
+        .ds-card-label { font-size: 10px; color: #A89278; margin-top: 3px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase; }
+        .ds-card-num.green { color: #8E9775; }
+        .ds-card-num.gold { color: #C4A87A; }
+        .ds-card-num.blue { color: #8A9BA8; }
+        .ds-card-num.rose { color: #C4928A; }
+        /* ── POS 雙欄佈局 ── */
+        .pos-two-col { display: grid; grid-template-columns: 1fr 320px; gap: 16px; padding: 16px 20px 100px; }
+        .pos-col-left { display: flex; flex-direction: column; gap: 12px; }
+        .pos-col-right { display: flex; flex-direction: column; gap: 12px; }
+        #posView { background: #F0E9DF; }
+        #studioView { padding: 16px 20px 100px; background: #F0E9DF; }
+        #studioView .s-card { max-width: 720px; }
+        /* ── 結帳底部 Bar 重新定位 ── */
+        .checkout-bar { position: fixed; bottom: 0; left: 220px; right: 0; z-index: 100; background: #7A6550; color: white; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(255,255,255,0.1); box-shadow: 0 -4px 20px rgba(122,101,80,0.2); border-radius: 0; }
+        .studio-bar { position: fixed; bottom: 0; left: 220px; right: 0; z-index: 100; background: #6B5544; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; border-top: 1px solid rgba(196,168,130,0.15); box-shadow: 0 -4px 20px rgba(107,85,68,0.2); border-radius: 0; }
+
+        /* ── Toggle 開關 ── */
+        .toggle-switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+        .toggle-switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+        .toggle-track { position: absolute; inset: 0; background: #DDD0BC; border-radius: 13px; cursor: pointer; transition: background 0.25s; }
+        .toggle-track::after { content: ''; position: absolute; left: 3px; top: 3px; width: 20px; height: 20px; background: white; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,0.15); transition: transform 0.25s cubic-bezier(0.34,1.56,0.64,1); }
+        .toggle-switch input:checked + .toggle-track { background: #8e9775; }
+        .toggle-switch input:checked + .toggle-track::after { transform: translateX(20px); }
+
+        /* ── 據點選擇卡片 ── */
+        .store-card { display: flex; align-items: center; gap: 14px; padding: 15px 18px; border-radius: 14px; border: 1.5px solid #DDD0BC; background: #FAF7F2; cursor: pointer; width: 100%; text-align: left; transition: all 0.18s; -webkit-tap-highlight-color: transparent; }
+        .store-card:active { transform: scale(0.98); background: #F5EFE6; }
+        .store-card:hover { border-color: #8e9775; background: #F5EFE6; }
+        .store-card .store-card-icon { width: 44px; height: 44px; border-radius: 12px; background: #f0f3ec; display: flex; align-items: center; justify-content: center; font-size: 22px; flex-shrink: 0; }
+        .store-card .store-card-name { font-size: 15px; font-weight: 700; color: #3D2E1E; }
+        .store-card .store-card-sub { font-size: 11px; color: #9ca3af; margin-top: 2px; }
+
+        /* ── 掛回提示 Banner ── */
+        .recall-banner { background: #fffbeb; border: 1px solid #fde68a; border-radius: 11px; padding: 9px 14px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+
+        @keyframes checkPop { 0%{transform:scale(0.5);opacity:0} 60%{transform:scale(1.2)} 100%{transform:scale(1);opacity:1} }
     </style>
 </head>
 <body>
@@ -59,82 +196,156 @@
 <!-- Toast -->
 <div id="toast"></div>
 
-<!-- Header -->
-<div class="bg-white border-b-2 border-[#8e9775] p-4 flex justify-between items-center sticky top-0 z-50 shadow-sm">
-    <div id="adminTrigger" class="select-none">
-        <h1 id="pageTitle" class="text-lg font-bold text-[#8e9775]">🌸 拾逅花事 POS</h1>
-        <p id="statusInfo" class="text-[10px] text-gray-400 italic">系統連接中...</p>
-    </div>
-    <div class="flex items-center gap-2">
-        <!-- GAS 連線狀態 -->
-        <div class="flex items-center gap-1" title="GAS 連線狀態">
-            <span class="gas-dot" id="gasDot"></span>
-            <span id="gasLabel" class="text-[9px] text-gray-300">—</span>
+<!-- ══ 側邊導覽列 ══ -->
+<nav class="bottom-nav" id="bottomNav">
+    <div class="nav-brand">
+        <div class="nav-brand-icon">🌸</div>
+        <div>
+            <div class="nav-brand-name">拾逅花事</div>
+            <div class="nav-brand-sub">Moment Flor · POS</div>
         </div>
-        <button onclick="openHistoryModal()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">🔍 記錄</button>
-        <button onclick="openDailyModal()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">📋 日結</button>
-        <a href="inventory.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">📦 庫存</a>
-        <a href="products.html"     class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">🌸 商品</a>
-        <a href="procurement.html" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">🚚 進貨</a>
-        <a href="dashboard.html"   class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">📊 後台</a>
-        <button onclick="openApiSettings()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">⚙ 設定</button>
-        <div class="text-[9px] text-gray-200">V2.3</div>
+    </div>
+    <div class="nav-items">
+        <div class="nav-section-label">主要功能</div>
+        <button onclick="switchToPOS(); setActiveNav('nav-pos')" id="nav-pos" class="active">
+            <span class="nav-icon">🛒</span>收銀台
+        </button>
+        <button onclick="switchToStudio(); setActiveNav('nav-studio')" id="nav-studio">
+            <span class="nav-icon">🌷</span>Studio 接單
+        </button>
+        <a href="sales.html" id="nav-history">
+            <span class="nav-icon">🔍</span>銷售紀錄
+        </a>
+        <button onclick="openDailyModal()" id="nav-daily">
+            <span class="nav-icon">📋</span>日結對帳
+        </button>
+        <div class="nav-section-label">管理工具</div>
+        <a href="procurement.html" id="nav-proc">
+            <span class="nav-icon">🚚</span>進貨管理
+        </a>
+        <a href="products.html" id="nav-products">
+            <span class="nav-icon">🌹</span>商品管理
+        </a>
+        <a href="inventory.html" id="nav-inventory">
+            <span class="nav-icon">📦</span>庫存管理
+        </a>
+        <a href="dashboard.html" id="nav-dash">
+            <span class="nav-icon">📊</span>後台報表
+        </a>
+    </div>
+    <div class="nav-bottom">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:10px;background:rgba(0,0,0,0.06);">
+            <span class="gas-dot" id="gasDot"></span>
+            <span id="gasLabel" style="font-size:11px;color:#a08060;font-weight:600;">—</span>
+            <span style="font-size:11px;color:#b8976a;flex:1;">GAS 連線</span>
+            <button onclick="openApiSettings()" style="background:rgba(0,0,0,0.06);border:none;border-radius:7px;width:28px;height:28px;display:flex;align-items:center;justify-content:center;cursor:pointer;font-size:14px;" title="API 設定">⚙️</button>
+        </div>
+    </div>
+</nav>
+
+<!-- ══ 主要內容區 ══ -->
+<div class="main-area">
+
+<!-- 主 Header -->
+<div class="main-header">
+    <div class="main-header-left">
+        <div id="adminTrigger" class="select-none" style="cursor:default;">
+            <h1 id="pageTitle" class="main-header-title">🌸 收銀台</h1>
+        </div>
+        <div style="height:20px;width:1px;background:#e9ecef;"></div>
+        <p id="statusInfo" style="font-size:11px;color:#9ca3af;">系統連接中...</p>
+    </div>
+    <div style="display:flex;align-items:center;gap:10px;">
+        <button onclick="reopenStorePicker()" style="display:flex;align-items:center;gap:6px;background:#F5EFE6;border:1.5px solid #DDD0BC;border-radius:10px;padding:6px 14px;cursor:pointer;font-size:12px;font-weight:700;color:#3D2E1E;font-family:'Noto Sans TC',sans-serif;">
+            <span style="font-size:14px;">📍</span>
+            <span id="currentStoreDisplay" style="color:#6d7756;">—</span>
+            <span style="color:#d1d5db;font-size:10px;">▾</span>
+        </button>
+        <div style="font-size:11px;color:#9ca3af;font-weight:500;" id="headerDate"></div>
     </div>
 </div>
 
 <!-- POS VIEW -->
 <div id="posView">
-<div class="p-4 space-y-5">
-    <section>
-        <h2 class="text-xs font-bold mb-2 text-gray-400 tracking-widest uppercase">📍 今日據點</h2>
-        <div style="background:#f1f3eb;border:2px solid #8e9775;border-radius:16px;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;">
-            <div>
-                <div id="currentStoreDisplay" style="font-size:16px;font-weight:bold;color:#6d7756;">—</div>
-                <div style="font-size:10px;color:#9ca3af;margin-top:2px;">點「切換」重新選擇</div>
-            </div>
-            <button onclick="reopenStorePicker()" style="font-size:12px;color:#8e9775;background:white;border:1.5px solid #c6cdb5;padding:6px 14px;border-radius:10px;cursor:pointer;font-family:'Noto Serif TC',serif;">切換</button>
-        </div>
-    </section>
-    <section>
-        <h2 class="text-xs font-bold mb-2 text-gray-400 tracking-widest uppercase">📣 客源統計</h2>
-        <div class="flex flex-wrap gap-2">
-            <button onclick="setSource('walk')"   class="source-chip source-btn">路過</button>
-            <button onclick="setSource('ig')"     class="source-chip source-btn">IG/FB</button>
-            <button onclick="setSource('friend')" class="source-chip source-btn">朋友介紹</button>
-            <button onclick="setSource('market')" class="source-chip source-btn">市集常客</button>
-            <button onclick="setSource('staff')"  class="source-chip source-btn">員工</button>
-            <button onclick="setSource('google')" class="source-chip source-btn">Google</button>
-        </div>
-    </section>
-    <section>
-        <h2 class="text-xs font-bold mb-3 text-gray-400 tracking-widest uppercase">👥 會員查詢</h2>
-        <div class="flex gap-2 mb-2">
-            <input type="tel" id="memberSearch" placeholder="手機號碼" class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]">
-            <button onclick="searchMember()" class="bg-[#8e9775] text-white px-4 py-3 rounded-xl text-sm font-bold">查詢</button>
-        </div>
-        <div id="memberResult"></div>
-    </section>
-    <section>
-        <div class="flex justify-between items-center mb-2">
-            <h2 class="text-xs font-bold text-gray-400 tracking-widest uppercase">🛒 結帳清單</h2>
-            <div class="flex gap-2">
-                <button onclick="openProductModal()" class="text-[10px] bg-[#8e9775] text-white px-3 py-1 rounded-full">＋ 加入商品</button>
-                <button onclick="openHangListModal()" class="text-[10px] text-[#8e9775] border border-[#8e9775] px-3 py-1 rounded-full">📌 掛單</button>
-                <button onclick="clearCart()" class="text-[10px] text-gray-300 border border-gray-200 px-2 py-1 rounded-full">清空</button>
-            </div>
-        </div>
-        <!-- 叫回掛單後顯示的「掛回」提示列 -->
-        <div id="recallBanner" style="display:none;background:#fdf8f0;border:1px solid #c4a882;border-radius:12px;padding:8px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px;">
-            <span style="font-size:12px;color:#8a5a2a;font-weight:bold;">📌 已叫回：<strong id="recallBannerName"></strong></span>
-            <button onclick="putBackHang()" style="background:#c4a882;color:white;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:bold;cursor:pointer;font-family:'Noto Serif TC',serif;">掛回同名</button>
-        </div>
-        <div id="cartList"><p class="text-center text-gray-200 text-xs py-6">點「加入商品」開始選花材</p></div>
-    </section>
+
+<!-- 頂部摘要卡片 -->
+<div class="dashboard-strip">
+    <div class="ds-card">
+        <div class="ds-card-num gold" id="ds-total">NT$ 0</div>
+        <div class="ds-card-label">購物車小計</div>
+    </div>
+    <div class="ds-card">
+        <div class="ds-card-num blue" id="ds-items">0 件</div>
+        <div class="ds-card-label">商品數量</div>
+    </div>
+    <div class="ds-card">
+        <div class="ds-card-num green" id="ds-payment">現金</div>
+        <div class="ds-card-label">付款方式</div>
+    </div>
+    <div class="ds-card">
+        <div class="ds-card-num" id="ds-source" style="font-size:16px;color:#6b7280;">路過</div>
+        <div class="ds-card-label">客源來源</div>
+    </div>
 </div>
+
+<!-- 雙欄主要內容 -->
+<div class="pos-two-col">
+
+    <!-- 左欄：購物車 -->
+    <div class="pos-col-left">
+        <div class="pos-card" style="flex:1;display:flex;flex-direction:column;">
+            <div class="card-title-row">
+                <div class="card-title">🛒 結帳清單</div>
+                <div class="flex gap-2">
+                    <button onclick="openProductModal()" style="font-size:12px;background:#6d7756;color:white;border:none;padding:7px 14px;border-radius:8px;cursor:pointer;font-weight:700;font-family:'Noto Sans TC',sans-serif;">＋ 加入商品</button>
+                    <button onclick="openHangListModal()" style="font-size:12px;color:#6d7756;background:#f0f3ec;border:1px solid #c6d0bc;padding:7px 12px;border-radius:8px;cursor:pointer;font-weight:600;font-family:'Noto Sans TC',sans-serif;">📌 掛單</button>
+                    <button onclick="clearCart()" style="font-size:11px;color:#9ca3af;background:none;border:1px solid #e5e7eb;padding:7px 10px;border-radius:8px;cursor:pointer;font-family:'Noto Sans TC',sans-serif;">清空</button>
+                </div>
+            </div>
+            <!-- 叫回掛單提示 -->
+            <div id="recallBanner" style="display:none;background:#fdf8f0;border:1px solid #c4a882;border-radius:12px;padding:8px 14px;margin-bottom:10px;align-items:center;justify-content:space-between;gap:8px;">
+                <span style="font-size:12px;color:#8a5a2a;font-weight:bold;">📌 已叫回：<strong id="recallBannerName"></strong></span>
+                <button onclick="putBackHang()" style="background:#c4a882;color:white;border:none;border-radius:8px;padding:5px 14px;font-size:12px;font-weight:bold;cursor:pointer;">掛回同名</button>
+            </div>
+            <div id="cartList" style="flex:1;"><p class="text-center text-gray-300 text-xs py-8">點「加入商品」開始選花材</p></div>
+        </div>
+    </div>
+
+    <!-- 右欄：控制面板 -->
+    <div class="pos-col-right">
+
+        <!-- 會員查詢 -->
+        <div class="pos-card">
+            <div class="card-title">👥 會員查詢</div>
+            <div class="flex gap-2 mb-2">
+                <input type="tel" id="memberSearch" placeholder="輸入手機號碼查詢會員" class="flex-1 border border-gray-200 rounded-xl px-4 py-3 text-sm outline-none focus:border-[#8e9775]" style="background:#f9fafb;">
+                <button onclick="searchMember()" class="bg-[#8e9775] text-white px-5 py-3 rounded-xl text-sm font-bold">查詢</button>
+            </div>
+            <div id="memberResult"></div>
+        </div>
+
+        <!-- 客源統計 -->
+        <div class="pos-card">
+            <div class="card-title">📣 客源統計</div>
+            <div class="flex flex-wrap gap-2">
+                <button onclick="setSource('walk')"   class="source-chip source-btn">路過</button>
+                <button onclick="setSource('ig')"     class="source-chip source-btn">IG/FB</button>
+                <button onclick="setSource('friend')" class="source-chip source-btn">朋友介紹</button>
+                <button onclick="setSource('market')" class="source-chip source-btn">市集常客</button>
+                <button onclick="setSource('staff')"  class="source-chip source-btn">員工</button>
+                <button onclick="setSource('google')" class="source-chip source-btn">Google</button>
+            </div>
+        </div>
+
+    </div>
+
+</div><!-- end pos-two-col -->
+
+<!-- 結帳底部 Bar -->
 <div class="checkout-bar">
     <div class="flex flex-col">
-        <div id="summaryText" class="text-[10px] text-gray-400 mb-1 tracking-tighter">載入中...</div>
-        <div id="totalDisplay" class="text-2xl font-bold text-[#DFC07A]">NT$ 0</div>
+        <div id="summaryText" style="font-size:11px;color:rgba(255,255,255,0.35);margin-bottom:3px;">載入中...</div>
+        <div id="totalDisplay" class="text-2xl font-bold" style="color:#DFC07A;letter-spacing:-0.5px;">NT$ 0</div>
     </div>
     <button onclick="openCheckoutModal()" id="checkoutBtn" class="bg-[#8e9775] px-8 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform">確認結帳</button>
 </div>
@@ -142,8 +353,7 @@
 
 <!-- STUDIO VIEW -->
 <div id="studioView" style="display:none;">
-<div class="p-4 space-y-3">
-    <button onclick="switchToPOS()" class="text-sm text-[#c4a882] flex items-center gap-1 mb-1">← 返回收銀</button>
+<div style="max-width:720px;display:flex;flex-direction:column;gap:12px;">
     <div class="s-card">
         <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">👤 客人資訊</div>
         <div class="grid grid-cols-2 gap-3 mb-3">
@@ -222,15 +432,15 @@
             <button onclick="toggleStudioTag(this,'status')" class="s-tag-btn" data-val="未付">⏳ 尚未付款</button>
         </div>
     </div>
-</div>
+</div><!-- end max-width wrapper -->
 <div class="studio-bar">
     <div class="flex flex-col">
-        <div class="text-[10px] text-[#a09080] mb-0.5">✦ Studio 接單</div>
-        <div id="s-total-display" class="text-2xl font-bold text-[#DFC07A]">NT$ 0</div>
+        <div style="font-size:11px;color:rgba(196,168,130,0.6);margin-bottom:3px;">✦ Studio 接單</div>
+        <div id="s-total-display" class="text-2xl font-bold" style="color:#DFC07A;letter-spacing:-0.5px;">NT$ 0</div>
     </div>
     <button onclick="submitStudioOrder()" id="s-submitBtn" class="px-8 py-4 rounded-2xl font-bold text-lg shadow-lg active:scale-95 transition-transform" style="background:#c4a882;color:white;">確認送出</button>
 </div>
-</div>
+</div><!-- end studioView -->
 
 <!-- 確認結帳 Modal -->
 <div class="modal-overlay" id="checkoutModal">
@@ -242,12 +452,19 @@
         <div id="checkoutItemList" class="overflow-y-auto px-5 py-3 flex-1 no-scrollbar"></div>
         <div class="px-5 py-3 border-t border-gray-100 space-y-1 text-sm">
             <div class="flex justify-between text-gray-400"><span>小計</span><span id="modalSubtotal">NT$ 0</span></div>
-            <div class="flex justify-between items-center text-gray-400">
+            <div class="flex justify-between items-center text-gray-400 mb-1">
                 <span>折扣</span>
-                <div class="flex items-center gap-2">
-                    <span id="discountDisplay" class="text-xs text-red-400">—</span>
-                    <button onclick="openDiscountModal()" class="text-[10px] border border-[#8e9775] text-[#8e9775] px-2 py-1 rounded-full">折扣</button>
-                </div>
+                <span id="discountDisplay" class="text-xs text-red-400">—</span>
+            </div>
+            <!-- 快速折扣 Chips -->
+            <div class="qd-row" id="quickDiscRow">
+                <button onclick="quickDiscount(90,this)"   class="qd-chip">9折</button>
+                <button onclick="quickDiscount(85,this)"   class="qd-chip">85折</button>
+                <button onclick="quickDiscount(80,this)"   class="qd-chip">8折</button>
+                <button onclick="quickDiscAmt(50,this)"    class="qd-chip">折$50</button>
+                <button onclick="quickDiscAmt(100,this)"   class="qd-chip">折$100</button>
+                <button onclick="openDiscountModal()"      class="qd-chip" title="自訂折扣">自訂…</button>
+                <button onclick="clearDiscount();resetQdChips()" class="qd-chip red">清除</button>
             </div>
             <!-- 點數兌換 -->
             <div id="pointsSection" class="hidden pt-1">
@@ -265,14 +482,14 @@
             <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-100"><span>合計</span><span id="modalTotal" class="text-[#8e9775]">NT$ 0</span></div>
         </div>
         <div class="px-5 pb-4">
-            <div class="text-xs text-gray-400 font-bold tracking-widest uppercase mb-2">支付方式</div>
-            <div class="grid grid-cols-4 gap-2 mb-4">
-                <button onclick="setPayment('現金')"    class="pay-btn btn-action text-sm py-3">現金</button>
-                <button onclick="setPayment('LINEPAY')" class="pay-btn btn-action text-xs py-3">LINE Pay</button>
-                <button onclick="setPayment('匯款')"    class="pay-btn btn-action text-sm py-3">匯款</button>
-                <button onclick="setPayment('刷卡')"    class="pay-btn btn-action text-sm py-3">刷卡</button>
+            <div class="text-xs text-gray-400 font-bold tracking-widest uppercase mb-3">💳 支付方式</div>
+            <div class="pay-card-grid mb-2">
+                <button onclick="setPayment('現金')"    class="pay-btn pay-card"><span class="pay-label">現金</span></button>
+                <button onclick="setPayment('LINEPAY')" class="pay-btn pay-card"><span class="pay-label">LINE Pay</span></button>
+                <button onclick="setPayment('匯款')"    class="pay-btn pay-card"><span class="pay-label">匯款</span></button>
+                <button onclick="setPayment('刷卡')"    class="pay-btn pay-card"><span class="pay-label">刷卡</span></button>
             </div>
-            <button onclick="confirmCheckout()" id="confirmBtn" class="w-full bg-[#2e2926] text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-transform">確認收款</button>
+            <button onclick="confirmCheckout()" id="confirmBtn" class="w-full text-white py-4 rounded-2xl font-bold text-lg active:scale-95 transition-transform" style="margin-top:8px;background:#7A6550;">✓ 確認收款</button>
         </div>
     </div>
 </div>
@@ -457,7 +674,7 @@
 
 <!-- 後台 Modal -->
 <!-- ══ 據點選擇 Popup ══ -->
-<div id="storePickerModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-[300] flex items-center justify-center p-6">
+<div id="storePickerModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-6" style="background:rgba(61,46,30,0.5);backdrop-filter:blur(6px);">
     <div class="bg-white rounded-3xl w-full max-w-sm shadow-2xl overflow-hidden">
         <div class="px-6 pt-6 pb-4 text-center border-b border-gray-100">
             <div class="text-2xl mb-1">🌸</div>
@@ -465,17 +682,26 @@
             <p class="text-xs text-gray-400 mt-1">每次開啟頁面需重新選擇</p>
         </div>
         <div class="p-5 space-y-3">
-            <button onclick="pickStore('高雄FOCUS 13')"
-                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
-                📍 高雄 FOCUS 13
+            <button onclick="pickStore('高雄FOCUS 13')" class="store-card">
+                <div class="store-card-icon">🏪</div>
+                <div>
+                    <div class="store-card-name">高雄 FOCUS 13</div>
+                    <div class="store-card-sub">高雄旗艦店</div>
+                </div>
             </button>
-            <button onclick="pickStore('台南FOCUS')"
-                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
-                📍 台南 FOCUS
+            <button onclick="pickStore('台南FOCUS')" class="store-card">
+                <div class="store-card-icon">🌿</div>
+                <div>
+                    <div class="store-card-name">台南 FOCUS</div>
+                    <div class="store-card-sub">台南旗艦店</div>
+                </div>
             </button>
-            <button onclick="pickStore('誠品生活台南')"
-                class="w-full py-4 rounded-2xl font-bold text-base border-2 border-[#8e9775] text-[#6d7756] bg-[#f1f3eb] active:bg-[#8e9775] active:text-white transition-all">
-                📍 誠品生活台南
+            <button onclick="pickStore('誠品生活台南')" class="store-card">
+                <div class="store-card-icon">📚</div>
+                <div>
+                    <div class="store-card-name">誠品生活台南</div>
+                    <div class="store-card-sub">誠品合作店面</div>
+                </div>
             </button>
         </div>
     </div>
@@ -502,6 +728,8 @@
         </div>
     </div>
 </div>
+
+</div><!-- end .main-area -->
 
 <script>
 // ══ 共用變數 ══
@@ -582,7 +810,8 @@ function setGasStatus(state) {
 // ── 據點選擇 ──
 function pickStore(store) {
     document.getElementById('storePickerModal').classList.add('hidden');
-    document.getElementById('currentStoreDisplay').innerText = store;
+    const el = document.getElementById('currentStoreDisplay');
+    if (el) el.innerText = store;
     setStore(store);
 }
 function reopenStorePicker() {
@@ -595,6 +824,13 @@ window.onload = async () => {
     setSource('walk');
     document.getElementById('reportDate').valueAsDate = new Date();
     document.getElementById('s-pickup-date').valueAsDate = new Date();
+    // 顯示今日日期
+    const dateEl = document.getElementById('headerDate');
+    if (dateEl) {
+        const now = new Date();
+        const weekDays = ['日','一','二','三','四','五','六'];
+        dateEl.innerText = `${now.getFullYear()}/${String(now.getMonth()+1).padStart(2,'0')}/${String(now.getDate()).padStart(2,'0')} 週${weekDays[now.getDay()]}`;
+    }
     if (!API_URL) { openApiSettings(); return; }
     // 先連線，成功後再顯示據點選擇 popup
     await fetchProducts();
@@ -624,6 +860,7 @@ function switchToStudio() {
     document.getElementById('studioView').style.display = 'block';
     document.getElementById('pageTitle').innerText = '✦ Studio 接單';
     document.querySelector('.checkout-bar').style.display = 'none';
+    setActiveNav('nav-studio');
 }
 function switchToPOS() {
     currentView = 'pos';
@@ -631,6 +868,7 @@ function switchToPOS() {
     document.getElementById('posView').style.display    = 'block';
     document.getElementById('pageTitle').innerText = '🌸 拾逅花事 POS';
     document.querySelector('.checkout-bar').style.display = 'flex';
+    setActiveNav('nav-pos');
 }
 
 // ══ 門市/付款/來源 ══
@@ -658,6 +896,17 @@ function updateSummary() {
     const srcLabel = SOURCE_LABEL[selectedSource] || selectedSource;
     const member   = currentMember ? ` | 👤 ${currentMember.name}` : '';
     document.getElementById('summaryText').innerText = `${currentStore} | ${selectedPayment} | ${srcLabel}${member}`;
+    // ── 更新頂部摘要卡片 ──
+    const totalItems = cart.reduce((s, i) => s + i.qty, 0);
+    const subtotal   = cart.reduce((s, i) => s + i.price * i.qty, 0);
+    const dsTotal = document.getElementById('ds-total');
+    const dsItems = document.getElementById('ds-items');
+    const dsPayment = document.getElementById('ds-payment');
+    const dsSource  = document.getElementById('ds-source');
+    if (dsTotal)   dsTotal.innerText   = `NT$ ${subtotal.toLocaleString()}`;
+    if (dsItems)   dsItems.innerText   = `${totalItems} 件`;
+    if (dsPayment) dsPayment.innerText = selectedPayment;
+    if (dsSource)  dsSource.innerText  = srcLabel;
 }
 
 // ══ 產品 ══
@@ -1623,6 +1872,30 @@ async function confirmDailyClose() {
 }
 
 function closeDailyModal() { document.getElementById('dailyModal').classList.remove('show'); }
+
+// ══ 快速折扣（結帳 Modal Chips）══
+function resetQdChips() {
+    document.querySelectorAll('.qd-chip').forEach(c => c.classList.remove('active'));
+}
+function quickDiscount(rate, btn) {
+    discountRate = rate; discountFixed = 0;
+    resetQdChips(); if (btn) btn.classList.add('active');
+    updateCheckoutBar();
+    document.getElementById('discountDisplay').innerText = `${rate}折`;
+}
+function quickDiscAmt(amt, btn) {
+    discountFixed = amt; discountRate = 0;
+    resetQdChips(); if (btn) btn.classList.add('active');
+    updateCheckoutBar();
+    document.getElementById('discountDisplay').innerText = `折 NT$${amt}`;
+}
+
+// ══ 底部導航高亮 ══
+function setActiveNav(id) {
+    document.querySelectorAll('.bottom-nav button, .bottom-nav a').forEach(el => el.classList.remove('active'));
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+}
 
 // ══ 設定 ══
 function openApiSettings() { document.getElementById('apiUrlInput').value = API_URL; document.getElementById('apiModal').classList.add('show'); }
