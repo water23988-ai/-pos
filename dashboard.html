@@ -124,6 +124,30 @@
         .loading-row { text-align: center; padding: 40px; color: #A89278; font-size: 13px; }
         .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid #DDD0BC; border-top-color: #8e9775; border-radius: 50%; animation: spin 0.7s linear infinite; margin-right: 8px; vertical-align: middle; }
         @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* 各點位報廢成本 */
+        .waste-section { margin-top: 28px; margin-bottom: 4px; }
+        .waste-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 14px; margin-top: 10px; }
+        .waste-card { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 16px 18px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
+        .waste-card.highlight { border-color: rgba(196,146,138,0.45); background: rgba(253,248,240,1); }
+        .waste-card-name { font-size: 12px; font-weight: 700; color: #7A6550; margin-bottom: 8px; }
+        .waste-card-cost { font-size: 20px; font-weight: 800; color: #C4928A; }
+        .waste-card-sub { font-size: 11px; color: #A89278; margin-top: 4px; }
+        .waste-card-bar { height: 4px; background: #EDE5D8; border-radius: 2px; margin-top: 10px; overflow: hidden; }
+        .waste-card-bar-fill { height: 100%; background: rgba(196,146,138,0.55); border-radius: 2px; transition: width 0.6s ease; }
+
+        /* 花材銷售排行 */
+        .rank-section { margin-top: 28px; }
+        .rank-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .rank-no { font-size: 13px; font-weight: 800; color: #A89278; text-align: center; }
+        .rank-no.top { color: #8e9775; }
+        .rank-bar-cell { width: 80px; }
+        .rank-bar { height: 6px; background: #EDE5D8; border-radius: 3px; overflow: hidden; }
+        .rank-bar-fill { height: 100%; background: #8e9775; border-radius: 3px; transition: width 0.5s ease; }
+        .waste-rate-tag { font-size: 11px; font-weight: 700; border-radius: 6px; padding: 2px 8px; display: inline-block; }
+        .waste-rate-tag.low  { background: rgba(142,151,117,0.15); color: #4d6145; }
+        .waste-rate-tag.mid  { background: rgba(196,168,122,0.2);  color: #7A5C20; }
+        .waste-rate-tag.high { background: rgba(196,146,138,0.2);  color: #9d4a42; }
     </style>
 </head>
 <body>
@@ -288,6 +312,56 @@
             <!-- 動態填入 -->
         </div>
 
+        <!-- 各點位報廢成本 -->
+        <div class="waste-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                <div class="card-title" style="margin-bottom:0;">🗑 各點位報廢成本</div>
+                <span id="wasteDate" style="font-size:11px;color:#A89278;"></span>
+            </div>
+            <div class="waste-grid" id="wasteGrid">
+                <p style="color:#A89278;font-size:13px;grid-column:1/-1;">請先查詢日期以載入報廢數據</p>
+            </div>
+        </div>
+
+        <!-- 花材銷售排行 -->
+        <div class="rank-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                <div>
+                    <div class="card-title" style="margin-bottom:2px;">🌸 花材銷售排行</div>
+                    <span style="font-size:11px;color:#A89278;" id="rankPeriodLabel">本月累計</span>
+                </div>
+                <div class="rank-filter-row" id="rankFilterRow">
+                    <span class="filter-label">點位</span>
+                    <button class="chip active" onclick="setRankFilter(this,'')">全部</button>
+                    <button class="chip" onclick="setRankFilter(this,'高雄FOCUS 13')">高雄</button>
+                    <button class="chip" onclick="setRankFilter(this,'台南FOCUS')">台南</button>
+                    <button class="chip" onclick="setRankFilter(this,'誠品生活台南')">誠品</button>
+                    <button class="chip" onclick="setRankFilter(this,'Studio')">Studio</button>
+                </div>
+            </div>
+            <div class="card" style="padding:0;overflow:hidden;">
+                <div class="table-wrap">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th style="width:44px;text-align:center;">排名</th>
+                                <th>花材 / 商品</th>
+                                <th>銷售量</th>
+                                <th>銷售額</th>
+                                <th>毛利率</th>
+                                <th style="width:90px;">佔比</th>
+                                <th>報廢量</th>
+                                <th>廢棄率</th>
+                            </tr>
+                        </thead>
+                        <tbody id="rankTableBody">
+                            <tr><td colspan="8" class="empty-table">請先查詢日期以載入排行</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -435,136 +509,4 @@ async function loadSummary() {
     }
 }
 
-// ══ 查詢報表（使用 getTransactionHistory 取得完整交易清單）══
-async function queryReport() {
-    const date = document.getElementById('queryDate').value;
-    if (!date) return showToast('請選擇日期');
-    if (!API_URL) { showToast('請先設定 API 網址'); openApiModal(); return; }
-
-    setGas('loading');
-    const tbody = document.getElementById('salesTableBody');
-    tbody.innerHTML = `<tr><td colspan="6" class="loading-row"><span class="spinner"></span>載入中...</td></tr>`;
-
-    try {
-        const store = currentFilter === '全部' ? '' : currentFilter;
-        const res   = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}&store=${encodeURIComponent(store)}`);
-        rawData     = await res.json();
-        if (!Array.isArray(rawData)) rawData = [];
-        setGas('ok');
-        renderTable();
-        renderStoreGrid();
-        showToast(`✅ 已載入 ${rawData.length} 筆`);
-    } catch(e) {
-        setGas('error');
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-table" style="color:#C4928A;">載入失敗，請確認 API 連線</td></tr>`;
-    }
-}
-
-function renderTable() {
-    const tbody = document.getElementById('salesTableBody');
-    let rows = rawData;
-    if (currentFilter !== '全部') {
-        rows = rawData.filter(r => {
-            const s = (r.store || '').toLowerCase();
-            return s.includes(currentFilter.toLowerCase());
-        });
-    }
-    document.getElementById('tableCount').innerText = rows.length + ' 筆';
-    if (!rows.length) {
-        tbody.innerHTML = `<tr><td colspan="6" class="empty-table">此條件查無資料</td></tr>`;
-        return;
-    }
-    tbody.innerHTML = rows.map(r => {
-        const time   = fmtTime(r.date || r.time || r.時間 || '');
-        const store  = r.store || '—';
-        const items  = Array.isArray(r.items) && r.items.length
-            ? r.items.map(i => (i.name||'') + (i.qty>1?'×'+i.qty:'')).join('、')
-            : (r.note || '—');
-        const amount = Number(r.total || 0);
-        const pay    = r.pay || r.payment || '—';
-        const src    = r.source || '—';
-        const voided = r.voided;
-        return `<tr style="${voided?'opacity:0.45;text-decoration:line-through;':''}">
-            <td style="color:#A89278;font-size:12px;">${time}</td>
-            <td><span class="td-store">${store}</span></td>
-            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${items}</td>
-            <td class="td-amount">NT$ ${amount.toLocaleString()}${voided?'<span style="font-size:10px;color:#C4928A;margin-left:4px;">退</span>':''}</td>
-            <td><span class="td-pay">${pay}</span></td>
-            <td style="font-size:12px;color:#7A6550;">${src}</td>
-        </tr>`;
-    }).join('');
-}
-
-function renderStoreGrid() {
-    const grid = document.getElementById('storeGrid');
-    const totals = {};
-    let maxSales = 0;
-
-    rawData.filter(r => !r.voided).forEach(r => {
-        const s = r.store || '其他';
-        if (!totals[s]) totals[s] = { sales: 0, profit: 0, count: 0 };
-        const rev = Number(r.total || 0);
-        const cst = Number(r.cost  || 0);
-        totals[s].sales  += rev;
-        totals[s].profit += (rev - cst);
-        totals[s].count++;
-        if (totals[s].sales > maxSales) maxSales = totals[s].sales;
-    });
-
-    if (!Object.keys(totals).length) {
-        grid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;">請先查詢日期以查看各點位業績</p>';
-        return;
-    }
-
-    grid.innerHTML = Object.entries(totals)
-        .sort((a, b) => b[1].sales - a[1].sales)
-        .map(([store, data]) => {
-            const pct = maxSales > 0 ? Math.round(data.sales / maxSales * 100) : 0;
-            const m   = data.sales > 0 ? Math.round(data.profit / data.sales * 100) : 0;
-            return `<div class="store-perf-card">
-                <div class="store-perf-name">${store}</div>
-                <div class="store-perf-sales">NT$ ${data.sales.toLocaleString()}</div>
-                <div class="store-perf-count">毛利 NT$ ${data.profit.toLocaleString()} · ${m}%　${data.count} 筆</div>
-                <div class="store-perf-bar">
-                    <div class="store-perf-bar-fill" style="width:${pct}%"></div>
-                </div>
-            </div>`;
-        }).join('');
-}
-
-// ══ Toast ══
-let _toastTimer;
-function showToast(msg, dur=2500) {
-    const el = document.getElementById('toast');
-    el.innerText = msg;
-    el.classList.add('show');
-    clearTimeout(_toastTimer);
-    _toastTimer = setTimeout(() => el.classList.remove('show'), dur);
-}
-
-// ══ 整體刷新 ══
-function refreshAll() {
-    loadSummary();
-    const date = document.getElementById('queryDate').value;
-    if (date) queryReport();
-}
-
-// ══ 初始化 ══
-function init() {
-    const today = getToday();
-    document.getElementById('queryDate').value = today;
-    document.getElementById('dateDisplay').innerText = today;
-
-    if (!API_URL) {
-        setGas('error');
-        document.getElementById('gasLabel').innerText = '未設定';
-        return;
-    }
-    setGas('loading');
-    Promise.all([loadSummary(), queryReport()]).then(() => setGas('ok'));
-}
-
-window.onload = init;
-</script>
-</body>
-</html>
+/
