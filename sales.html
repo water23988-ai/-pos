@@ -353,7 +353,8 @@ function saleItemHtml(r) {
     return `<div class="sale-item ${voided ? 'sale-voided' : ''}" onclick="openDetail('${jsonStr}')">
         <div class="sale-item-top">
             <div style="display:flex;align-items:center;gap:8px;">
-                <span class="sale-time">${escHtml(String(time))}</span>
+                <span class="sale-time">${escHtml(fmtTime(time))}</span>
+                <span style="font-size:10px;color:#A89278;">${escHtml(fmtDate(time))}</span>
                 <span class="sale-store-badge">${escHtml(store)}</span>
                 ${voided ? '<span class="sale-void-badge">已退款</span>' : ''}
             </div>
@@ -383,7 +384,7 @@ function openDetail(jsonStr) {
     const voided  = r.voided || r.isVoided || false;
     const items   = r.items || r.商品 || [];
 
-    document.getElementById('detailTitle').innerText = '交易明細 ' + (typeof time === 'string' ? time.slice(0,8) : '');
+    document.getElementById('detailTitle').innerText = '交易明細 ' + fmtDate(time);
 
     let itemsHtml = '';
     if (Array.isArray(items) && items.length) {
@@ -397,7 +398,7 @@ function openDetail(jsonStr) {
 
     document.getElementById('detailBody').innerHTML = `
         <div class="detail-row"><span class="detail-row-label">交易編號</span><span class="detail-row-val" style="font-size:11px;color:#A89278;">${escHtml(String(id))}</span></div>
-        <div class="detail-row"><span class="detail-row-label">時間</span><span class="detail-row-val">${escHtml(String(time))}</span></div>
+        <div class="detail-row"><span class="detail-row-label">時間</span><span class="detail-row-val">${escHtml(fmtFull(time))}</span></div>
         <div class="detail-row"><span class="detail-row-label">點位</span><span class="detail-row-val">${escHtml(store)}</span></div>
         <div class="detail-row"><span class="detail-row-label">付款方式</span><span class="detail-row-val">${escHtml(payment)}</span></div>
         <div class="detail-row"><span class="detail-row-label">客源</span><span class="detail-row-val">${escHtml(source)}</span></div>
@@ -453,6 +454,31 @@ async function confirmVoid() {
 }
 
 // ── 工具 ──
+// ── 日期時間格式化 ──
+function fmtTime(ts) {
+    if (!ts) return '—';
+    const s = String(ts);
+    // ISO "2026-04-21T14:30:00" → "14:30"
+    if (s.includes('T') && s.length >= 16) return s.slice(11, 16);
+    // "2026-04-21 14:30:00" → "14:30"
+    if (s.length >= 16 && s[10] === ' ') return s.slice(11, 16);
+    // Date-only "2026-04-21" (10 chars) — no time stored
+    if (s.length <= 10) return '—';
+    return s.slice(0, 5) || '—';
+}
+function fmtDate(ts) {
+    if (!ts) return '';
+    const s = String(ts);
+    return s.slice(0, 10); // "YYYY-MM-DD"
+}
+function fmtFull(ts) {
+    if (!ts) return '—';
+    const s = String(ts);
+    if (s.includes('T') && s.length >= 16) return s.slice(0, 10) + '  ' + s.slice(11, 16);
+    if (s.length >= 16) return s.slice(0, 16);
+    return s;
+}
+
 function escHtml(s) {
     if (typeof s !== 'string') s = String(s);
     return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');

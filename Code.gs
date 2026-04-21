@@ -120,6 +120,7 @@ function doGet(e) {
       case 'getMemberStats':        return jsonOut(getMemberStats());
       case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
+      case 'getMonthlyReport':      return jsonOut(getMonthlyReport(e.parameter.store, e.parameter.ym)); // [v2.5]
       case 'getFlowerLibrary':      return jsonOut(getFlowerLibrary());
       case 'getPriceHistory':         return jsonOut(getPriceHistory(e.parameter.name));
       case 'getProcurementBatches':   return jsonOut(getProcurementBatches());
@@ -218,21 +219,20 @@ function newId(prefix) {
 function getProducts() {
   const sh   = getSheet(SH.PRODUCTS);
   const rows = sheetToObjects(sh);
-  // [v2.3] 軟刪除：只回傳 status 為 'active' 或空值（舊資料）的商品
-  return rows
-    .filter(r => (r.status || 'active') !== 'inactive')
-    .map(r => ({
-      id      : Number(r.id),
-      name    : r.name,
-      category: r.category || '其他加購',
-      price   : Number(r.price)   || 0,
-      cost    : Number(r.cost)    || 0,
-      stockKH : Number(r.stockKH) || 0,
-      stockTN : Number(r.stockTN) || 0,
-      stockES : Number(r.stockES) || 0,
-      // [v2.4] visible：空值舊資料視為 true（向下相容）
-      visible : r.visible === false || r.visible === 'false' ? false : true,
-    }));
+  // [v2.5] 回傳所有商品（含 inactive），讓商品管理頁面顯示完整清單
+  // 收銀台（index.html）需自行根據 status==='active' 篩選
+  return rows.map(r => ({
+    id      : Number(r.id),
+    name    : r.name,
+    category: r.category || '其他加購',
+    price   : Number(r.price)   || 0,
+    cost    : Number(r.cost)    || 0,
+    stockKH : Number(r.stockKH) || 0,
+    stockTN : Number(r.stockTN) || 0,
+    stockES : Number(r.stockES) || 0,
+    status  : r.status || 'active',   // active | hidden | inactive
+    visible : r.visible === false || r.visible === 'false' ? false : true,
+  }));
 }
 
 function addProduct(data) {
@@ -273,6 +273,16 @@ function updateProduct(data) {
       if (data.stockKH  !== undefined) set('stockKH',  Number(data.stockKH));
       if (data.stockTN  !== undefined) set('stockTN',  Number(data.stockTN));
       if (data.stockES  !== undefined) set('stockES',  Number(data.stockES));
+      // status 欄位：active | hidden | inactive
+      if (data.status !== undefined) {
+        let statusCol = headers.indexOf('status');
+        if (statusCol === -1) {
+          statusCol = headers.length;
+          sh.getRange(1, statusCol + 1).setValue('status');
+          headers.push('status'); // keep local headers in sync
+        }
+        sh.getRange(row, statusCol + 1).setValue(data.status);
+      }
       // [v2.4] visible 欄位：動態新增欄若不存在
       if (data.visible !== undefined) {
         let visCol = headers.indexOf('visible');
@@ -484,9 +494,17 @@ function addTransaction(data) {
     if (ids.includes(txId)) return { success: true, duplicate: true };
   }
 
+  // 確保 date 一定包含時間；若 POS 只傳日期字串則補上伺服器時間
+  const txDate = (() => {
+    const d = String(data.date || '');
+    if (d.length > 10) return d;          // 已含時間
+    if (d.length === 10) return d + 'T' + Utilities.formatDate(new Date(), 'Asia/Taipei', 'HH:mm:ss');
+    return taipeiNow();                   // 完全沒傳則用伺服器現在時間
+  })();
+
   sh.appendRow([
     txId,
-    data.date         || taipeiNow(),
+    txDate,
     data.store        || '',
     data.memberId     || '',
     data.memberName   || '',
@@ -619,12 +637,35 @@ function getDailyReport(store, date) {
     return !isNaN(d) && filt(r) && notVoid(r) && d >= lwFrom && d <= lwTo;
   });
 
-  const compute = txs => ({
-    revenue  : txs.reduce((s,r) => s + (Number(r.total)||0), 0),
-    cost     : txs.reduce((s,r) => s + (Number(r.cost)||0),  0),
-    profit   : txs.reduce((s,r) => s + (Number(r.total)||0) - (Number(r.cost)||0), 0),
-    customers: txs.length,
+  // Same date last month [v2.5]
+  const lmFrom = new Date(from); lmFrom.setMonth(lmFrom.getMonth() - 1);
+  const lmTo   = new Date(to);   lmTo.setMonth(lmTo.getMonth() - 1);
+  const lmTxs  = rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= lmFrom && d <= lmTo;
   });
+
+  // Same date last year [v2.5]
+  const lyFrom = new Date(from); lyFrom.setFullYear(lyFrom.getFullYear() - 1);
+  const lyTo   = new Date(to);   lyTo.setFullYear(lyTo.getFullYear() - 1);
+  const lyTxs  = rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= lyFrom && d <= lyTo;
+  });
+
+  const compute = txs => {
+    const rev = txs.reduce((s,r) => s + (Number(r.total)||0), 0);
+    const cst = txs.reduce((s,r) => s + (Number(r.cost)||0),  0);
+    const pft = rev - cst;
+    return {
+      revenue  : rev,
+      cost     : cst,
+      profit   : pft,
+      margin   : rev > 0 ? Math.round(pft / rev * 100) : 0,
+      customers: txs.length,
+      avg      : txs.length > 0 ? Math.round(rev / txs.length) : 0,
+    };
+  };
 
   const sourceBreakdown = {};
   let newCount = 0, memberCount = 0;
@@ -643,7 +684,41 @@ function getDailyReport(store, date) {
     .filter(r => r.type === 'waste' && !isNaN(new Date(r.time)) && new Date(r.time) >= from && new Date(r.time) <= to)
     .reduce((s,r) => s + (prodMap[Number(r.productId)]||0) * Math.abs(Number(r.diff)||0), 0);
 
-  return { ...compute(todayTxs), lastWeek: compute(lwTxs), sourceBreakdown, newCount, memberCount, totalWasteCost };
+  return {
+    ...compute(todayTxs),
+    lastWeek  : compute(lwTxs),
+    lastMonth : compute(lmTxs),   // [v2.5]
+    lastYear  : compute(lyTxs),   // [v2.5]
+    sourceBreakdown, newCount, memberCount, totalWasteCost,
+  };
+}
+
+// [v2.5] 月度摘要：本月 vs 去年同月
+function getMonthlyReport(store, ym) {
+  const base  = ym || Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM');
+  const year  = parseInt(base.slice(0, 4), 10);
+  const month = parseInt(base.slice(5, 7), 10);
+  const from  = new Date(year, month - 1, 1, 0, 0, 0);
+  const to    = new Date(year, month, 0, 23, 59, 59);    // last day of month
+  const lyFrom = new Date(year - 1, month - 1, 1, 0, 0, 0);
+  const lyTo   = new Date(year - 1, month, 0, 23, 59, 59);
+
+  const sh     = getSheet(SH.TRANSACTIONS);
+  const rows   = sheetToObjects(sh);
+  const filt   = storeFilter_(store);
+  const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const compute = txs => {
+    const rev = txs.reduce((s,r) => s + (Number(r.total)||0), 0);
+    const cst = txs.reduce((s,r) => s + (Number(r.cost)||0), 0);
+    const pft = rev - cst;
+    return { revenue: rev, cost: cst, profit: pft, margin: rev > 0 ? Math.round(pft/rev*100) : 0, customers: txs.length };
+  };
+
+  const thisTxs = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= from  && d <= to; });
+  const lyTxs   = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= lyFrom && d <= lyTo; });
+
+  return { ...compute(thisTxs), lastYear: compute(lyTxs) };
 }
 
 function getPayBreakdown(store, date) {

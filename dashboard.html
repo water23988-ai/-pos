@@ -68,13 +68,27 @@
         .api-modal-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; margin: 16px; border: 1px solid #DDD0BC; }
 
         /* 摘要卡片 */
-        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 20px; }
+        .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 16px; }
         .summary-card { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 18px 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
         .summary-card-label { font-size: 11px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
         .summary-card-value { font-size: 26px; font-weight: 800; color: #3D2E1E; line-height: 1.1; }
         .summary-card-sub { font-size: 11px; color: #A89278; margin-top: 6px; }
         .summary-card.accent { border-color: #8e9775; background: #f0f3ec; }
         .summary-card.accent .summary-card-value { color: #4d6145; }
+        .summary-card.profit-card { border-color: #C4A87A; background: #fdf8f0; }
+        .summary-card.profit-card .summary-card-value { color: #7A5C20; }
+
+        /* 同期比較列 */
+        .compare-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 20px; }
+        .compare-card { background: #FAF7F2; border-radius: 14px; border: 1px solid #DDD0BC; padding: 14px 18px; box-shadow: 0 1px 4px rgba(122,101,80,0.04); }
+        .compare-card-label { font-size: 10px; font-weight: 700; color: #A89278; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 8px; }
+        .compare-row { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+        .compare-row-label { font-size: 11px; color: #A89278; }
+        .compare-row-val { font-size: 13px; font-weight: 700; color: #3D2E1E; }
+        .compare-chip { font-size: 10px; font-weight: 700; border-radius: 20px; padding: 2px 8px; display: inline-block; }
+        .compare-chip.up { background: rgba(142,151,117,0.15); color: #4d6145; }
+        .compare-chip.down { background: rgba(196,146,138,0.15); color: #9d4a42; }
+        .compare-chip.flat { background: #F0E9DF; color: #A89278; }
 
         /* 查詢列 */
         .query-bar { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 16px 20px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
@@ -178,20 +192,45 @@
                 <div class="summary-card-value" id="statTodaySales">—</div>
                 <div class="summary-card-sub" id="statTodaySalesSub">載入中</div>
             </div>
+            <div class="summary-card profit-card">
+                <div class="summary-card-label">今日毛利</div>
+                <div class="summary-card-value" id="statTodayProfit">—</div>
+                <div class="summary-card-sub" id="statTodayMargin">毛利率 —%</div>
+            </div>
             <div class="summary-card">
-                <div class="summary-card-label">今日筆數</div>
+                <div class="summary-card-label">今日筆數 / 均單</div>
                 <div class="summary-card-value" id="statTodayCount">—</div>
-                <div class="summary-card-sub" id="statTodayCountSub">載入中</div>
+                <div class="summary-card-sub" id="statAvgOrder">均單 —</div>
             </div>
             <div class="summary-card">
-                <div class="summary-card-label">本月業績</div>
+                <div class="summary-card-label">本月業績 / 毛利</div>
                 <div class="summary-card-value" id="statMonthSales">—</div>
-                <div class="summary-card-sub" id="statMonthSalesSub">載入中</div>
+                <div class="summary-card-sub" id="statMonthProfit">本月毛利 —</div>
             </div>
-            <div class="summary-card">
-                <div class="summary-card-label">平均客單</div>
-                <div class="summary-card-value" id="statAvgOrder">—</div>
-                <div class="summary-card-sub" id="statAvgOrderSub">載入中</div>
+        </div>
+
+        <!-- 同期比較 -->
+        <div class="compare-grid">
+            <div class="compare-card">
+                <div class="compare-card-label">📅 上週同日比較</div>
+                <div class="compare-row"><span class="compare-row-label">上週同日業績</span><span class="compare-row-val" id="lwRevenue">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">業績變動</span><span id="lwRevenueChip">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">上週同日毛利</span><span class="compare-row-val" id="lwProfit">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">毛利變動</span><span id="lwProfitChip">—</span></div>
+            </div>
+            <div class="compare-card">
+                <div class="compare-card-label">🗓 上月同日比較</div>
+                <div class="compare-row"><span class="compare-row-label">上月同日業績</span><span class="compare-row-val" id="lmRevenue">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">業績變動</span><span id="lmRevenueChip">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">上月同日毛利</span><span class="compare-row-val" id="lmProfit">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">毛利變動</span><span id="lmProfitChip">—</span></div>
+            </div>
+            <div class="compare-card">
+                <div class="compare-card-label">📆 去年同日比較</div>
+                <div class="compare-row"><span class="compare-row-label">去年同日業績</span><span class="compare-row-val" id="lyRevenue">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">業績變動</span><span id="lyRevenueChip">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">去年同日毛利</span><span class="compare-row-val" id="lyProfit">—</span></div>
+                <div class="compare-row"><span class="compare-row-label">毛利變動</span><span id="lyProfitChip">—</span></div>
             </div>
         </div>
 
@@ -256,13 +295,6 @@
 let API_URL = localStorage.getItem('moment_flor_api') || '';
 let currentFilter = '全部';
 let rawData = [];
-const STORES = [
-    { key: '高雄FOCUS 13', label: '高雄 FOCUS', filter: '高雄' },
-    { key: '台南FOCUS',    label: '台南 FOCUS', filter: '台南' },
-    { key: '誠品生活台南', label: '誠品台南',   filter: '誠品' },
-    { key: 'Studio',       label: 'Studio',     filter: 'Studio' },
-    { key: '小花站',       label: '小花站',     filter: '小花站' },
-];
 
 // ══ API Modal ══
 function openApiModal() {
@@ -275,7 +307,6 @@ function closeApiModal() {
 document.getElementById('apiModal').addEventListener('click', function(e) {
     if (e.target === this) closeApiModal();
 });
-
 function saveApi() {
     const v = document.getElementById('apiInput').value.trim();
     if (!v) return;
@@ -304,19 +335,16 @@ function getYesterday() {
     d.setDate(d.getDate() - 1);
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(d);
 }
-function queryToday() {
-    document.getElementById('queryDate').value = getToday();
-    queryReport();
-}
-function queryYesterday() {
-    document.getElementById('queryDate').value = getYesterday();
-    queryReport();
-}
-function formatTime(ts) {
+function queryToday()     { document.getElementById('queryDate').value = getToday();     queryReport(); }
+function queryYesterday() { document.getElementById('queryDate').value = getYesterday(); queryReport(); }
+
+function fmtTime(ts) {
     if (!ts) return '—';
     const s = String(ts);
-    if (s.length >= 16) return s.slice(11, 16);
-    return s;
+    if (s.includes('T') && s.length >= 16) return s.slice(11, 16);
+    if (s.length >= 16 && s[10] === ' ')   return s.slice(11, 16);
+    if (s.length <= 10) return '—';
+    return s.slice(0, 5) || '—';
 }
 
 // ══ 點位篩選 ══
@@ -328,44 +356,80 @@ function setStoreFilter(btn, val) {
     renderStoreGrid();
 }
 
+// ══ 同期比較 chip ══
+function chip(now, prev) {
+    if (prev === 0) return `<span class="compare-chip flat">—</span>`;
+    const pct = Math.round((now - prev) / prev * 100);
+    const sign = pct >= 0 ? '+' : '';
+    const cls  = pct > 0 ? 'up' : (pct < 0 ? 'down' : 'flat');
+    return `<span class="compare-chip ${cls}">${sign}${pct}%</span>`;
+}
+
 // ══ 摘要卡片 ══
 async function loadSummary() {
     if (!API_URL) return;
     const today = getToday();
-    const ym = today.slice(0, 7); // YYYY-MM
+    const ym    = today.slice(0, 7);
     try {
         const [todayRes, monthRes] = await Promise.all([
             fetch(`${API_URL}?action=getDailyReport&date=${today}`),
-            fetch(`${API_URL}?action=getDailyReport&date=${ym}&mode=month`)
+            fetch(`${API_URL}?action=getMonthlyReport&ym=${ym}`)
         ]);
-        const todayData  = await todayRes.json();
-        const monthData  = await monthRes.json();
+        const td = await todayRes.json();
+        const mo = await monthRes.json();
 
-        const todaySales = todayData.totalSales || 0;
-        const todayCount = todayData.totalCount || 0;
-        const monthSales = monthData.totalSales || 0;
-        const avg = todayCount > 0 ? Math.round(todaySales / todayCount) : 0;
+        // ── 今日卡片 ──
+        const rev    = td.revenue   || 0;
+        const profit = td.profit    || 0;
+        const margin = td.margin    || 0;
+        const count  = td.customers || 0;
+        const avg    = td.avg       || 0;
 
-        document.getElementById('statTodaySales').innerText  = 'NT$ ' + todaySales.toLocaleString();
-        document.getElementById('statTodayCount').innerText  = todayCount + ' 筆';
-        document.getElementById('statMonthSales').innerText  = 'NT$ ' + monthSales.toLocaleString();
-        document.getElementById('statAvgOrder').innerText    = avg > 0 ? 'NT$ ' + avg.toLocaleString() : '—';
+        document.getElementById('statTodaySales').innerText  = 'NT$ ' + rev.toLocaleString();
+        document.getElementById('statTodaySalesSub').innerText = today + ' · 業績';
+        document.getElementById('statTodayProfit').innerText = 'NT$ ' + profit.toLocaleString();
+        document.getElementById('statTodayMargin').innerText = `毛利率 ${margin}%`;
+        document.getElementById('statTodayCount').innerText  = count + ' 筆';
+        document.getElementById('statAvgOrder').innerText    = `均單 NT$ ${avg.toLocaleString()}`;
 
-        document.getElementById('statTodaySalesSub').innerText  = today;
-        document.getElementById('statTodayCountSub').innerText  = '今日交易';
-        document.getElementById('statMonthSalesSub').innerText  = ym + ' 累計';
-        document.getElementById('statAvgOrderSub').innerText    = '今日平均';
+        // ── 本月卡片 ──
+        const mRev    = mo.revenue || 0;
+        const mProfit = mo.profit  || 0;
+        document.getElementById('statMonthSales').innerText  = 'NT$ ' + mRev.toLocaleString();
+        document.getElementById('statMonthProfit').innerText = `本月毛利 NT$ ${mProfit.toLocaleString()}`;
+
+        // ── 同期比較 ──
+        const lw = td.lastWeek  || {};
+        const lm = td.lastMonth || {};
+        const ly = td.lastYear  || {};
+
+        const nt = v => 'NT$ ' + (v||0).toLocaleString();
+
+        // 上週
+        document.getElementById('lwRevenue').innerText     = nt(lw.revenue);
+        document.getElementById('lwRevenueChip').innerHTML = chip(rev, lw.revenue||0);
+        document.getElementById('lwProfit').innerText      = nt(lw.profit);
+        document.getElementById('lwProfitChip').innerHTML  = chip(profit, lw.profit||0);
+
+        // 上月
+        document.getElementById('lmRevenue').innerText     = nt(lm.revenue);
+        document.getElementById('lmRevenueChip').innerHTML = chip(rev, lm.revenue||0);
+        document.getElementById('lmProfit').innerText      = nt(lm.profit);
+        document.getElementById('lmProfitChip').innerHTML  = chip(profit, lm.profit||0);
+
+        // 去年
+        document.getElementById('lyRevenue').innerText     = nt(ly.revenue);
+        document.getElementById('lyRevenueChip').innerHTML = chip(rev, ly.revenue||0);
+        document.getElementById('lyProfit').innerText      = nt(ly.profit);
+        document.getElementById('lyProfitChip').innerHTML  = chip(profit, ly.profit||0);
+
     } catch(e) {
-        ['statTodaySales','statTodayCount','statMonthSales','statAvgOrder'].forEach(id => {
-            document.getElementById(id).innerText = '—';
-        });
-        ['statTodaySalesSub','statTodayCountSub','statMonthSalesSub','statAvgOrderSub'].forEach(id => {
-            document.getElementById(id).innerText = '無法載入';
-        });
+        ['statTodaySales','statTodayProfit','statTodayCount','statMonthSales'].forEach(id =>
+            document.getElementById(id).innerText = '—');
     }
 }
 
-// ══ 查詢報表 ══
+// ══ 查詢報表（使用 getTransactionHistory 取得完整交易清單）══
 async function queryReport() {
     const date = document.getElementById('queryDate').value;
     if (!date) return showToast('請選擇日期');
@@ -377,9 +441,9 @@ async function queryReport() {
 
     try {
         const store = currentFilter === '全部' ? '' : currentFilter;
-        const res  = await fetch(`${API_URL}?action=getDailyReport&date=${date}&store=${encodeURIComponent(store)}`);
-        rawData    = await res.json();
-        if (!Array.isArray(rawData)) rawData = rawData.records || rawData.data || [];
+        const res   = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}&store=${encodeURIComponent(store)}`);
+        rawData     = await res.json();
+        if (!Array.isArray(rawData)) rawData = [];
         setGas('ok');
         renderTable();
         renderStoreGrid();
@@ -395,7 +459,7 @@ function renderTable() {
     let rows = rawData;
     if (currentFilter !== '全部') {
         rows = rawData.filter(r => {
-            const s = (r.store || r.點位 || '').toLowerCase();
+            const s = (r.store || '').toLowerCase();
             return s.includes(currentFilter.toLowerCase());
         });
     }
@@ -405,17 +469,20 @@ function renderTable() {
         return;
     }
     tbody.innerHTML = rows.map(r => {
-        const time   = formatTime(r.time || r.時間 || r.timestamp || '');
-        const store  = r.store || r.點位 || '—';
-        const item   = r.item || r.product || r.商品 || '—';
-        const amount = Number(r.amount || r.金額 || r.total || 0);
-        const pay    = r.payment || r.付款方式 || '—';
-        const src    = r.source || r.客源 || '—';
-        return `<tr>
+        const time   = fmtTime(r.date || r.time || r.時間 || '');
+        const store  = r.store || '—';
+        const items  = Array.isArray(r.items) && r.items.length
+            ? r.items.map(i => (i.name||'') + (i.qty>1?'×'+i.qty:'')).join('、')
+            : (r.note || '—');
+        const amount = Number(r.total || 0);
+        const pay    = r.pay || r.payment || '—';
+        const src    = r.source || '—';
+        const voided = r.voided;
+        return `<tr style="${voided?'opacity:0.45;text-decoration:line-through;':''}">
             <td style="color:#A89278;font-size:12px;">${time}</td>
             <td><span class="td-store">${store}</span></td>
-            <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${item}</td>
-            <td class="td-amount">NT$ ${amount.toLocaleString()}</td>
+            <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:12px;">${items}</td>
+            <td class="td-amount">NT$ ${amount.toLocaleString()}${voided?'<span style="font-size:10px;color:#C4928A;margin-left:4px;">退</span>':''}</td>
             <td><span class="td-pay">${pay}</span></td>
             <td style="font-size:12px;color:#7A6550;">${src}</td>
         </tr>`;
@@ -427,10 +494,13 @@ function renderStoreGrid() {
     const totals = {};
     let maxSales = 0;
 
-    rawData.forEach(r => {
-        const s = r.store || r.點位 || '其他';
-        if (!totals[s]) totals[s] = { sales: 0, count: 0 };
-        totals[s].sales += Number(r.amount || r.金額 || r.total || 0);
+    rawData.filter(r => !r.voided).forEach(r => {
+        const s = r.store || '其他';
+        if (!totals[s]) totals[s] = { sales: 0, profit: 0, count: 0 };
+        const rev = Number(r.total || 0);
+        const cst = Number(r.cost  || 0);
+        totals[s].sales  += rev;
+        totals[s].profit += (rev - cst);
         totals[s].count++;
         if (totals[s].sales > maxSales) maxSales = totals[s].sales;
     });
@@ -444,10 +514,11 @@ function renderStoreGrid() {
         .sort((a, b) => b[1].sales - a[1].sales)
         .map(([store, data]) => {
             const pct = maxSales > 0 ? Math.round(data.sales / maxSales * 100) : 0;
+            const m   = data.sales > 0 ? Math.round(data.profit / data.sales * 100) : 0;
             return `<div class="store-perf-card">
                 <div class="store-perf-name">${store}</div>
                 <div class="store-perf-sales">NT$ ${data.sales.toLocaleString()}</div>
-                <div class="store-perf-count">${data.count} 筆交易</div>
+                <div class="store-perf-count">毛利 NT$ ${data.profit.toLocaleString()} · ${m}%　${data.count} 筆</div>
                 <div class="store-perf-bar">
                     <div class="store-perf-bar-fill" style="width:${pct}%"></div>
                 </div>
@@ -484,8 +555,7 @@ function init() {
         return;
     }
     setGas('loading');
-    loadSummary().then(() => setGas('ok'));
-    queryReport();
+    Promise.all([loadSummary(), queryReport()]).then(() => setGas('ok'));
 }
 
 window.onload = init;
