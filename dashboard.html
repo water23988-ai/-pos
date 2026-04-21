@@ -338,13 +338,19 @@ function getYesterday() {
 function queryToday()     { document.getElementById('queryDate').value = getToday();     queryReport(); }
 function queryYesterday() { document.getElementById('queryDate').value = getYesterday(); queryReport(); }
 
+function _parseTaipei(ts) {
+    const s = String(ts || '');
+    if (!s || s.length <= 10) return null;
+    const hasOffset = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s);
+    const d = new Date(hasOffset ? s : s + '+08:00');
+    return isNaN(d.getTime()) ? null : d;
+}
 function fmtTime(ts) {
-    if (!ts) return '—';
-    const s = String(ts);
-    if (s.includes('T') && s.length >= 16) return s.slice(11, 16);
-    if (s.length >= 16 && s[10] === ' ')   return s.slice(11, 16);
-    if (s.length <= 10) return '—';
-    return s.slice(0, 5) || '—';
+    const d = _parseTaipei(ts);
+    if (!d) return '—';
+    return new Intl.DateTimeFormat('zh-TW', {
+        timeZone: 'Asia/Taipei', hour: '2-digit', minute: '2-digit', hour12: false
+    }).format(d);
 }
 
 // ══ 點位篩選 ══

@@ -209,6 +209,14 @@ function taipeiNow() {
   );
 }
 
+// 將任意日期值（Date物件 或 UTC/本地字串）統一轉換為台北時間 ISO 字串
+function toTaipeiStr_(v) {
+  if (!v) return '';
+  var d = (v instanceof Date) ? v : new Date(String(v));
+  if (isNaN(d.getTime())) return String(v);
+  return Utilities.formatDate(d, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss");
+}
+
 function newId(prefix) {
   return prefix + Date.now().toString().slice(-8) + Math.random().toString(36).slice(2, 5);
 }
@@ -839,7 +847,7 @@ function getTransactionHistory(store, date) {
 
   return filtered.reverse().slice(0, 200).map(r => ({
     id        : r.id,
-    date      : r.date,
+    date      : toTaipeiStr_(r.date),   // 強制台北時間 ISO 字串，避免 UTC 直接截位
     store     : r.store,
     memberName: r.memberName,
     total     : Number(r.total) || 0,
