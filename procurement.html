@@ -122,6 +122,45 @@
 <body>
 <div id="toast"></div>
 
+<!-- 進貨紀錄編輯 Modal -->
+<div class="api-modal" id="editBatchModal" style="display:none;">
+    <div class="api-modal-box" style="max-width:480px;max-height:88vh;overflow-y:auto;" onclick="event.stopPropagation()">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">✏️ 編輯進貨紀錄</h3>
+            <button onclick="closeEditBatch()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
+        </div>
+
+        <!-- 批次基本資料 -->
+        <div style="background:#F5EFE6;border-radius:12px;padding:14px;margin-bottom:14px;">
+            <p style="font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:10px;">批次資訊</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:10px;">
+                <div>
+                    <label class="f-label">供應商</label>
+                    <input type="text" id="edit-source" class="f-input" placeholder="供應商名稱">
+                </div>
+                <div>
+                    <label class="f-label">進貨日期</label>
+                    <input type="date" id="edit-date" class="f-input">
+                </div>
+            </div>
+            <div>
+                <label class="f-label">備註</label>
+                <input type="text" id="edit-note" class="f-input" placeholder="選填">
+            </div>
+        </div>
+
+        <!-- 品項編輯 -->
+        <p style="font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">品項明細</p>
+        <div id="editItemsList" style="margin-bottom:12px;"></div>
+
+        <!-- 操作按鈕 -->
+        <div style="display:flex;gap:10px;">
+            <button onclick="saveEditBatch()" class="btn-primary" style="flex:1;">儲存修改</button>
+            <button onclick="closeEditBatch()" class="btn-secondary" style="flex:0 0 auto;padding:10px 20px;">取消</button>
+        </div>
+    </div>
+</div>
+
 <!-- API Modal -->
 <div class="api-modal" id="apiModal">
     <div class="api-modal-box">
@@ -428,6 +467,9 @@ function updateTotal() {
 function renderItemList() {
     const el = document.getElementById('itemList');
     const opts = flowerOptions();
+    const addBtn = procItems.length > 0
+        ? `<div style="padding:8px 0 4px;"><button onclick="addItemRow()" class="btn-secondary" style="font-size:13px;padding:9px 16px;width:100%;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:6px;"><span style="font-size:16px;">＋</span> 繼續新增品項</button></div>`
+        : '';
     el.innerHTML = procItems.map((item, idx) => `
     <div class="item-card" id="icard-${idx}">
         <div class="item-card-header">
@@ -503,7 +545,7 @@ function renderItemList() {
                 <div class="lbl">小計</div>
             </div>
         </div>
-    </div>`).join('');
+    </div>`).join('') + addBtn;
 
     // 重新計算所有卡片
     procItems.forEach((_, i) => updateCalc(i));
@@ -599,9 +641,12 @@ function renderBatches() {
                 <p style="font-weight:700;font-size:13px;color:#3D2E1E;">${b.source || '—'}</p>
                 <p style="font-size:11px;color:#A89278;margin-top:3px;">${String(b.date||'').slice(0,10)} · ${b.store||''} · ${b.totalItems}項</p>
             </div>
-            <div style="text-align:right;">
-                <p style="font-weight:700;color:#6d7756;font-size:14px;">NT$ ${Number(b.totalCost).toLocaleString()}</p>
-                <p style="font-size:10px;color:#C4A87A;margin-top:2px;">${_expandedBatch===b.batchId?'▲ 收合':'▼ 展開'}</p>
+            <div style="text-align:right;display:flex;align-items:center;gap:8px;">
+                <div>
+                    <p style="font-weight:700;color:#6d7756;font-size:14px;">NT$ ${Number(b.totalCost).toLocaleString()}</p>
+                    <p style="font-size:10px;color:#C4A87A;margin-top:2px;">${_expandedBatch===b.batchId?'▲ 收合':'▼ 展開'}</p>
+                </div>
+                <button onclick="event.stopPropagation();openEditBatch('${b.batchId}')" style="background:#F5EFE6;border:1.5px solid #DDD0BC;border-radius:8px;padding:5px 10px;font-size:11px;color:#7A6550;cursor:pointer;font-weight:600;white-space:nowrap;">✏️ 編輯</button>
             </div>
         </div>
         ${_expandedBatch === b.batchId ? `<div id="detail-${b.batchId}" style="margin-top:10px;border-top:1px solid #EDE5D8;padding-top:10px;">
@@ -646,6 +691,125 @@ async function loadBatchItems(batchId) {
         el.innerHTML = '<p style="font-size:12px;color:#C4928A;padding:8px 0;">載入失敗</p>';
     }
 }
+
+// ══ 進貨紀錄編輯 ══
+let _editBatchId   = null;
+let _editBatchItems = [];
+
+async function openEditBatch(batchId) {
+    _editBatchId = batchId;
+    const batch = _batchData.find(b => b.batchId === batchId);
+    if (!batch) return;
+
+    // 填入批次資料
+    document.getElementById('edit-source').value = batch.source || '';
+    document.getElementById('edit-date').value   = String(batch.date || '').slice(0, 10);
+    document.getElementById('edit-note').value   = batch.note || '';
+
+    // 顯示 modal
+    document.getElementById('editBatchModal').style.display = 'flex';
+    document.getElementById('editItemsList').innerHTML = '<p style="font-size:12px;color:#A89278;padding:8px 0;">載入品項中...</p>';
+
+    // 載入品項
+    try {
+        const res = await fetch(`${API_URL}?action=getProcurementItems&batchId=${encodeURIComponent(batchId)}`);
+        _editBatchItems = await res.json();
+        renderEditItems();
+    } catch(e) {
+        document.getElementById('editItemsList').innerHTML = '<p style="font-size:12px;color:#C4928A;padding:8px 0;">載入失敗</p>';
+    }
+}
+
+function renderEditItems() {
+    const el = document.getElementById('editItemsList');
+    if (!Array.isArray(_editBatchItems) || !_editBatchItems.length) {
+        el.innerHTML = '<p style="font-size:12px;color:#A89278;padding:8px 0;">無品項資料</p>';
+        return;
+    }
+    el.innerHTML = _editBatchItems.map((it, i) => `
+    <div style="background:#F5EFE6;border-radius:12px;padding:12px;margin-bottom:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <span style="font-size:12px;font-weight:700;color:#7A6550;">品項 ${i+1}</span>
+            <button onclick="removeEditItem(${i})" style="background:rgba(196,146,138,0.12);border:none;border-radius:8px;padding:3px 10px;font-size:12px;color:#C4928A;cursor:pointer;">刪除</button>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px;">
+            <div>
+                <label class="f-label-xs">花材名稱</label>
+                <input type="text" class="f-input-sm" value="${it.flowerName||''}" oninput="_editBatchItems[${i}].flowerName=this.value">
+            </div>
+            <div>
+                <label class="f-label-xs">分類</label>
+                <select class="f-select" style="border:1.5px solid #DDD0BC;border-radius:10px;padding:7px 10px;font-size:13px;outline:none;background:#FAF7F2;" onchange="_editBatchItems[${i}].category=this.value">
+                    <option ${it.category==='主花'?'selected':''}>主花</option>
+                    <option ${it.category==='配花'?'selected':''}>配花</option>
+                    <option ${it.category==='葉材'?'selected':''}>葉材</option>
+                    <option ${it.category==='其他'?'selected':''}>其他</option>
+                </select>
+            </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+            <div>
+                <label class="f-label-xs">每把枝數</label>
+                <input type="number" min="1" class="f-input-sm" value="${it.stemsPerBunch||''}" oninput="_editBatchItems[${i}].stemsPerBunch=Number(this.value)||0">
+            </div>
+            <div>
+                <label class="f-label-xs">購入把數</label>
+                <input type="number" min="1" class="f-input-sm" value="${it.bunchesQty||''}" oninput="_editBatchItems[${i}].bunchesQty=Number(this.value)||0">
+            </div>
+            <div>
+                <label class="f-label-xs">每把單價</label>
+                <input type="number" min="0" class="f-input-sm" value="${it.pricePerBunch||''}" oninput="_editBatchItems[${i}].pricePerBunch=Number(this.value)||0">
+            </div>
+        </div>
+    </div>`).join('');
+}
+
+function removeEditItem(idx) {
+    if (!confirm(`確定刪除品項「${_editBatchItems[idx].flowerName||'(未命名)'}」？`)) return;
+    _editBatchItems.splice(idx, 1);
+    renderEditItems();
+}
+
+async function saveEditBatch() {
+    if (!API_URL) return alert('請先設定 API 網址');
+    const payload = {
+        action: 'updateProcurementBatch',
+        data: {
+            batchId: _editBatchId,
+            source : document.getElementById('edit-source').value.trim(),
+            date   : document.getElementById('edit-date').value,
+            note   : document.getElementById('edit-note').value.trim(),
+            items  : _editBatchItems,
+        }
+    };
+    try {
+        setGas('loading');
+        const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify(payload) });
+        const result = await res.json();
+        if (result.success) {
+            setGas('ok');
+            showToast('✅ 進貨紀錄已更新');
+            closeEditBatch();
+            loadBatches();
+        } else {
+            setGas('error');
+            alert('儲存失敗：' + (result.error || '未知錯誤'));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗，請確認 API 網址');
+    }
+}
+
+function closeEditBatch() {
+    document.getElementById('editBatchModal').style.display = 'none';
+    _editBatchId    = null;
+    _editBatchItems = [];
+}
+
+document.getElementById('editBatchModal').addEventListener('click', function(e) {
+    if (e.target === this) closeEditBatch();
+});
 
 // ══ Toast ══
 let _toastTimer;

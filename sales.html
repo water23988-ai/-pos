@@ -336,11 +336,11 @@ function renderRecords() {
 
 function saleItemHtml(r) {
     const id      = r.id || r.txId || r.transactionId || '';
-    const time    = r.time || r.createdAt || r.時間 || '';
+    const time    = r.date || r.time || r.createdAt || r.時間 || '';
     const store   = r.store || r.點位 || '';
     const amount  = Number(r.total || r.amount || r.金額 || 0);
-    const payment = r.payment || r.paymentMethod || r.付款方式 || '';
-    const source  = r.source || r.客源 || '';
+    const payment = r.pay || r.payment || r.paymentMethod || r.付款方式 || '';
+    const source  = r.source || r.customerSource || r.客源 || '';
     const voided  = r.voided || r.isVoided || false;
     const items   = r.items || r.商品 || [];
 
@@ -374,11 +374,11 @@ function openDetail(jsonStr) {
     currentTx = r;
 
     const id      = r.id || r.txId || r.transactionId || '—';
-    const time    = r.time || r.createdAt || r.時間 || '—';
+    const time    = r.date || r.time || r.createdAt || r.時間 || '—';
     const store   = r.store || r.點位 || '—';
     const amount  = Number(r.total || r.amount || r.金額 || 0);
-    const payment = r.payment || r.paymentMethod || r.付款方式 || '—';
-    const source  = r.source || r.客源 || '—';
+    const payment = r.pay || r.payment || r.paymentMethod || r.付款方式 || '—';
+    const source  = r.source || r.customerSource || r.客源 || '—';
     const member  = r.member || r.memberName || r.會員 || '—';
     const voided  = r.voided || r.isVoided || false;
     const items   = r.items || r.商品 || [];

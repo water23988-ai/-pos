@@ -159,6 +159,7 @@ function doPost(e) {
       case 'logPriceHistory':      return jsonOut(logPriceHistory(data));
       case 'addFlowerToLibrary':   return jsonOut(addFlowerToLibrary(data));
       case 'addProcurement':          return jsonOut(addProcurement(data));
+      case 'updateProcurementBatch':  return jsonOut(updateProcurementBatch(data));
       case 'reportWaste':             return jsonOut(reportWaste(data));
       case 'voidTransaction':         return jsonOut(voidTransaction(data));
       case 'deleteProcurementBatch':  return jsonOut(deleteProcurementBatch(data));
@@ -769,6 +770,7 @@ function getTransactionHistory(store, date) {
     total     : Number(r.total) || 0,
     cost      : Number(r.cost)  || 0,
     pay       : r.pay,
+    source    : r.source,
     note      : r.note,
     items     : safeJson(r.items, []),
     voided    : r.voided === true || String(r.voided).toLowerCase() === 'true', // [v2.4]
@@ -1558,6 +1560,76 @@ function deleteProcurementBatch(data) {
   return deleted
     ? { success: true }
     : { success: false, error: '找不到此進貨批次' };
+}
+
+// ══════════════════════════════════════════════════════
+//  更新進貨批次（含品項）
+// ══════════════════════════════════════════════════════
+function updateProcurementBatch(data) {
+  // data: { batchId, source, date, note, items: [...] }
+  const batchSh = getSheet(SH_PROC.BATCHES);
+  const itemSh  = getSheet(SH_PROC.ITEMS);
+  if (!batchSh || !itemSh) return { success: false, error: '進貨工作表不存在' };
+
+  const bId = String(data.batchId);
+
+  // ── 更新 batch 列的基本資料 ──
+  const bVals  = batchSh.getDataRange().getValues();
+  const bHdr   = bVals[0];
+  const bIdCol = bHdr.indexOf('batchId');
+  let batchRow = -1;
+  for (let i = 1; i < bVals.length; i++) {
+    if (String(bVals[i][bIdCol]) === bId) { batchRow = i + 1; break; }
+  }
+  if (batchRow === -1) return { success: false, error: '找不到此進貨批次' };
+
+  // 更新欄位：source / date / note / totalCost（重算）
+  const colOf = name => bHdr.indexOf(name);
+  const items = Array.isArray(data.items) ? data.items : [];
+  const totalCost  = items.reduce((s, it) => s + (Number(it.pricePerBunch)||0) * (Number(it.bunchesQty)||0), 0);
+  const totalItems = items.length;
+
+  if (colOf('source') >= 0) batchSh.getRange(batchRow, colOf('source')+1).setValue(data.source || '');
+  if (colOf('date')   >= 0) batchSh.getRange(batchRow, colOf('date')  +1).setValue(data.date   || '');
+  if (colOf('note')   >= 0) batchSh.getRange(batchRow, colOf('note')  +1).setValue(data.note   || '');
+  if (colOf('totalCost')  >= 0) batchSh.getRange(batchRow, colOf('totalCost') +1).setValue(totalCost);
+  if (colOf('totalItems') >= 0) batchSh.getRange(batchRow, colOf('totalItems')+1).setValue(totalItems);
+
+  // ── 刪除舊 items，重新寫入 ──
+  if (itemSh.getLastRow() >= 2) {
+    const iVals = itemSh.getDataRange().getValues();
+    const ibCol = iVals[0].indexOf('batchId');
+    for (let i = iVals.length - 1; i >= 1; i--) {
+      if (String(iVals[i][ibCol]) === bId) itemSh.deleteRow(i + 1);
+    }
+  }
+
+  // 寫入新 items
+  const iHdr = itemSh.getRange(1, 1, 1, itemSh.getLastColumn()).getValues()[0];
+  items.forEach((it, idx) => {
+    const spb  = Number(it.stemsPerBunch) || 0;
+    const bq   = Number(it.bunchesQty)   || 0;
+    const ppb  = Number(it.pricePerBunch) || 0;
+    const costPerStem    = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
+    const suggestedPrice = Math.round(costPerStem * 3.8);
+    const row = iHdr.map(h => {
+      if (h === 'batchId')        return bId;
+      if (h === 'flowerName')     return it.flowerName || '';
+      if (h === 'category')       return it.category || '其他';
+      if (h === 'stemsPerBunch')  return spb;
+      if (h === 'bunchesQty')     return bq;
+      if (h === 'pricePerBunch')  return ppb;
+      if (h === 'totalStems')     return spb * bq;
+      if (h === 'costPerStem')    return costPerStem;
+      if (h === 'suggestedPrice') return suggestedPrice;
+      if (h === 'totalCost')      return ppb * bq;
+      if (h === 'seq')            return idx + 1;
+      return '';
+    });
+    itemSh.appendRow(row);
+  });
+
+  return { success: true, totalCost, totalItems };
 }
 
 // ══════════════════════════════════════════════════════
