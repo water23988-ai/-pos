@@ -1,8 +1,14 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
-//  版本：2.3  |  2026-04
+//  版本：2.4  |  2026-04
 //  更新：新增進貨模組（ProcurementBatches / ProcurementItems）
 //        成本回寫改為加權平均邏輯
+//  [v2.4 新增]
+//  - 新增 getHistory action（sales.html 銷售紀錄頁面查詢）
+//  - 新增 adjustStock action（inventory.html 庫存 +/- 快速調整）
+//  - Products 新增 visible 欄位（商品管理開關：收銀台顯示/隱藏）
+//  - updateProduct 支援寫入 visible 欄位
+//  - getProducts 回傳 visible 欄位
 //  [v2.3 修復]
 //  - Bug Fix: deleteProduct 改為軟刪除（status='inactive'），歷史報表成本不斷鏈
 //  - 新增 reactivateProduct：可將停用商品重新啟用
@@ -56,7 +62,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','status']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','status','visible']);
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -119,6 +125,8 @@ function doGet(e) {
       case 'getProcurementBatches':   return jsonOut(getProcurementBatches());
       case 'getProcurementItems':     return jsonOut(getProcurementItems(e.parameter.batchId));
       case 'getFlowerProcHistory':    return jsonOut(getFlowerProcHistory(e.parameter.name));
+      // [v2.4] sales.html 銷售紀錄頁面 — 與 getTransactionHistory 相同功能
+      case 'getHistory':              return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -154,6 +162,8 @@ function doPost(e) {
       case 'reportWaste':             return jsonOut(reportWaste(data));
       case 'voidTransaction':         return jsonOut(voidTransaction(data));
       case 'deleteProcurementBatch':  return jsonOut(deleteProcurementBatch(data));
+      // [v2.4] inventory.html 庫存管理頁面快速調整 +/-
+      case 'adjustStock':             return jsonOut(adjustStock(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -219,6 +229,8 @@ function getProducts() {
       stockKH : Number(r.stockKH) || 0,
       stockTN : Number(r.stockTN) || 0,
       stockES : Number(r.stockES) || 0,
+      // [v2.4] visible：空值舊資料視為 true（向下相容）
+      visible : r.visible === false || r.visible === 'false' ? false : true,
     }));
 }
 
@@ -238,6 +250,7 @@ function addProduct(data) {
     Number(data.stockTN) || 0,
     Number(data.stockES) || 0,
     'active',  // [v2.3] status 欄位
+    true,      // [v2.4] visible 欄位：新增商品預設顯示在收銀台
   ]);
   return { success: true, id };
 }
@@ -259,6 +272,15 @@ function updateProduct(data) {
       if (data.stockKH  !== undefined) set('stockKH',  Number(data.stockKH));
       if (data.stockTN  !== undefined) set('stockTN',  Number(data.stockTN));
       if (data.stockES  !== undefined) set('stockES',  Number(data.stockES));
+      // [v2.4] visible 欄位：動態新增欄若不存在
+      if (data.visible !== undefined) {
+        let visCol = headers.indexOf('visible');
+        if (visCol === -1) {
+          visCol = headers.length;
+          sh.getRange(1, visCol + 1).setValue('visible');
+        }
+        sh.getRange(row, visCol + 1).setValue(data.visible === true || data.visible === 'true');
+      }
       return { success: true };
     }
   }
@@ -374,6 +396,50 @@ function receiveStock(data) {
         Number(data.qty),
         data.note || '進貨入庫',
         'receive',
+      ]);
+      return { success: true, newStock: newQty };
+    }
+  }
+  return { success: false, error: '找不到商品' };
+}
+
+// [v2.4] inventory.html 庫存管理頁面 — 快速 +/- 調整
+// data: { id, store: 'KH'|'TN'|'ES', delta: +1|-1, note? }
+function adjustStock(data) {
+  const storeMap = {
+    'KH': '高雄FOCUS 13',
+    'TN': '台南FOCUS',
+    'ES': '誠品生活台南',
+  };
+  // 支援短代碼（KH/TN/ES）或完整店名
+  const storeName = storeMap[data.store] || data.store || '高雄FOCUS 13';
+  const delta     = Number(data.delta) || 0;
+  if (delta === 0) return { success: false, error: 'delta 不可為 0' };
+
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol   = headers.indexOf('id');
+  const colKey  = storeName === '台南FOCUS' ? 'stockTN' : storeName === '誠品生活台南' ? 'stockES' : 'stockKH';
+  const storeCol = headers.indexOf(colKey);
+
+  for (let i = 1; i < vals.length; i++) {
+    if (Number(vals[i][idCol]) === Number(data.id)) {
+      const oldQty = Number(vals[i][storeCol]) || 0;
+      const newQty = Math.max(0, oldQty + delta);
+      sh.getRange(i + 1, storeCol + 1).setValue(newQty);
+
+      // 寫入庫存日誌
+      getSheet(SH.INV_LOG).appendRow([
+        taipeiNow(),
+        data.id,
+        vals[i][headers.indexOf('name')],
+        storeName,
+        oldQty,
+        newQty,
+        delta,
+        data.note || (delta > 0 ? '手動增加' : '手動減少'),
+        'adjust',
       ]);
       return { success: true, newStock: newQty };
     }
