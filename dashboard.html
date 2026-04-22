@@ -306,35 +306,31 @@
             </div>
         </div>
 
-        <!-- 銷售明細表格 -->
-        <div class="card" style="margin-bottom:20px;padding:0;overflow:hidden;">
-            <div style="padding:16px 20px;border-bottom:1px solid #EDE5D8;display:flex;justify-content:space-between;align-items:center;">
-                <div class="card-title" style="margin-bottom:0;">銷售明細</div>
-                <span id="tableCount" style="font-size:11px;color:#A89278;">— 筆</span>
-            </div>
-            <div class="table-wrap">
-                <table id="salesTable">
-                    <thead>
-                        <tr>
-                            <th>時間</th>
-                            <th>點位</th>
-                            <th>商品</th>
-                            <th>金額</th>
-                            <th>付款方式</th>
-                            <th>客源</th>
-                        </tr>
-                    </thead>
-                    <tbody id="salesTableBody">
-                        <tr><td colspan="6" class="empty-table">請選擇日期查詢</td></tr>
-                    </tbody>
-                </table>
+        <!-- 排行 & 業績 日期區間查詢列 -->
+        <div class="query-bar" style="margin-bottom:20px;">
+            <div class="query-row">
+                <div>
+                    <label class="f-label" style="margin-bottom:4px;">📊 業績 / 排行 / 報廢 — 日期區間</label>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <input type="date" id="rangeFrom" class="query-date-input">
+                        <span style="font-size:13px;color:#A89278;">至</span>
+                        <input type="date" id="rangeTo" class="query-date-input">
+                        <button onclick="queryRange()" class="btn-primary" style="padding:10px 20px;font-size:13px;">查詢</button>
+                        <button onclick="rangeThisMonth()" class="btn-secondary" style="padding:9px 14px;font-size:12px;">本月</button>
+                        <button onclick="rangeLastMonth()" class="btn-secondary" style="padding:9px 14px;font-size:12px;">上月</button>
+                        <button onclick="rangeLast7()" class="btn-secondary" style="padding:9px 14px;font-size:12px;">近7天</button>
+                    </div>
+                </div>
             </div>
         </div>
 
         <!-- 點位業績卡片列 -->
-        <div class="card-title" style="margin-bottom:8px;">各點位業績</div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+            <div class="card-title" style="margin-bottom:0;">各點位業績</div>
+            <span id="storeRangeLabel" style="font-size:11px;color:#A89278;"></span>
+        </div>
         <div class="store-grid" id="storeGrid">
-            <!-- 動態填入 -->
+            <p style="color:#A89278;font-size:13px;">請設定日期區間後查詢</p>
         </div>
 
         <!-- 各點位報廢成本 -->
@@ -344,7 +340,7 @@
                 <span id="wasteDate" style="font-size:11px;color:#A89278;"></span>
             </div>
             <div class="waste-grid" id="wasteGrid">
-                <p style="color:#A89278;font-size:13px;grid-column:1/-1;">請先查詢日期以載入報廢數據</p>
+                <p style="color:#A89278;font-size:13px;grid-column:1/-1;">請設定日期區間後查詢</p>
             </div>
         </div>
 
@@ -353,7 +349,7 @@
             <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
                 <div>
                     <div class="card-title" style="margin-bottom:2px;">🌸 花材銷售排行</div>
-                    <span style="font-size:11px;color:#A89278;" id="rankPeriodLabel">本月累計</span>
+                    <span style="font-size:11px;color:#A89278;" id="rankPeriodLabel">請設定日期區間後查詢</span>
                 </div>
                 <div class="rank-filter-row" id="rankFilterRow">
                     <span class="filter-label">點位</span>
@@ -393,7 +389,7 @@
 <script>
 let API_URL = localStorage.getItem('moment_flor_api') || '';
 let currentFilter = '全部';
-let rawData = [];
+let _rangeFrom = '', _rangeTo = '';
 
 // ══ API Modal ══
 function openApiModal() {
@@ -452,13 +448,11 @@ function fmtTime(ts) {
     }).format(d);
 }
 
-// ══ 點位篩選 ══
+// ══ 點位篩選（日報摘要） ══
 function setStoreFilter(btn, val) {
     document.querySelectorAll('.store-filter-row .chip').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     currentFilter = val;
-    renderTable();
-    renderStoreGrid();
 }
 
 // ══ 同期比較 chip ══
@@ -534,94 +528,112 @@ async function loadSummary() {
     }
 }
 
-// ══ 查詢銷售明細表格 ══
+// ══ 日期區間工具 ══
+function taipeiStr(d) {
+    return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(d);
+}
+function rangeThisMonth() {
+    const d = new Date();
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    document.getElementById('rangeFrom').value = taipeiStr(first);
+    document.getElementById('rangeTo').value   = taipeiStr(d);
+}
+function rangeLastMonth() {
+    const d = new Date();
+    const first = new Date(d.getFullYear(), d.getMonth() - 1, 1);
+    const last  = new Date(d.getFullYear(), d.getMonth(), 0);
+    document.getElementById('rangeFrom').value = taipeiStr(first);
+    document.getElementById('rangeTo').value   = taipeiStr(last);
+}
+function rangeLast7() {
+    const d = new Date();
+    const from7 = new Date(); from7.setDate(d.getDate() - 6);
+    document.getElementById('rangeFrom').value = taipeiStr(from7);
+    document.getElementById('rangeTo').value   = taipeiStr(d);
+}
+
+// ══ 日期區間查詢（業績 + 排行 + 報廢） ══
+async function queryRange() {
+    const from = document.getElementById('rangeFrom').value;
+    const to   = document.getElementById('rangeTo').value;
+    if (!from || !to) return alert('請設定開始與結束日期');
+    if (!API_URL) return;
+    _rangeFrom = from;
+    _rangeTo   = to;
+    setGas('loading');
+    try {
+        await Promise.all([
+            loadStoreGrid(from, to),
+            loadWaste(from, to),
+            loadRanking(),
+        ]);
+        setGas('ok');
+    } catch(e) {
+        setGas('error');
+    }
+}
+
+// ══ 查詢日報（摘要卡片用） ══
 async function queryReport() {
     if (!API_URL) return;
     const date = document.getElementById('queryDate').value;
     if (!date) return alert('請選擇查詢日期');
-    const tbody = document.getElementById('salesTableBody');
-    tbody.innerHTML = '<tr><td colspan="6" class="empty-table"><span class="spinner"></span> 載入中...</td></tr>';
     setGas('loading');
     try {
-        const res = await fetch(`${API_URL}?action=getTransactionHistory&date=${date}`);
-        rawData = await res.json();
         setGas('ok');
-        renderTable();
-        renderStoreGrid();
-        loadWaste(date);
-        loadRanking();
     } catch(e) {
         setGas('error');
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-table" style="color:#C4928A;">載入失敗</td></tr>';
     }
 }
 
-function renderTable() {
-    const tbody = document.getElementById('salesTableBody');
-    let data = rawData;
-    if (currentFilter !== '全部') {
-        data = data.filter(r => (r.store || '').includes(currentFilter));
-    }
-    document.getElementById('tableCount').innerText = data.length + ' 筆';
-    if (!data.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty-table">無銷售紀錄</td></tr>';
-        return;
-    }
-    tbody.innerHTML = data.map(r => {
-        const time    = fmtTime(r.date || r.time || '');
-        const store   = r.store   || '—';
-        const items   = r.items   || r.itemsText || '—';
-        const total   = 'NT$ ' + (Number(r.total || r.amount || 0)).toLocaleString();
-        const pay     = r.pay || r.payment || '—';
-        const source  = r.source || r.customerSource || '—';
-        return `<tr>
-            <td>${time}</td>
-            <td><span style="background:#F5EFE6;border-radius:6px;padding:2px 8px;font-size:11px;">${store}</span></td>
-            <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="${String(items).replace(/"/g,'&quot;')}">${items}</td>
-            <td style="font-weight:700;color:#6d7756;">${total}</td>
-            <td>${pay}</td>
-            <td>${source}</td>
-        </tr>`;
-    }).join('');
-}
-
-function renderStoreGrid() {
+// ══ 各點位業績（從 API 查詢） ══
+async function loadStoreGrid(from, to) {
     const grid = document.getElementById('storeGrid');
-    if (!rawData.length) { grid.innerHTML = ''; return; }
-    const stores = {};
-    rawData.forEach(r => {
-        const s = r.store || '未知';
-        if (!stores[s]) stores[s] = { count: 0, total: 0 };
-        stores[s].count++;
-        stores[s].total += Number(r.total || r.amount || 0);
-    });
-    grid.innerHTML = Object.entries(stores).map(([s, v]) => `
-    <div class="store-card">
-        <div class="store-card-name">${s}</div>
-        <div class="store-card-val">NT$ ${v.total.toLocaleString()}</div>
-        <div class="store-card-sub">${v.count} 筆</div>
-    </div>`).join('');
+    const label = document.getElementById('storeRangeLabel');
+    grid.innerHTML = '<div style="color:#A89278;font-size:13px;"><span class="spinner"></span> 載入中...</div>';
+    label.innerText = from + ' ~ ' + to;
+    try {
+        const res  = await fetch(`${API_URL}?action=getStoreStats&from=${from}&to=${to}`);
+        const data = await res.json();
+        if (!Array.isArray(data) || !data.length) {
+            grid.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無業績資料</p>';
+            return;
+        }
+        const maxRev = Math.max(...data.map(s => s.revenue), 1);
+        grid.innerHTML = data.map(s => {
+            const pct = Math.round(s.revenue / maxRev * 100);
+            return `<div class="store-perf-card">
+                <div class="store-perf-name">${s.store}</div>
+                <div class="store-perf-sales">NT$ ${(s.revenue||0).toLocaleString()}</div>
+                <div class="store-perf-count">${s.count} 筆 · 毛利 ${s.margin}%</div>
+                <div class="store-perf-bar"><div class="store-perf-bar-fill" style="width:${pct}%"></div></div>
+            </div>`;
+        }).join('');
+    } catch(e) {
+        grid.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
+    }
 }
 
-async function loadWaste(date) {
+// ══ 報廢成本（日期區間） ══
+async function loadWaste(from, to) {
     const wasteGrid = document.getElementById('wasteGrid');
     const wasteDate = document.getElementById('wasteDate');
-    if (!date) return;
-    wasteDate.innerText = date;
+    if (!from || !to) return;
+    wasteDate.innerText = from + ' ~ ' + to;
+    wasteGrid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;"><span class="spinner"></span> 載入中...</p>';
     try {
-        const res  = await fetch(`${API_URL}?action=getDailyReport&date=${date}`);
+        const res  = await fetch(`${API_URL}?action=getWasteReport&from=${from}&to=${to}`);
         const data = await res.json();
-        const waste = data.wasteByStore || {};
+        const waste = data.byStore || {};
         const entries = Object.entries(waste);
         if (!entries.length) {
-            wasteGrid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;">本日無報廢記錄</p>';
+            wasteGrid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;">此區間無報廢記錄</p>';
             return;
         }
         const maxCost = Math.max(...entries.map(([,v]) => v.cost || 0), 1);
         wasteGrid.innerHTML = entries.map(([store, v]) => {
             const cost = v.cost || 0;
             const pct  = Math.round(cost / maxCost * 100);
-            const tag  = pct < 30 ? 'low' : (pct < 70 ? 'mid' : 'high');
             return `<div class="waste-card ${pct >= 70 ? 'highlight' : ''}">
                 <div class="waste-card-name">${store}</div>
                 <div class="waste-card-cost">NT$ ${cost.toLocaleString()}</div>
@@ -629,7 +641,9 @@ async function loadWaste(date) {
                 <div class="waste-card-bar"><div class="waste-card-bar-fill" style="width:${pct}%;"></div></div>
             </div>`;
         }).join('');
-    } catch(e) {}
+    } catch(e) {
+        wasteGrid.innerHTML = '<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗</p>';
+    }
 }
 
 let _rankStore = '';
@@ -637,28 +651,33 @@ function setRankFilter(btn, store) {
     document.querySelectorAll('#rankFilterRow .chip').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     _rankStore = store;
-    loadRanking();
+    if (_rangeFrom && _rangeTo) loadRanking();
 }
 
 async function loadRanking() {
     const tbody = document.getElementById('rankTableBody');
-    const date  = document.getElementById('queryDate').value;
-    const ym    = date ? date.slice(0, 7) : new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date()).slice(0,7);
-    document.getElementById('rankPeriodLabel').innerText = ym + ' 月份';
+    const from  = _rangeFrom || document.getElementById('rangeFrom').value;
+    const to    = _rangeTo   || document.getElementById('rangeTo').value;
+    if (!from || !to || !API_URL) {
+        tbody.innerHTML = '<tr><td colspan="8" class="empty-table">請設定日期區間後查詢</td></tr>';
+        return;
+    }
+    document.getElementById('rankPeriodLabel').innerText = from + ' ~ ' + to;
+    tbody.innerHTML = '<tr><td colspan="8" class="loading-row"><span class="spinner"></span> 載入中...</td></tr>';
     try {
-        const url = `${API_URL}?action=getItemRanking&date=${ym}${_rankStore ? '&store=' + encodeURIComponent(_rankStore) : ''}`;
+        const url = `${API_URL}?action=getItemRanking&from=${from}&to=${to}${_rankStore ? '&store=' + encodeURIComponent(_rankStore) : ''}`;
         const res = await fetch(url);
         const data = await res.json();
         if (!Array.isArray(data) || !data.length) {
-            tbody.innerHTML = '<tr><td colspan="8" class="empty-table">無資料</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="8" class="empty-table">此區間無銷售資料</td></tr>';
             return;
         }
         tbody.innerHTML = data.slice(0, 30).map((it, i) => {
-            const rank    = i + 1;
-            const isTop   = rank <= 3;
-            const pct     = it.pct || 0;
+            const rank      = i + 1;
+            const isTop     = rank <= 3;
+            const pct       = it.pct || 0;
             const wasteRate = Number(it.wasteRate || 0);
-            const wTag    = wasteRate < 10 ? 'low' : (wasteRate < 30 ? 'mid' : 'high');
+            const wTag      = wasteRate < 10 ? 'low' : (wasteRate < 30 ? 'mid' : 'high');
             return `<tr>
                 <td class="rank-no ${isTop?'top':''}">${isTop ? ['🥇','🥈','🥉'][i] : rank}</td>
                 <td style="font-weight:600;color:#3D2E1E;">${it.name || '—'}</td>
@@ -688,8 +707,7 @@ function showToast(msg, dur=2500) {
 // ══ 初始化 ══
 async function refreshAll() {
     loadSummary();
-    const date = document.getElementById('queryDate').value;
-    if (date) queryReport();
+    if (_rangeFrom && _rangeTo) queryRange();
 }
 
 function init() {
@@ -699,12 +717,13 @@ function init() {
         return;
     }
     setGas('loading');
-    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+    const today = taipeiStr(new Date());
     document.getElementById('queryDate').value = today;
     document.getElementById('dateDisplay').innerText = today;
     loadSummary();
-    queryReport();
-    setGas('ok');
+    // 預設本月區間
+    rangeThisMonth();
+    queryRange();
 }
 
 window.onload = init;

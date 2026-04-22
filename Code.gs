@@ -116,7 +116,9 @@ function doGet(e) {
       case 'getDailyReport':        return jsonOut(getDailyReport(e.parameter.store, e.parameter.date));
       case 'getPayBreakdown':       return jsonOut(getPayBreakdown(e.parameter.store, e.parameter.date));
       case 'getWeeklyTrend':        return jsonOut(getWeeklyTrend(e.parameter.store));
-      case 'getItemRanking':        return jsonOut(getItemRanking(e.parameter.store, e.parameter.date));
+      case 'getItemRanking':        return jsonOut(getItemRanking(e.parameter.store, e.parameter.date, e.parameter.from, e.parameter.to));
+      case 'getStoreStats':         return jsonOut(getStoreStats(e.parameter.store, e.parameter.from, e.parameter.to));
+      case 'getWasteReport':        return jsonOut(getWasteReport(e.parameter.store, e.parameter.from, e.parameter.to));
       case 'getMemberStats':        return jsonOut(getMemberStats());
       case 'getTransactionHistory': return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
       case 'getAllStoresReport':     return jsonOut(getAllStoresReport(e.parameter.period));
@@ -619,6 +621,14 @@ function dateRange_(date, tz) {
   return { from, to };
 }
 
+// [v2.7] 解析台北時間字串（sheetToObjects 輸出無 TZ 後綴），補上 +08:00 避免被當 UTC 解析
+function parseTaipei_(ts) {
+  const s = String(ts || '');
+  if (!s) return new Date(NaN);
+  const hasOffset = s.endsWith('Z') || /[+-]\d{2}:\d{2}$/.test(s);
+  return new Date(hasOffset ? s : s + '+08:00');
+}
+
 function storeFilter_(store) {
   // [v2.2 修復] Studio 獨立記錄，不再合併至高雄
   if (store) return r => r.store === store;
@@ -688,9 +698,10 @@ function getDailyReport(store, date) {
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
     prodMap[Number(r.id)] = Number(r.cost)||0;
   });
+  // [v2.7] 使用 parseTaipei_ 解析，避免 GAS 將台北時間字串當 UTC 處理導致超出查詢範圍
   const wasteRows = sheetToObjects(getSheet(SH.INV_LOG))
     .filter(r => {
-      const d = new Date(r.time);
+      const d = parseTaipei_(r.time);
       return r.type === 'waste' && !isNaN(d) && d >= from && d <= to;
     });
   const totalWasteCost = wasteRows
@@ -784,15 +795,21 @@ function getWeeklyTrend(store) {
   return result;
 }
 
-function getItemRanking(store, date) {
+function getItemRanking(store, date, fromDate, toDate) {
   const sh   = getSheet(SH.TRANSACTIONS);
   const rows = sheetToObjects(sh);
   const filt = storeFilter_(store);
 
-  // Use current month (month-to-date)
-  const base = date ? new Date(date + 'T00:00:00+08:00') : new Date();
-  const from = new Date(base.getFullYear(), base.getMonth(), 1);
-  const to   = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
+  // [v2.7] 支援明確 from/to 日期區間；若未提供則預設為 date 所在月份
+  let from, to;
+  if (fromDate && toDate) {
+    from = new Date(fromDate + 'T00:00:00+08:00');
+    to   = new Date(toDate   + 'T23:59:59+08:00');
+  } else {
+    const base = date ? new Date(date + 'T00:00:00+08:00') : new Date();
+    from = new Date(base.getFullYear(), base.getMonth(), 1);
+    to   = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
+  }
 
   // [v2.6] 同時建立 cost map 與 price map（售價），供 item.price 缺失時 fallback
   const prodMap = {};
@@ -824,12 +841,12 @@ function getItemRanking(store, date) {
       });
     });
 
-  // [v2.6] 從 INV_LOG 補入廢棄數量（依商品名稱對應）
+  // [v2.7] 從 INV_LOG 補入廢棄數量（依商品名稱對應），使用 parseTaipei_ 修正時區
   const nameToKey = {};
   Object.entries(itemMap).forEach(([k, v]) => { nameToKey[v.name] = k; });
   sheetToObjects(getSheet(SH.INV_LOG))
     .filter(r => {
-      const d = new Date(r.time);
+      const d = parseTaipei_(r.time);
       return r.type === 'waste' && !isNaN(d) && filt(r) && d >= from && d <= to;
     })
     .forEach(r => {
@@ -848,6 +865,67 @@ function getItemRanking(store, date) {
   const maxSales = sorted.length > 0 ? (sorted[0].revenue || 1) : 1;
   sorted.forEach(it => { it.pct = Math.round(it.revenue / maxSales * 100); });
   return sorted;
+}
+
+// [v2.7] 各點位業績（依日期區間查詢）
+function getStoreStats(store, fromDate, toDate) {
+  const sh   = getSheet(SH.TRANSACTIONS);
+  const rows = sheetToObjects(sh);
+  const filt = storeFilter_(store);
+  const from = fromDate ? new Date(fromDate + 'T00:00:00+08:00') : new Date(0);
+  const to   = toDate   ? new Date(toDate   + 'T23:59:59+08:00') : new Date();
+  const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const byStore = {};
+  rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= from && d <= to;
+  }).forEach(r => {
+    const s = r.store || '未知';
+    if (!byStore[s]) byStore[s] = { count: 0, revenue: 0, cost: 0 };
+    byStore[s].count++;
+    byStore[s].revenue += Number(r.total) || 0;
+    byStore[s].cost    += Number(r.cost)  || 0;
+  });
+
+  return Object.entries(byStore).map(([s, v]) => ({
+    store : s,
+    count : v.count,
+    revenue: v.revenue,
+    cost  : v.cost,
+    profit: v.revenue - v.cost,
+    margin: v.revenue > 0 ? Math.round((v.revenue - v.cost) / v.revenue * 100) : 0,
+  })).sort((a, b) => b.revenue - a.revenue);
+}
+
+// [v2.7] 日期區間報廢成本（獨立 endpoint，解決 getDailyReport 只能查單日的限制）
+function getWasteReport(store, fromDate, toDate) {
+  const from = fromDate ? new Date(fromDate + 'T00:00:00+08:00') : new Date(0);
+  const to   = toDate   ? new Date(toDate   + 'T23:59:59+08:00') : new Date();
+  const filt = storeFilter_(store);
+
+  const prodMap = {};
+  sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
+    prodMap[Number(r.id)] = Number(r.cost) || 0;
+  });
+
+  const wasteRows = sheetToObjects(getSheet(SH.INV_LOG)).filter(r => {
+    const d = parseTaipei_(r.time);   // [v2.7] 正確解析台北時間
+    return r.type === 'waste' && !isNaN(d) && filt(r) && d >= from && d <= to;
+  });
+
+  const byStore = {};
+  wasteRows.forEach(r => {
+    const s = r.store || '未知';
+    if (!byStore[s]) byStore[s] = { count: 0, cost: 0 };
+    byStore[s].count++;
+    byStore[s].cost += (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0);
+  });
+
+  return {
+    totalCost: wasteRows.reduce((s, r) => s + (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0), 0),
+    byStore,
+  };
 }
 
 function getMemberStats() {
