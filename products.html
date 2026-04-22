@@ -365,18 +365,30 @@ async function loadProducts() {
     setGas('loading');
     document.getElementById('productsContainer').innerHTML = '<div class="loading-state"><div class="spinner"></div></div>';
     try {
-        const res  = await fetch(`${API_URL}?action=getProducts`);
-        const data = await res.json();
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 15000); // 15秒超時
+        const res  = await fetch(`${API_URL}?action=getProducts`, { signal: controller.signal });
+        clearTimeout(timer);
+        const text = await res.text();
+        let data;
+        try {
+            data = JSON.parse(text);
+        } catch(jsonErr) {
+            throw new Error('GAS 回傳非 JSON：' + text.slice(0, 200));
+        }
+        if (data && data.error) throw new Error('GAS 錯誤：' + data.error);
         allProducts = Array.isArray(data) ? data : (data.products || data.data || []);
         setGas('ok');
         renderProducts();
     } catch(e) {
         setGas('error');
+        const msg = e.name === 'AbortError' ? '連線逾時（15秒），請確認 GAS 有重新部署' : (e.message || '未知錯誤');
         document.getElementById('productsContainer').innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">❌</div>
-                <div class="empty-state-text" style="color:#C4928A;">載入失敗，請確認 API 連線</div>
-                <button onclick="loadProducts()" class="btn-secondary" style="margin-top:16px;">重試</button>
+                <div class="empty-state-text" style="color:#C4928A;">載入失敗</div>
+                <div style="margin:10px 0;padding:10px 14px;background:#FFF0EE;border-radius:10px;font-size:11px;color:#9d4a42;text-align:left;max-width:400px;word-break:break-all;">${msg}</div>
+                <button onclick="loadProducts()" class="btn-secondary" style="margin-top:8px;">重試</button>
             </div>`;
     }
 }
