@@ -683,21 +683,34 @@ function getDailyReport(store, date) {
     if (r.memberId) memberCount++;
   });
 
-  // Waste cost from inventory log
+  // Waste cost from inventory log — [v2.6] 增加 wasteByStore 分店細項
   const prodMap = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
     prodMap[Number(r.id)] = Number(r.cost)||0;
   });
-  const totalWasteCost = sheetToObjects(getSheet(SH.INV_LOG))
-    .filter(r => r.type === 'waste' && !isNaN(new Date(r.time)) && new Date(r.time) >= from && new Date(r.time) <= to)
+  const wasteRows = sheetToObjects(getSheet(SH.INV_LOG))
+    .filter(r => {
+      const d = new Date(r.time);
+      return r.type === 'waste' && !isNaN(d) && d >= from && d <= to;
+    });
+  const totalWasteCost = wasteRows
     .reduce((s,r) => s + (prodMap[Number(r.productId)]||0) * Math.abs(Number(r.diff)||0), 0);
+
+  // 分店廢棄摘要
+  const wasteByStore = {};
+  wasteRows.forEach(r => {
+    const s = r.store || '未知';
+    if (!wasteByStore[s]) wasteByStore[s] = { count: 0, cost: 0 };
+    wasteByStore[s].count++;
+    wasteByStore[s].cost += (prodMap[Number(r.productId)]||0) * Math.abs(Number(r.diff)||0);
+  });
 
   return {
     ...compute(todayTxs),
     lastWeek  : compute(lwTxs),
     lastMonth : compute(lmTxs),   // [v2.5]
     lastYear  : compute(lyTxs),   // [v2.5]
-    sourceBreakdown, newCount, memberCount, totalWasteCost,
+    sourceBreakdown, newCount, memberCount, totalWasteCost, wasteByStore,
   };
 }
 
@@ -781,35 +794,60 @@ function getItemRanking(store, date) {
   const from = new Date(base.getFullYear(), base.getMonth(), 1);
   const to   = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
 
+  // [v2.6] 同時建立 cost map 與 price map（售價），供 item.price 缺失時 fallback
   const prodMap = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
-    prodMap[Number(r.id)] = { cost: Number(r.cost)||0, name: r.name };
+    prodMap[Number(r.id)] = {
+      cost : Number(r.cost)  || 0,
+      price: Number(r.price) || 0,
+      name : r.name,
+    };
   });
 
   const itemMap = {};
-  rows.filter(r => { const d = new Date(r.date); const iv = r.voided===true||String(r.voided).toLowerCase()==='true'; return !isNaN(d) && filt(r) && !iv && d >= from && d <= to; }) // [v2.4]
+  rows.filter(r => { const d = new Date(r.date); const iv = r.voided===true||String(r.voided).toLowerCase()==='true'; return !isNaN(d) && filt(r) && !iv && d >= from && d <= to; })
     .forEach(tx => {
       const items = safeJson(tx.items, []);
       items.forEach(item => {
         const key = String(item.id || item.name);
+        const prod = prodMap[Number(item.id)] || {};
         if (!itemMap[key]) {
-          itemMap[key] = { name: item.name || (prodMap[Number(item.id)] ? prodMap[Number(item.id)].name : key), qty: 0, sales: 0, cost: 0, waste: 0 };
+          itemMap[key] = { name: item.name || prod.name || key, qty: 0, sales: 0, cost: 0, waste: 0 };
         }
-        const qty  = Number(item.qty)   || 0;
-        const price= Number(item.price) || 0;
-        const uc   = prodMap[Number(item.id)] ? prodMap[Number(item.id)].cost : 0;
+        const qty   = Number(item.qty)   || 0;
+        // item.price 若為 0，改用 Products 表的售價 fallback
+        const price = Number(item.price) || prod.price || 0;
+        const uc    = prod.cost || 0;
         itemMap[key].qty   += qty;
         itemMap[key].sales += price * qty;
         itemMap[key].cost  += uc * qty;
       });
     });
 
-  return Object.values(itemMap).map(it => {
+  // [v2.6] 從 INV_LOG 補入廢棄數量（依商品名稱對應）
+  const nameToKey = {};
+  Object.entries(itemMap).forEach(([k, v]) => { nameToKey[v.name] = k; });
+  sheetToObjects(getSheet(SH.INV_LOG))
+    .filter(r => {
+      const d = new Date(r.time);
+      return r.type === 'waste' && !isNaN(d) && filt(r) && d >= from && d <= to;
+    })
+    .forEach(r => {
+      const k = nameToKey[r.name];
+      if (k && itemMap[k]) itemMap[k].waste += Math.abs(Number(r.diff)||0);
+    });
+
+  const sorted = Object.values(itemMap).map(it => {
     const profit    = it.sales - it.cost;
     const margin    = it.sales > 0 ? Math.round(profit / it.sales * 100) : 0;
     const wasteRate = (it.qty + it.waste) > 0 ? Math.round(it.waste / (it.qty + it.waste) * 100) : 0;
-    return { name: it.name, qty: it.qty, sales: Math.round(it.sales), cost: Math.round(it.cost), profit: Math.round(profit), margin, waste: it.waste, wasteRate };
-  }).sort((a,b) => b.sales - a.sales);
+    return { name: it.name, qty: it.qty, revenue: Math.round(it.sales), sales: Math.round(it.sales), cost: Math.round(it.cost), profit: Math.round(profit), margin, waste: it.waste, wasteRate };
+  }).sort((a,b) => b.revenue - a.revenue);
+
+  // 補上佔比 pct（以最高銷售額為基準 100%）
+  const maxSales = sorted.length > 0 ? (sorted[0].revenue || 1) : 1;
+  sorted.forEach(it => { it.pct = Math.round(it.revenue / maxSales * 100); });
+  return sorted;
 }
 
 function getMemberStats() {
