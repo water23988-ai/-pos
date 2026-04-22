@@ -423,28 +423,18 @@ function productCardHtml(p) {
     const stockKH  = Number(p.stockKH || p.庫存KH || 0);
     const stockTN  = Number(p.stockTN || p.庫存TN || 0);
     const stockES  = Number(p.stockES || p.庫存ES || 0);
-<<<<<<< HEAD
     // status: 'active' = 收銀台顯示, 'hidden' = 管理可見但不在收銀台, 'inactive' = 已刪除
     const status  = p.status || 'active';
     const posOn   = status === 'active';    // 是否顯示在收銀台
     const deleted = status === 'inactive';  // 已軟刪除
-=======
-    const visible  = p.visible !== false && p.visible !== 'false' && p.visible !== 0;
->>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
 
     const khClass  = stockKH <= 3 ? 'stock-low' : '';
     const tnClass  = stockTN <= 3 ? 'stock-low' : '';
     const esClass  = stockES <= 3 ? 'stock-low' : '';
 
-<<<<<<< HEAD
     return `<div class="product-card" style="${deleted ? 'opacity:0.55;' : ''}">
         <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
         <div class="product-card-name">${escHtml(name)}${deleted ? ' <span style="font-size:9px;background:#f3d6d4;color:#C4928A;border-radius:6px;padding:2px 6px;font-weight:700;">已停用</span>' : ''}</div>
-=======
-    return `<div class="product-card">
-        <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
-        <div class="product-card-name">${escHtml(name)}</div>
->>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
         <span class="product-card-cat">${escHtml(cat)}</span>
         <div class="product-card-price">NT$ ${price.toLocaleString()}</div>
         <div class="product-card-cost">成本 NT$ ${cost.toLocaleString()} ${sugprice > 0 ? '· 建議 NT$ ' + sugprice.toLocaleString() : ''}</div>
@@ -465,15 +455,9 @@ function productCardHtml(p) {
             </div>
         </div>
         <div class="toggle-wrap">
-<<<<<<< HEAD
             <span class="toggle-label-text ${posOn ? 'on' : ''}">${posOn ? '收銀台顯示中' : (deleted ? '已停用' : '收銀台已隱藏')}</span>
             <label class="toggle" style="${deleted ? 'pointer-events:none;opacity:0.4;' : ''}">
                 <input type="checkbox" ${posOn ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
-=======
-            <span class="toggle-label-text ${visible ? 'on' : ''}">${visible ? '收銀台顯示中' : '已隱藏'}</span>
-            <label class="toggle">
-                <input type="checkbox" ${visible ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
->>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
             </label>
@@ -596,33 +580,20 @@ async function deleteProduct() {
     }
 }
 
-<<<<<<< HEAD
 // ══ 切換收銀台顯示（同步更新 Google Sheet status 欄位）══
 async function toggleVisibility(id, checkbox) {
-    const posOn  = checkbox.checked;
+    const posOn     = checkbox.checked;
     const newStatus = posOn ? 'active' : 'hidden';
-    const wrap   = checkbox.closest('.toggle-wrap');
-    const label  = wrap ? wrap.querySelector('.toggle-label-text') : null;
+    const wrap      = checkbox.closest('.toggle-wrap');
+    const label     = wrap ? wrap.querySelector('.toggle-label-text') : null;
 
     if (!API_URL) {
         showToast('請先設定 API 網址');
         checkbox.checked = !posOn;
-=======
-// ══ 切換收銀台顯示 ══
-async function toggleVisibility(id, checkbox) {
-    const visible = checkbox.checked;
-    const wrap    = checkbox.closest('.toggle-wrap');
-    const label   = wrap ? wrap.querySelector('.toggle-label-text') : null;
-
-    if (!API_URL) {
-        showToast('請先設定 API 網址');
-        checkbox.checked = !visible; // 還原
->>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
         return;
     }
 
     try {
-<<<<<<< HEAD
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
             action: 'updateProduct',
             data: { id, status: newStatus, visible: posOn }
@@ -643,26 +614,6 @@ async function toggleVisibility(id, checkbox) {
     } catch(e) {
         showToast('連線失敗');
         checkbox.checked = !posOn;
-=======
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data: { id, visible } }) });
-        const result = await res.json();
-        if (result.success) {
-            showToast(visible ? '✅ 已顯示在收銀台' : '🔕 已從收銀台隱藏');
-            if (label) {
-                label.innerText    = visible ? '收銀台顯示中' : '已隱藏';
-                label.className    = 'toggle-label-text' + (visible ? ' on' : '');
-            }
-            // 同步更新本地陣列
-            const p = allProducts.find(p => (p.id || p.productId) == id);
-            if (p) p.visible = visible;
-        } else {
-            showToast('更新失敗');
-            checkbox.checked = !visible;
-        }
-    } catch(e) {
-        showToast('連線失敗');
-        checkbox.checked = !visible;
->>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
     }
 }
 
