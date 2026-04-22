@@ -1350,16 +1350,33 @@ function fixTransactionsSheet() {
 function getProcurementBatches() {
   const sh = getSheet(SH_PROC.BATCHES);
   if (!sh || sh.getLastRow() < 2) return [];
-  // [v2.2 修復] 回傳 store 欄位
-  return sheetToObjects(sh).reverse().slice(0, 100).map(r => ({
-    batchId   : r.batchId,
-    date      : r.date,
-    source    : r.source,
-    store     : r.store || '',
-    note      : r.note,
-    totalItems: Number(r.totalItems) || 0,
-    totalCost : Number(r.totalCost)  || 0,
-  }));
+
+  // [v2.6 修復] 動態從 ITEMS 工作表重算摘要，避免儲存值過時
+  const itemSh = getSheet(SH_PROC.ITEMS);
+  const aggByBatch = {};
+  if (itemSh && itemSh.getLastRow() >= 2) {
+    sheetToObjects(itemSh).forEach(function(r) {
+      if (!r.batchId) return;
+      if (!aggByBatch[r.batchId]) aggByBatch[r.batchId] = { count: 0, bunches: 0, cost: 0 };
+      aggByBatch[r.batchId].count++;
+      aggByBatch[r.batchId].bunches += Number(r.bunchesQty)   || 0;
+      aggByBatch[r.batchId].cost   += (Number(r.pricePerBunch) || 0) * (Number(r.bunchesQty) || 0);
+    });
+  }
+
+  return sheetToObjects(sh).reverse().slice(0, 100).map(function(r) {
+    const agg = aggByBatch[r.batchId] || { count: 0, bunches: 0, cost: 0 };
+    return {
+      batchId     : r.batchId,
+      date        : r.date,
+      source      : r.source,
+      store       : r.store || '',
+      note        : r.note,
+      totalItems  : agg.count   > 0 ? agg.count   : (Number(r.totalItems) || 0),
+      totalBunches: agg.bunches > 0 ? agg.bunches  : 0,
+      totalCost   : agg.cost    > 0 ? agg.cost     : (Number(r.totalCost)  || 0),
+    };
+  });
 }
 
 function getProcurementItems(batchId) {

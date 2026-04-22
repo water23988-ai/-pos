@@ -101,6 +101,28 @@
         .adj-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
         .adj-modal.show { display: flex; }
         .adj-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; margin: 16px; border: 1px solid #DDD0BC; }
+
+        /* ════════════════════════════════
+           手機響應式設計 (≤768px)
+        ════════════════════════════════ */
+        .mobile-bottom-nav { display: none; }
+        @media (max-width: 768px) {
+            .side-nav { display: none !important; }
+            .main-area { margin-left: 0 !important; }
+            .main-header { padding: 0 16px; }
+            .main-content { padding: 14px 14px 80px; }
+            .store-chips { padding: 10px 14px; overflow-x: auto; flex-wrap: nowrap; -webkit-overflow-scrolling: touch; }
+            .mobile-bottom-nav {
+                display: flex; position: fixed;
+                bottom: 0; left: 0; right: 0; height: 60px;
+                background: #FAF7F2; border-top: 1.5px solid #DDD0BC;
+                z-index: 150; padding-bottom: env(safe-area-inset-bottom, 0px);
+                box-shadow: 0 -2px 8px rgba(61,46,30,0.08);
+            }
+            .mbn-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-decoration:none; color:#A89278; font-size:9px; font-weight:600; padding:6px 2px 4px; -webkit-tap-highlight-color:transparent; gap:2px; }
+            .mbn-item.active { color: #6d7756; }
+            .mbn-icon { font-size: 20px; line-height: 1; }
+        }
     </style>
 </head>
 <body>
@@ -512,5 +534,14 @@ window.onload = function() {
     loadProducts();
 };
 </script>
+
+<!-- 手機底部導航 -->
+<nav class="mobile-bottom-nav">
+    <a href="index.html" class="mbn-item"><span class="mbn-icon">🛒</span><span>收銀台</span></a>
+    <a href="sales.html" class="mbn-item"><span class="mbn-icon">🔍</span><span>銷售</span></a>
+    <a href="procurement.html" class="mbn-item"><span class="mbn-icon">🚚</span><span>進貨</span></a>
+    <a href="products.html" class="mbn-item"><span class="mbn-icon">🌹</span><span>商品</span></a>
+    <a href="dashboard.html" class="mbn-item"><span class="mbn-icon">📊</span><span>報表</span></a>
+</nav>
 </body>
 </html>

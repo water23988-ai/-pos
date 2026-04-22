@@ -130,6 +130,28 @@
         .toggle input:checked + .toggle-track { background: #8e9775; }
         .toggle-thumb { position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; background: white; border-radius: 50%; transition: left 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); pointer-events: none; }
         .toggle input:checked ~ .toggle-thumb { left: 21px; }
+
+        /* ════════════════════════════════
+           手機響應式設計 (≤768px)
+        ════════════════════════════════ */
+        .mobile-bottom-nav { display: none; }
+        @media (max-width: 768px) {
+            .side-nav { display: none !important; }
+            .main-area { margin-left: 0 !important; }
+            .main-header { padding: 0 16px; }
+            .main-content { padding: 14px 14px 80px; }
+            .products-grid { grid-template-columns: repeat(2, 1fr) !important; }
+            .mobile-bottom-nav {
+                display: flex; position: fixed;
+                bottom: 0; left: 0; right: 0; height: 60px;
+                background: #FAF7F2; border-top: 1.5px solid #DDD0BC;
+                z-index: 150; padding-bottom: env(safe-area-inset-bottom, 0px);
+                box-shadow: 0 -2px 8px rgba(61,46,30,0.08);
+            }
+            .mbn-item { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; text-decoration:none; color:#A89278; font-size:9px; font-weight:600; padding:6px 2px 4px; -webkit-tap-highlight-color:transparent; gap:2px; }
+            .mbn-item.active { color: #6d7756; }
+            .mbn-icon { font-size: 20px; line-height: 1; }
+        }
     </style>
 </head>
 <body>
@@ -389,15 +411,28 @@ function productCardHtml(p) {
     const stockKH  = Number(p.stockKH || p.庫存KH || 0);
     const stockTN  = Number(p.stockTN || p.庫存TN || 0);
     const stockES  = Number(p.stockES || p.庫存ES || 0);
+<<<<<<< HEAD
+    // status: 'active' = 收銀台顯示, 'hidden' = 管理可見但不在收銀台, 'inactive' = 已刪除
+    const status  = p.status || 'active';
+    const posOn   = status === 'active';    // 是否顯示在收銀台
+    const deleted = status === 'inactive';  // 已軟刪除
+=======
     const visible  = p.visible !== false && p.visible !== 'false' && p.visible !== 0;
+>>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
 
     const khClass  = stockKH <= 3 ? 'stock-low' : '';
     const tnClass  = stockTN <= 3 ? 'stock-low' : '';
     const esClass  = stockES <= 3 ? 'stock-low' : '';
 
+<<<<<<< HEAD
+    return `<div class="product-card" style="${deleted ? 'opacity:0.55;' : ''}">
+        <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
+        <div class="product-card-name">${escHtml(name)}${deleted ? ' <span style="font-size:9px;background:#f3d6d4;color:#C4928A;border-radius:6px;padding:2px 6px;font-weight:700;">已停用</span>' : ''}</div>
+=======
     return `<div class="product-card">
         <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
         <div class="product-card-name">${escHtml(name)}</div>
+>>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
         <span class="product-card-cat">${escHtml(cat)}</span>
         <div class="product-card-price">NT$ ${price.toLocaleString()}</div>
         <div class="product-card-cost">成本 NT$ ${cost.toLocaleString()} ${sugprice > 0 ? '· 建議 NT$ ' + sugprice.toLocaleString() : ''}</div>
@@ -418,9 +453,15 @@ function productCardHtml(p) {
             </div>
         </div>
         <div class="toggle-wrap">
+<<<<<<< HEAD
+            <span class="toggle-label-text ${posOn ? 'on' : ''}">${posOn ? '收銀台顯示中' : (deleted ? '已停用' : '收銀台已隱藏')}</span>
+            <label class="toggle" style="${deleted ? 'pointer-events:none;opacity:0.4;' : ''}">
+                <input type="checkbox" ${posOn ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
+=======
             <span class="toggle-label-text ${visible ? 'on' : ''}">${visible ? '收銀台顯示中' : '已隱藏'}</span>
             <label class="toggle">
                 <input type="checkbox" ${visible ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
+>>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
                 <div class="toggle-track"></div>
                 <div class="toggle-thumb"></div>
             </label>
@@ -543,6 +584,18 @@ async function deleteProduct() {
     }
 }
 
+<<<<<<< HEAD
+// ══ 切換收銀台顯示（同步更新 Google Sheet status 欄位）══
+async function toggleVisibility(id, checkbox) {
+    const posOn  = checkbox.checked;
+    const newStatus = posOn ? 'active' : 'hidden';
+    const wrap   = checkbox.closest('.toggle-wrap');
+    const label  = wrap ? wrap.querySelector('.toggle-label-text') : null;
+
+    if (!API_URL) {
+        showToast('請先設定 API 網址');
+        checkbox.checked = !posOn;
+=======
 // ══ 切換收銀台顯示 ══
 async function toggleVisibility(id, checkbox) {
     const visible = checkbox.checked;
@@ -552,10 +605,33 @@ async function toggleVisibility(id, checkbox) {
     if (!API_URL) {
         showToast('請先設定 API 網址');
         checkbox.checked = !visible; // 還原
+>>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
         return;
     }
 
     try {
+<<<<<<< HEAD
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+            action: 'updateProduct',
+            data: { id, status: newStatus, visible: posOn }
+        })});
+        const result = await res.json();
+        if (result.success) {
+            showToast(posOn ? '✅ 已顯示在收銀台' : '🔕 已從收銀台隱藏');
+            if (label) {
+                label.innerText = posOn ? '收銀台顯示中' : '收銀台已隱藏';
+                label.className = 'toggle-label-text' + (posOn ? ' on' : '');
+            }
+            const p = allProducts.find(p => (p.id || p.productId) == id);
+            if (p) { p.status = newStatus; p.visible = posOn; }
+        } else {
+            showToast('更新失敗');
+            checkbox.checked = !posOn;
+        }
+    } catch(e) {
+        showToast('連線失敗');
+        checkbox.checked = !posOn;
+=======
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data: { id, visible } }) });
         const result = await res.json();
         if (result.success) {
@@ -574,6 +650,7 @@ async function toggleVisibility(id, checkbox) {
     } catch(e) {
         showToast('連線失敗');
         checkbox.checked = !visible;
+>>>>>>> aa013abd7275b95cf1150613546dd465b9b3457b
     }
 }
 
@@ -598,5 +675,14 @@ function init() {
 
 window.onload = init;
 </script>
+
+<!-- 手機底部導航 -->
+<nav class="mobile-bottom-nav">
+    <a href="index.html" class="mbn-item"><span class="mbn-icon">🛒</span><span>收銀台</span></a>
+    <a href="sales.html" class="mbn-item"><span class="mbn-icon">🔍</span><span>銷售</span></a>
+    <a href="procurement.html" class="mbn-item"><span class="mbn-icon">🚚</span><span>進貨</span></a>
+    <a href="products.html" class="mbn-item active"><span class="mbn-icon">🌹</span><span>商品</span></a>
+    <a href="dashboard.html" class="mbn-item"><span class="mbn-icon">📊</span><span>報表</span></a>
+</nav>
 </body>
 </html>
