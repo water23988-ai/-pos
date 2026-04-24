@@ -6,128 +6,65 @@
 <title>拾逅樹洞 · 後台</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
 <style>
-:root {
-  --cream:#faf6f0;--cream2:#f5ede0;--ivory:#fdf9f4;
-  --dark:#2e1f14;--warm:#8b6e52;--muted:#8b7263;
-  --sage:#8a9e7e;--blush:#c9928a;
-  --border:rgba(139,110,82,0.18);
-}
+:root{--cream:#faf6f0;--cream2:#f5ede0;--ivory:#fdf9f4;--dark:#2e1f14;--warm:#8b6e52;--muted:#8b7263;--sage:#8a9e7e;--blush:#c9928a;--border:rgba(139,110,82,0.18);}
 *{margin:0;padding:0;box-sizing:border-box;}
-html,body{
-  font-family:'Noto Sans TC',sans-serif;
-  background:var(--cream);color:var(--dark);
-  min-height:100vh;-webkit-text-size-adjust:100%;
-}
+html,body{font-family:'Noto Sans TC',sans-serif;background:var(--cream);color:var(--dark);min-height:100vh;-webkit-text-size-adjust:100%;}
 
-.header{
-  background:var(--dark);color:var(--cream);
-  padding:14px 16px;
-  display:flex;align-items:center;justify-content:space-between;
-  position:sticky;top:0;z-index:100;gap:10px;
-}
+.header{background:var(--dark);color:var(--cream);padding:14px 16px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:100;gap:10px;}
 .header-left{display:flex;align-items:center;gap:10px;}
 .header-logo{width:30px;filter:invert(1) brightness(2);opacity:0.85;pointer-events:none;}
 .header-title{font-family:'Noto Serif TC',serif;font-size:15px;font-weight:300;letter-spacing:1px;}
 .header-count{font-size:11px;opacity:0.5;margin-top:1px;}
-.refresh-btn{
-  padding:7px 14px;border-radius:8px;
-  border:1px solid rgba(255,255,255,0.2);
-  background:transparent;color:rgba(255,255,255,0.7);
-  font-size:12px;font-family:'Noto Sans TC',sans-serif;cursor:pointer;
-  transition:all 0.15s;white-space:nowrap;
-}
+.refresh-btn{padding:7px 14px;border-radius:8px;border:1px solid rgba(255,255,255,0.2);background:transparent;color:rgba(255,255,255,0.7);font-size:12px;font-family:'Noto Sans TC',sans-serif;cursor:pointer;transition:all 0.15s;white-space:nowrap;}
 .refresh-btn:hover{border-color:rgba(255,255,255,0.5);color:white;}
 
-.filters{
-  padding:10px 14px;display:flex;gap:7px;flex-wrap:wrap;
-  border-bottom:1px solid var(--border);background:var(--ivory);
-  position:sticky;top:57px;z-index:90;
-}
-.filter-btn{
-  padding:5px 14px;border-radius:20px;
-  border:1px solid var(--border);background:transparent;
-  font-size:12px;color:var(--muted);cursor:pointer;
-  font-family:'Noto Sans TC',sans-serif;transition:all 0.15s;white-space:nowrap;
-}
+/* stats */
+.stats-section{padding:14px 14px 0;}
+.stats-title{font-size:11px;color:var(--muted);letter-spacing:1px;margin-bottom:8px;}
+.stats-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-bottom:8px;}
+.stats-grid.wide{grid-template-columns:repeat(4,1fr);}
+.stat-box{background:var(--ivory);border:1px solid var(--border);border-radius:12px;padding:12px 14px;text-align:center;}
+.stat-num{font-size:26px;font-weight:500;color:var(--dark);line-height:1;margin-bottom:3px;}
+.stat-label{font-size:10px;color:var(--muted);letter-spacing:0.5px;}
+.stat-box.highlight .stat-num{color:var(--blush);}
+.stat-box.highlight2 .stat-num{color:var(--sage);}
+
+/* conversion bar */
+.conv-bar{background:var(--ivory);border:1px solid var(--border);border-radius:12px;padding:12px 16px;margin-bottom:8px;}
+.conv-label{font-size:11px;color:var(--muted);margin-bottom:6px;letter-spacing:0.5px;}
+.conv-track{height:8px;background:var(--cream2);border-radius:4px;overflow:hidden;}
+.conv-fill{height:100%;background:linear-gradient(90deg,var(--sage),var(--blush));border-radius:4px;transition:width 0.6s ease;}
+.conv-pct{font-size:12px;color:var(--warm);font-weight:500;margin-top:5px;text-align:right;}
+
+.filters{padding:10px 14px;display:flex;gap:7px;flex-wrap:wrap;border-bottom:1px solid var(--border);background:var(--ivory);position:sticky;top:57px;z-index:90;}
+.filter-btn{padding:5px 14px;border-radius:20px;border:1px solid var(--border);background:transparent;font-size:12px;color:var(--muted);cursor:pointer;font-family:'Noto Sans TC',sans-serif;transition:all 0.15s;white-space:nowrap;}
 .filter-btn.active{background:var(--dark);color:var(--cream);border-color:var(--dark);}
 .filter-btn:hover:not(.active){border-color:rgba(139,110,82,0.4);color:var(--warm);}
 
-.stats-row{
-  display:flex;gap:8px;padding:10px 14px;
-  border-bottom:1px solid var(--border);
-  background:var(--cream2);
-}
-.stat-box{
-  flex:1;background:var(--ivory);border:1px solid var(--border);
-  border-radius:10px;padding:10px 12px;text-align:center;
-}
-.stat-num{font-size:22px;font-weight:500;color:var(--dark);line-height:1;margin-bottom:3px;}
-.stat-label{font-size:10px;color:var(--muted);letter-spacing:0.5px;}
-
 .list{padding:10px 14px;display:flex;flex-direction:column;gap:10px;}
-
-.card{
-  background:var(--ivory);border:1px solid var(--border);
-  border-radius:14px;padding:14px;
-  transition:box-shadow 0.2s;
-}
+.card{background:var(--ivory);border:1px solid var(--border);border-radius:14px;padding:14px;transition:box-shadow 0.2s;}
 .card:hover{box-shadow:0 2px 14px rgba(61,43,31,0.08);}
-
-.card-top{
-  display:flex;justify-content:space-between;align-items:flex-start;
-  margin-bottom:8px;gap:8px;flex-wrap:wrap;
-}
-.mood-tag{
-  font-size:12px;padding:3px 11px;border-radius:20px;font-weight:500;white-space:nowrap;
-}
+.card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;gap:8px;flex-wrap:wrap;}
+.mood-tag{font-size:12px;padding:3px 11px;border-radius:20px;font-weight:500;white-space:nowrap;}
 .tag-joy{background:rgba(138,158,126,0.15);color:#4a6b3e;}
 .tag-sad{background:rgba(212,165,160,0.2);color:#7a4040;}
 .card-time{font-size:11px;color:var(--muted);opacity:0.65;flex-shrink:0;}
-
-.card-content{
-  font-size:14px;line-height:1.85;color:var(--dark);
-  margin-bottom:10px;white-space:pre-wrap;
-}
-
-.card-footer{
-  display:flex;justify-content:space-between;
-  align-items:center;flex-wrap:wrap;gap:8px;
-}
-.ig-badge{
-  font-size:11px;padding:3px 10px;border-radius:20px;
-  background:rgba(188,24,136,0.1);color:#bc1888;font-weight:500;
-}
+.card-content{font-size:14px;line-height:1.85;color:var(--dark);margin-bottom:10px;white-space:pre-wrap;}
+.card-footer{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;}
+.badge-row{display:flex;gap:6px;flex-wrap:wrap;align-items:center;}
+.ig-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(188,24,136,0.1);color:#bc1888;font-weight:500;}
+.tracked-badge{font-size:11px;padding:3px 10px;border-radius:20px;background:rgba(138,158,126,0.15);color:#4a6b3e;font-weight:500;}
 .no-badge{font-size:11px;color:var(--muted);opacity:0.4;}
-
 .action-btns{display:flex;gap:6px;flex-wrap:wrap;}
-.act-btn{
-  padding:6px 13px;border-radius:8px;
-  border:1px solid var(--border);background:transparent;
-  font-size:12px;color:var(--muted);cursor:pointer;
-  font-family:'Noto Sans TC',sans-serif;transition:all 0.15s;white-space:nowrap;
-}
+.act-btn{padding:6px 13px;border-radius:8px;border:1px solid var(--border);background:transparent;font-size:12px;color:var(--muted);cursor:pointer;font-family:'Noto Sans TC',sans-serif;transition:all 0.15s;white-space:nowrap;}
 .act-btn:active{transform:scale(0.96);}
 .act-btn.ig:hover{background:#e1306c;border-color:#e1306c;color:white;}
 .act-btn.threads:hover{background:#1a1a1a;border-color:#1a1a1a;color:white;}
 
 .empty{text-align:center;padding:56px 20px;color:var(--muted);font-size:14px;line-height:2;}
 .loading-state{text-align:center;padding:56px 20px;color:var(--muted);font-size:13px;}
-
-.error-bar{
-  background:#fff0f0;border-bottom:1px solid rgba(180,60,60,0.15);
-  padding:12px 16px;font-size:13px;color:#7a3030;line-height:1.7;
-  display:none;
-}
-
-.toast{
-  position:fixed;bottom:20px;left:50%;
-  transform:translateX(-50%) translateY(70px);
-  background:var(--dark);color:var(--cream);
-  padding:9px 22px;border-radius:22px;
-  font-size:13px;transition:transform 0.3s;
-  pointer-events:none;z-index:999;white-space:nowrap;
-  box-shadow:0 4px 16px rgba(0,0,0,0.2);
-}
+.error-bar{background:#fff0f0;border-bottom:1px solid rgba(180,60,60,0.15);padding:12px 16px;font-size:13px;color:#7a3030;line-height:1.7;display:none;}
+.toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(70px);background:var(--dark);color:var(--cream);padding:9px 22px;border-radius:22px;font-size:13px;transition:transform 0.3s;pointer-events:none;z-index:999;white-space:nowrap;box-shadow:0 4px 16px rgba(0,0,0,0.2);}
 .toast.show{transform:translateX(-50%) translateY(0);}
 </style>
 </head>
@@ -144,11 +81,23 @@ html,body{
   <button class="refresh-btn" onclick="loadData()">↻ 重新整理</button>
 </div>
 
-<div class="stats-row">
-  <div class="stat-box"><div class="stat-num" id="s-total">—</div><div class="stat-label">總計</div></div>
-  <div class="stat-box"><div class="stat-num" id="s-joy">—</div><div class="stat-label">🌸 開心</div></div>
-  <div class="stat-box"><div class="stat-num" id="s-sad">—</div><div class="stat-label">🍂 不愉快</div></div>
-  <div class="stat-box"><div class="stat-num" id="s-ig">—</div><div class="stat-label">IG 授權</div></div>
+<div class="stats-section">
+  <div class="stats-title">📊 數據總覽</div>
+  <div class="stats-grid wide">
+    <div class="stat-box"><div class="stat-num" id="s-total">—</div><div class="stat-label">總投遞</div></div>
+    <div class="stat-box"><div class="stat-num" id="s-joy">—</div><div class="stat-label">🌸 開心</div></div>
+    <div class="stat-box"><div class="stat-num" id="s-sad">—</div><div class="stat-label">🍂 不愉快</div></div>
+    <div class="stat-box highlight"><div class="stat-num" id="s-ig">—</div><div class="stat-label">IG 授權</div></div>
+  </div>
+  <div class="stats-grid">
+    <div class="stat-box highlight2"><div class="stat-num" id="s-tracked">—</div><div class="stat-label">已點擊追蹤</div></div>
+    <div class="stat-box"><div class="stat-num" id="s-keyword">—</div><div class="stat-label">有填關鍵字</div></div>
+  </div>
+  <div class="conv-bar">
+    <div class="conv-label">IG 追蹤轉換率（點擊 / 總投遞）</div>
+    <div class="conv-track"><div class="conv-fill" id="conv-fill" style="width:0%"></div></div>
+    <div class="conv-pct" id="conv-pct">—</div>
+  </div>
 </div>
 
 <div class="filters">
@@ -156,6 +105,7 @@ html,body{
   <button class="filter-btn" onclick="setFilter('joy',this)">🌸 開心</button>
   <button class="filter-btn" onclick="setFilter('sad',this)">🍂 不愉快</button>
   <button class="filter-btn" onclick="setFilter('ig',this)">IG 授權</button>
+  <button class="filter-btn" onclick="setFilter('tracked',this)">已追蹤</button>
 </div>
 
 <div class="error-bar" id="err"></div>
@@ -173,21 +123,23 @@ async function loadData() {
   try {
     const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:csv&sheet=樹洞心情&t=${Date.now()}`;
     const res = await fetch(url);
-    if (!res.ok) throw new Error('無法讀取試算表');
+    if (!res.ok) throw new Error('無法讀取試算表，請確認已設為公開檢視');
     const text = await res.text();
     const rows = parseCSV(text);
     all = rows.length > 1
       ? rows.slice(1).map((r,i) => ({
           id:i, time:r[0]||'', mood:r[1]||'',
           keyword:r[2]||'', content:r[3]||'',
-          igConsent: r[4]==='✓ 同意'
+          igConsent: r[4]==='✓ 同意',
+          tracked: r[5]==='✓ 已點擊',
+          status: r[6]||''
         })).filter(e=>e.content).reverse()
       : [];
     updateStats();
     render();
     document.getElementById('hcount').textContent = all.length + ' 則心情';
   } catch(e) {
-    showErr('⚠️ ' + e.message + '——請確認試算表已設為「知道連結的任何人皆可檢視」');
+    showErr('⚠️ ' + e.message);
     document.getElementById('hcount').textContent = '讀取失敗';
     document.getElementById('list').innerHTML = '';
   }
@@ -206,10 +158,22 @@ function parseCSV(text) {
 }
 
 function updateStats() {
-  document.getElementById('s-total').textContent = all.length;
-  document.getElementById('s-joy').textContent = all.filter(e=>e.mood.includes('開心')).length;
-  document.getElementById('s-sad').textContent = all.filter(e=>e.mood.includes('不愉快')).length;
-  document.getElementById('s-ig').textContent = all.filter(e=>e.igConsent).length;
+  const total = all.length;
+  const joy = all.filter(e=>e.mood.includes('開心')).length;
+  const sad = all.filter(e=>e.mood.includes('不愉快')).length;
+  const ig = all.filter(e=>e.igConsent).length;
+  const tracked = all.filter(e=>e.tracked).length;
+  const kw = all.filter(e=>e.keyword).length;
+  const pct = total > 0 ? Math.round(tracked/total*100) : 0;
+
+  document.getElementById('s-total').textContent = total;
+  document.getElementById('s-joy').textContent = joy;
+  document.getElementById('s-sad').textContent = sad;
+  document.getElementById('s-ig').textContent = ig;
+  document.getElementById('s-tracked').textContent = tracked;
+  document.getElementById('s-keyword').textContent = kw;
+  document.getElementById('conv-fill').style.width = pct + '%';
+  document.getElementById('conv-pct').textContent = pct + '%（' + tracked + ' / ' + total + '）';
 }
 
 function setFilter(f,btn) {
@@ -225,6 +189,7 @@ function render() {
   if (filter==='joy') entries=all.filter(e=>e.mood.includes('開心'));
   if (filter==='sad') entries=all.filter(e=>e.mood.includes('不愉快'));
   if (filter==='ig') entries=all.filter(e=>e.igConsent);
+  if (filter==='tracked') entries=all.filter(e=>e.tracked);
   if (!entries.length) {
     list.innerHTML='<div class="empty">這裡還很安靜<br>等待第一則心情落下 🌸</div>'; return;
   }
@@ -238,7 +203,10 @@ function render() {
       </div>
       <div class="card-content">${esc(e.content)}</div>
       <div class="card-footer">
-        ${e.igConsent?'<span class="ig-badge">✓ 同意分享</span>':'<span class="no-badge">僅保存</span>'}
+        <div class="badge-row">
+          ${e.igConsent?'<span class="ig-badge">✓ 同意分享</span>':'<span class="no-badge">未授權</span>'}
+          ${e.tracked?'<span class="tracked-badge">✓ 已追蹤</span>':''}
+        </div>
         <div class="action-btns">
           <button class="act-btn ig" onclick="copyIG(${e.id})">複製 IG</button>
           <button class="act-btn threads" onclick="copyThreads(${e.id})">複製 Threads</button>
@@ -259,9 +227,7 @@ function copyThreads(id) {
   copy(`${emoji} 樹洞裡，有人這樣說——\n\n${e.content}\n\n${e.keyword?'#'+e.keyword+' ':''}#拾逅樹洞 #momentflor`,'Threads 發文已複製 ✓');
 }
 
-function copy(text,msg) {
-  navigator.clipboard.writeText(text).then(()=>showToast(msg));
-}
+function copy(text,msg) { navigator.clipboard.writeText(text).then(()=>showToast(msg)); }
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 function showErr(msg) { const el=document.getElementById('err'); el.textContent=msg; el.style.display='block'; }
 function showToast(msg) {

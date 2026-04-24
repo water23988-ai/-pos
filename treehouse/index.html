@@ -916,7 +916,7 @@
     <h2 class="success-title" id="success-title"></h2>
     <p class="success-subtitle" id="success-subtitle"></p>
     <div class="success-cta" id="success-cta">
-      <a href="https://www.instagram.com/moment.flor?igsh=aXhnYjdid29yNDJq&utm_source=qr" target="_blank" class="ig-cta">
+      <a href="https://www.instagram.com/moment.flor?igsh=aXhnYjdid29yNDJq&utm_source=qr" target="_blank" class="ig-cta" onclick="trackIGClick()">
         追蹤 IG，隨意取走一枝花
         <span class="ig-handle">@moment.flor</span>
       </a>
@@ -1400,6 +1400,22 @@ function animateDust(canvas) {
     if (f < 500) requestAnimationFrame(draw);
     else ctx.clearRect(0, 0, W, H);
   })();
+}
+
+// ─── IG CLICK TRACKING ───
+function trackIGClick() {
+  const last = loadEntries()[0];
+  if (!last) return;
+  fetch('https://script.google.com/macros/s/AKfycbw2VkQkt2ak4hWwqPMBuZrK6LBdgyOQvGTFa5eH8chNQrii87WDSxyHDi6LEJhuWdVd/exec', {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      action: 'ig_click',
+      time: last.time,
+      content: last.content
+    })
+  }).catch(() => {});
 }
 
 // ─── LONG PRESS ADMIN ───
