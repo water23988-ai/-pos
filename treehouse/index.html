@@ -1130,6 +1130,14 @@ function submitForm() {
   allEntries.unshift(entry);
   saveEntries(allEntries);
 
+  // ── POST to Google Sheets ──
+  fetch('https://script.google.com/macros/s/AKfycbw2VkQkt2ak4hWwqPMBuZrK6LBdgyOQvGTFa5eH8chNQrii87WDSxyHDi6LEJhuWdVd/exec', {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry)
+  }).catch(() => {}); // silent fail, data already in localStorage
+
   const moodSaved = currentMood;
   showView('success');
   setTimeout(() => launchMoodScene(moodSaved), 60);
