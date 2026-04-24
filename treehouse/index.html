@@ -23,6 +23,16 @@
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
 
+  /* ── logo protection ── */
+  img {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    user-select: none;
+    pointer-events: none;
+    -webkit-touch-callout: none;
+    -webkit-user-drag: none;
+  }
+
   html, body {
     font-family: 'Noto Sans TC', sans-serif;
     background: var(--cream);
@@ -1399,6 +1409,14 @@ function cancelAdminHold() {
   const ring = document.getElementById('hold-ring');
   ring.classList.remove('active');
 }
+
+// ── image protection ──
+document.addEventListener('contextmenu', e => {
+  if (e.target.tagName === 'IMG') e.preventDefault();
+});
+document.addEventListener('dragstart', e => {
+  if (e.target.tagName === 'IMG') e.preventDefault();
+});
 
 function showToast(msg) {
   const t = document.getElementById('toast');
