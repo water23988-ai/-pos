@@ -102,6 +102,18 @@
         .adj-modal.show { display: flex; }
         .adj-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; margin: 16px; border: 1px solid #DDD0BC; }
 
+        /* ── 報廢 Modal ── */
+        .waste-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
+        .waste-modal.show { display: flex; }
+        .waste-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; margin: 16px; border: 1px solid rgba(196,146,138,0.5); }
+        .btn-waste { background: rgba(196,146,138,0.15); color: #9d4a42; border: 1.5px solid rgba(196,146,138,0.4); border-radius: 10px; padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
+        .btn-waste:hover { background: rgba(196,146,138,0.28); border-color: #C4928A; }
+        .waste-store-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 14px; }
+        .waste-store-btn { border: 1.5px solid #DDD0BC; background: #F5EFE6; border-radius: 10px; padding: 10px 6px; font-size: 12px; font-weight: 600; color: #7A6550; cursor: pointer; text-align: center; transition: all 0.15s; }
+        .waste-store-btn.active { border-color: #C4928A; background: rgba(196,146,138,0.12); color: #9d4a42; }
+        .waste-store-btn .store-stock { font-size: 18px; font-weight: 800; color: #3D2E1E; display: block; margin-bottom: 2px; }
+        .waste-store-btn.active .store-stock { color: #C4928A; }
+
         /* ════════════════════════════════
            手機響應式設計 (≤768px)
         ════════════════════════════════ */
@@ -156,6 +168,29 @@
         <div style="display:flex;gap:10px;">
             <button onclick="closeAdjModal()" class="btn-secondary" style="flex:1;">取消</button>
             <button onclick="submitAdj()" class="btn-primary" style="flex:2;" id="adjBtn">確認調整</button>
+        </div>
+    </div>
+</div>
+
+<!-- 報廢 Modal -->
+<div class="waste-modal" id="wasteModal">
+    <div class="waste-box" id="wasteBox">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">🗑 回報報廢</h3>
+            <button onclick="closeWasteModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
+        </div>
+        <p id="wasteProductName" style="font-size:13px;font-weight:600;color:#6d7756;margin-bottom:16px;"></p>
+
+        <div style="font-size:11px;font-weight:600;color:#A89278;margin-bottom:8px;letter-spacing:0.04em;text-transform:uppercase;">選擇點位</div>
+        <div class="waste-store-grid" id="wasteStoreGrid"></div>
+
+        <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;letter-spacing:0.04em;text-transform:uppercase;">報廢數量</label>
+        <input type="number" id="wasteQty" class="f-input" style="width:100%;margin-bottom:12px;" min="1" placeholder="輸入要報廢的支數">
+        <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;letter-spacing:0.04em;text-transform:uppercase;">備註（選填）</label>
+        <input type="text" id="wasteNote" class="f-input" style="width:100%;margin-bottom:18px;" placeholder="例：凋謝、損壞">
+        <div style="display:flex;gap:10px;">
+            <button onclick="closeWasteModal()" class="btn-secondary" style="flex:1;">取消</button>
+            <button onclick="submitWaste()" style="flex:2;background:#C4928A;color:white;border:none;border-radius:12px;padding:12px;font-size:14px;font-weight:700;cursor:pointer;" id="wasteBtn">確認報廢</button>
         </div>
     </div>
 </div>
@@ -386,7 +421,10 @@ function renderTable() {
                 <span style="font-size:14px;font-weight:800;color:#6d7756;">${total}</span>
             </td>
             <td style="text-align:center;">
-                <button onclick='openAdjModal(${pJson})' class="btn-secondary" style="font-size:11px;padding:6px 12px;">手動調整</button>
+                <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
+                    <button onclick='openAdjModal(${pJson})' class="btn-secondary" style="font-size:11px;padding:6px 10px;">手動調整</button>
+                    <button onclick='openWasteModal(${pJson})' class="btn-waste">🗑 報廢</button>
+                </div>
             </td>
         </tr>`;
     }).join('');
@@ -511,6 +549,111 @@ async function submitAdj() {
         setGas('error');
         showToast('連線失敗');
         btn.disabled = false; btn.innerText = '確認調整';
+    }
+}
+
+// ── 報廢 Modal ──
+let wasteTarget = null;
+let wasteStore  = 'KH';
+
+function openWasteModal(p) {
+    wasteTarget = p;
+    wasteStore  = 'KH';
+    const name = p.name || p.productName || '未命名';
+    const kh   = Number(p.stockKH || 0);
+    const tn   = Number(p.stockTN || 0);
+    const es   = Number(p.stockES || 0);
+
+    document.getElementById('wasteProductName').innerText = name;
+    document.getElementById('wasteQty').value  = '';
+    document.getElementById('wasteNote').value = '';
+    document.getElementById('wasteBtn').disabled = false;
+    document.getElementById('wasteBtn').innerText = '確認報廢';
+
+    // 三個點位選擇按鈕
+    const stores = [
+        { code:'KH', label:'高雄', stock: kh },
+        { code:'TN', label:'台南', stock: tn },
+        { code:'ES', label:'誠品', stock: es },
+    ];
+    document.getElementById('wasteStoreGrid').innerHTML = stores.map(s => `
+        <button class="waste-store-btn ${s.code === 'KH' ? 'active' : ''}"
+            id="wasteSBtn_${s.code}"
+            onclick="selectWasteStore('${s.code}',${s.stock})">
+            <span class="store-stock" id="wasteStk_${s.code}">${s.stock}</span>
+            ${s.label}
+        </button>`).join('');
+
+    document.getElementById('wasteModal').classList.add('show');
+    setTimeout(() => document.getElementById('wasteQty').focus(), 150);
+}
+
+function selectWasteStore(code, stock) {
+    wasteStore = code;
+    document.querySelectorAll('.waste-store-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById('wasteSBtn_' + code).classList.add('active');
+}
+
+function closeWasteModal() {
+    document.getElementById('wasteModal').classList.remove('show');
+    wasteTarget = null;
+}
+document.getElementById('wasteModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('wasteModal')) closeWasteModal();
+});
+
+async function submitWaste() {
+    if (!wasteTarget) return;
+    const qty  = parseInt(document.getElementById('wasteQty').value);
+    const note = document.getElementById('wasteNote').value.trim() || '報廢';
+    if (isNaN(qty) || qty <= 0) { showToast('請輸入報廢數量'); return; }
+    if (!API_URL) { showToast('請先設定 API 網址'); return; }
+
+    const storeLabel = wasteStore === 'KH' ? '高雄FOCUS 13' : wasteStore === 'TN' ? '台南FOCUS' : '誠品生活台南';
+    const id   = wasteTarget.id || wasteTarget.productId;
+    const name = wasteTarget.name || wasteTarget.productName || '';
+    const stockKey = wasteStore === 'KH' ? 'stockKH' : wasteStore === 'TN' ? 'stockTN' : 'stockES';
+    const curStock = Number(wasteTarget[stockKey] || 0);
+
+    if (qty > curStock) {
+        showToast(`報廢數量（${qty}）超過 ${storeLabel} 現有庫存（${curStock}）`);
+        return;
+    }
+
+    const btn = document.getElementById('wasteBtn');
+    btn.disabled = true; btn.innerText = '記錄中...';
+
+    try {
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
+            action: 'reportWaste',
+            data: { id, name, store: storeLabel, qty, note }
+        })});
+        const result = await res.json();
+        if (result.success) {
+            showToast(`✅ ${name} ×${qty} 已記錄報廢（${storeLabel}）`);
+            // 樂觀更新庫存顯示
+            const p = allProducts.find(p => (p.id || p.productId) == id);
+            if (p) {
+                p[stockKey] = Math.max(0, curStock - qty);
+                const el = document.getElementById(`${wasteStore.toLowerCase()}_${id}`);
+                if (el) {
+                    el.innerText   = p[stockKey];
+                    el.className   = 'stock-val' + (p[stockKey] <= 3 ? ' low' : '');
+                }
+                // 更新 modal 裡的庫存數字
+                const stkEl = document.getElementById('wasteStk_' + wasteStore);
+                if (stkEl) stkEl.innerText = p[stockKey];
+                wasteTarget[stockKey] = p[stockKey];
+            }
+            renderAlerts();
+            closeWasteModal();
+        } else {
+            showToast('報廢記錄失敗：' + (result.error || ''));
+            btn.disabled = false; btn.innerText = '確認報廢';
+        }
+    } catch(e) {
+        showToast('連線失敗');
+        btn.disabled = false; btn.innerText = '確認報廢';
     }
 }
 
