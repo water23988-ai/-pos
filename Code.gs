@@ -2087,4 +2087,21 @@ function safeJson(str, fallback) {
   try   { return JSON.parse(str); }
   catch { return fallback; }
 }
+
+// ══════════════════════════════════════════════════════
+//  [v2.6 遷移] 替現有 ProcurementItems 工作表加上 allocation 欄位
+//  執行一次即可，已有 allocation 欄位時會自動跳過
+// ══════════════════════════════════════════════════════
+function addAllocationColumn() {
+  const sh = getSheet(SH_PROC.ITEMS);
+  if (!sh) { Logger.log('❌ 找不到 ProcurementItems 工作表'); return; }
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (headers.includes('allocation')) {
+    Logger.log('✅ allocation 欄位已存在，無需重複新增');
+    return;
+  }
+  const newCol = sh.getLastColumn() + 1;
+  sh.getRange(1, newCol).setValue('allocation');
+  Logger.log(`✅ 已在第 ${newCol} 欄新增 allocation 欄位`);
+}
 fix: v2.2 修復 Studio 分帳和廢棄成本
