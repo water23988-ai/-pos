@@ -176,6 +176,23 @@
     </style>
 </head>
 <body>
+<!-- ══ 密碼鎖 ══ -->
+<div id="pwLock" style="position:fixed;inset:0;background:#F0E9DF;z-index:9999;display:flex;align-items:center;justify-content:center;font-family:'Noto Sans TC',-apple-system,sans-serif;">
+  <div id="pwBox" style="text-align:center;padding:32px 28px;background:#FAF7F2;border-radius:24px;border:1px solid #DDD0BC;width:280px;box-shadow:0 4px 24px rgba(122,101,80,0.12);">
+    <div style="width:48px;height:48px;background:linear-gradient(135deg,#8e9775,#6d7756);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:24px;margin:0 auto 14px;">🌸</div>
+    <div style="font-size:15px;font-weight:800;color:#3D2E1E;margin-bottom:4px;">拾逅花事</div>
+    <div style="font-size:11px;color:#A89278;margin-bottom:20px;">請輸入管理密碼</div>
+    <input id="pwInput" type="password" inputmode="numeric" maxlength="10" placeholder="••••"
+      style="width:100%;border:1.5px solid #DDD0BC;border-radius:12px;padding:12px;font-size:22px;text-align:center;letter-spacing:8px;outline:none;background:#F5EFE6;color:#3D2E1E;margin-bottom:10px;box-sizing:border-box;"
+      onkeydown="if(event.key==='Enter')_checkPw()">
+    <div id="pwErr" style="font-size:11px;color:#C4928A;min-height:16px;margin-bottom:10px;"></div>
+    <button onclick="_checkPw()" style="width:100%;background:#8e9775;color:white;border:none;border-radius:12px;padding:13px;font-size:14px;font-weight:700;cursor:pointer;">進入</button>
+  </div>
+</div>
+<style>@keyframes pwShake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}</style>
+<script>
+(function(){const PW='8282',KEY='mf_auth';if(sessionStorage.getItem(KEY)==='ok'){document.getElementById('pwLock').style.display='none';}else{setTimeout(()=>document.getElementById('pwInput').focus(),150);}window._checkPw=function(){var v=document.getElementById('pwInput').value;if(v===PW){sessionStorage.setItem(KEY,'ok');document.getElementById('pwLock').style.display='none';}else{document.getElementById('pwErr').innerText='密碼錯誤';document.getElementById('pwInput').value='';document.getElementById('pwInput').focus();var b=document.getElementById('pwBox');b.style.animation='none';b.offsetHeight;b.style.animation='pwShake 0.4s ease';}}})();
+</script>
 <div id="toast"></div>
 
 <!-- API Modal -->
