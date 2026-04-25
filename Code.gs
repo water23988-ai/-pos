@@ -1546,6 +1546,10 @@ function addProcurement(data) {
     // [v2.4] 商品不存在時自動建立，再更新成本與庫存
     ensureProductExists(item.flowerName, item.category, costPerStem, suggestedPrice);
     updateProductCostWeighted({ flowerName: item.flowerName, store: item.store || data.store, newStems: totalStems, newCost: costPerStem });
+    // [v2.5] 若有手動設定收銀台售價，同步更新商品 price 欄位
+    if (Number(item.salePrice) > 0) {
+      updateProductPrice(item.flowerName, Number(item.salePrice));
+    }
 
     // [v2.3] 進貨時同步記錄價格歷史（修復：以前只有「本週進花」流程才會寫入）
     const phSh = getSheet(SH.PRICE_LOG);
@@ -1586,6 +1590,24 @@ function ensureProductExists(name, category, cost, price) {
   const maxId = vals.slice(1).reduce((m, r) => Math.max(m, Number(r[headers.indexOf('id')]) || 0), 0);
   sh.appendRow([maxId + 1, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 'active']);
   Logger.log(`✅ 自動建立商品：${name}`);
+}
+
+// [v2.5] 進貨時若手動填寫收銀台售價，同步更新 Products 工作表的 price 欄
+function updateProductPrice(name, price) {
+  if (!name || !price) return;
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameCol  = headers.indexOf('name');
+  const priceCol = headers.indexOf('price');
+  if (nameCol < 0 || priceCol < 0) return;
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][nameCol]).trim() === String(name).trim()) {
+      sh.getRange(i + 1, priceCol + 1).setValue(price);
+      Logger.log(`💰 售價更新：${name} → NT$ ${price}`);
+      return;
+    }
+  }
 }
 
 function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
