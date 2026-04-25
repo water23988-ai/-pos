@@ -455,13 +455,11 @@ function saveApi() {
     init();
 }
 
-// ══ 據點 ══
+// ══ 據點（v2.6：chip 已改為一鍵分配，不再有 active 狀態）══
 function setStore(s) {
     currentStore = s;
-    ['kh','tn','es'].forEach(k => document.getElementById('btn-'+k).classList.remove('active'));
-    const map = { '高雄FOCUS 13':'btn-kh', '台南FOCUS':'btn-tn', '誠品生活台南':'btn-es' };
-    if (map[s]) document.getElementById(map[s]).classList.add('active');
-    document.getElementById('storeLabel').innerText = s;
+    const lbl = document.getElementById('storeLabel');
+    if (lbl) lbl.innerText = s || '多點位';
 }
 
 // ══ 供應商 ══
