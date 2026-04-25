@@ -24,6 +24,9 @@
         .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
         .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
         .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
+        /* ── 手機 API 按鈕 ── */
+        .mobile-gas-btn { display: none; align-items: center; gap: 5px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #7A6550; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 768px) { .mobile-gas-btn { display: flex; } }
 
         /* ── 主內容 ── */
         .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
@@ -66,8 +69,12 @@
 
         /* ── 低庫存警示列 ── */
         .alert-banner { background: rgba(196,146,138,0.12); border: 1px solid rgba(196,146,138,0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: none; }
-        .alert-banner-title { font-size: 12px; font-weight: 700; color: #C4928A; margin-bottom: 6px; }
-        .alert-chips { display: flex; gap: 6px; flex-wrap: wrap; }
+        .alert-banner-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
+        .alert-banner-title { font-size: 12px; font-weight: 700; color: #C4928A; }
+        .alert-toggle-btn { background: rgba(196,146,138,0.15); border: none; border-radius: 6px; padding: 3px 10px; font-size: 11px; font-weight: 700; color: #C4928A; cursor: pointer; transition: background 0.15s; }
+        .alert-toggle-btn:hover { background: rgba(196,146,138,0.3); }
+        .alert-chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+        .alert-chips.collapsed { display: none; }
         .alert-chip { font-size: 11px; font-weight: 600; background: rgba(196,146,138,0.15); color: #C4928A; border-radius: 8px; padding: 4px 10px; }
 
         /* ── 庫存表格 ── */
@@ -232,9 +239,10 @@
             <div class="main-header-title">📦 庫存管理</div>
             <span id="productCount" style="background:#F5EFE6;color:#7A6550;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">—</span>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
             <a href="procurement.html" class="btn-secondary" style="text-decoration:none;font-size:12px;">🚚 補貨記錄</a>
             <button onclick="loadProducts()" class="btn-primary" style="font-size:12px;padding:8px 16px;">重新整理</button>
+            <button class="mobile-gas-btn" onclick="openApiModal()"><span class="gas-dot"></span>⚙️ API</button>
         </div>
     </div>
 
@@ -243,7 +251,10 @@
 
         <!-- 低庫存警示 -->
         <div class="alert-banner" id="alertBanner">
-            <div class="alert-banner-title">⚠️ 低庫存警示（庫存 ≤ 3）</div>
+            <div class="alert-banner-header" onclick="toggleAlertBanner()">
+                <div class="alert-banner-title" id="alertBannerTitle">⚠️ 低庫存警示（庫存 ≤ 3）</div>
+                <button class="alert-toggle-btn" id="alertToggleBtn">收合 ▲</button>
+            </div>
             <div class="alert-chips" id="alertChips"></div>
         </div>
 
@@ -296,10 +307,9 @@ function saveApi() {
 
 // ── GAS 狀態 ──
 function setGas(state) {
-    const dot = document.getElementById('gasDot');
+    document.querySelectorAll('.gas-dot').forEach(d => d.className = 'gas-dot ' + state);
     const lbl = document.getElementById('gasLabel');
-    dot.className = 'gas-dot ' + state;
-    lbl.innerText = state === 'loading' ? '同步中' : state === 'ok' ? '正常' : '錯誤';
+    if (lbl) lbl.innerText = state === 'loading' ? '同步中' : state === 'ok' ? '正常' : '錯誤';
 }
 
 // ── 分類篩選 ──
@@ -342,6 +352,8 @@ async function loadProducts() {
 }
 
 // ── 低庫存警示 ──
+let _alertCollapsed = false;
+
 function renderAlerts() {
     const LOW = 3;
     const alerts = [];
@@ -355,11 +367,33 @@ function renderAlerts() {
         if (es <= LOW) alerts.push(`${name} (誠品 ${es})`);
     });
     const banner = document.getElementById('alertBanner');
+    const chips  = document.getElementById('alertChips');
+    const title  = document.getElementById('alertBannerTitle');
+    const btn    = document.getElementById('alertToggleBtn');
     if (alerts.length) {
-        document.getElementById('alertChips').innerHTML = alerts.map(a => `<span class="alert-chip">${escHtml(a)}</span>`).join('');
+        chips.innerHTML = alerts.map(a => `<span class="alert-chip">${escHtml(a)}</span>`).join('');
+        title.textContent = `⚠️ 低庫存警示（${alerts.length} 項）`;
+        chips.className = _alertCollapsed ? 'alert-chips collapsed' : 'alert-chips';
+        btn.textContent = _alertCollapsed ? `展開（${alerts.length}）▼` : '收合 ▲';
         banner.style.display = 'block';
     } else {
         banner.style.display = 'none';
+    }
+}
+
+function toggleAlertBanner() {
+    _alertCollapsed = !_alertCollapsed;
+    const chips = document.getElementById('alertChips');
+    const btn   = document.getElementById('alertToggleBtn');
+    const title = document.getElementById('alertBannerTitle');
+    if (_alertCollapsed) {
+        chips.classList.add('collapsed');
+        // count items from current chips
+        const count = chips.querySelectorAll('.alert-chip').length;
+        btn.textContent = `展開（${count}）▼`;
+    } else {
+        chips.classList.remove('collapsed');
+        btn.textContent = '收合 ▲';
     }
 }
 

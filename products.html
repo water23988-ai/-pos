@@ -24,6 +24,9 @@
         .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
         .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
         .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
+        /* ── 手機 API 按鈕 ── */
+        .mobile-gas-btn { display: none; align-items: center; gap: 5px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #7A6550; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 768px) { .mobile-gas-btn { display: flex; } }
 
         /* 主內容 */
         .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
@@ -294,7 +297,10 @@
             <div class="main-header-title">🌹 商品管理</div>
             <span class="count-badge" id="productCount">—</span>
         </div>
-        <button onclick="openAddModal()" class="btn-primary" style="padding:10px 20px;font-size:13px;">＋ 新增商品</button>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="openAddModal()" class="btn-primary" style="padding:10px 20px;font-size:13px;">＋ 新增商品</button>
+            <button class="mobile-gas-btn" onclick="openApiModal()"><span class="gas-dot"></span>⚙️ API</button>
+        </div>
     </div>
 
     <!-- 主內容 -->
@@ -352,12 +358,13 @@ function saveApi() {
 
 // ══ GAS 狀態 ══
 function setGas(state) {
-    const dot   = document.getElementById('gasDot');
+    document.querySelectorAll('.gas-dot').forEach(d => d.className = 'gas-dot ' + state);
     const label = document.getElementById('gasLabel');
-    dot.className = 'gas-dot ' + state;
-    if (state === 'loading') label.innerText = '同步中';
-    if (state === 'ok')      label.innerText = '正常';
-    if (state === 'error')   label.innerText = '錯誤';
+    if (label) {
+        if (state === 'loading') label.innerText = '同步中';
+        if (state === 'ok')      label.innerText = '正常';
+        if (state === 'error')   label.innerText = '錯誤';
+    }
 }
 
 // ══ 分類篩選 ══

@@ -24,6 +24,9 @@
         .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
         .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
         .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
+        /* ── 手機 API 按鈕 ── */
+        .mobile-gas-btn { display: none; align-items: center; gap: 5px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #7A6550; cursor: pointer; font-weight: 600; white-space: nowrap; }
+        @media (max-width: 768px) { .mobile-gas-btn { display: flex; } }
 
         /* ── 主內容 ── */
         .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
@@ -74,7 +77,9 @@
         /* ── 花材輸入行（新設計）── */
         .item-row { background: #F5EFE6; border: 1px solid #DDD0BC; border-radius: 14px; padding: 12px 14px; margin-bottom: 10px; }
         .item-row-top { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; align-items: center; margin-bottom: 10px; }
-        .item-row-nums { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; align-items: end; }
+        .item-row-nums { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; align-items: end; }
+        .sale-price-input { border: 1.5px solid rgba(142,151,117,0.6) !important; background: rgba(240,243,236,0.8) !important; }
+        .sale-price-input:focus { border-color: #8e9775 !important; }
         .item-row-calc { background: rgba(109,119,86,0.08); border-radius: 8px; padding: 7px 10px; margin-top: 8px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap; }
         .calc-chip { font-size: 11px; color: #6d7756; white-space: nowrap; }
         .calc-chip strong { font-weight: 700; }
@@ -164,7 +169,7 @@
             .mbn-icon { font-size: 20px; line-height: 1; }
 
             /* item-row 在手機上微調 */
-            .item-row-nums { grid-template-columns: 1fr 1fr 1fr; gap: 6px; }
+            .item-row-nums { grid-template-columns: 1fr 1fr 1fr 1fr; gap: 6px; }
         }
     </style>
 </head>
@@ -214,8 +219,9 @@
         </div>
         <p style="font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.06em;text-transform:uppercase;margin-bottom:8px;">品項明細</p>
         <div id="editItemsList" style="margin-bottom:12px;"></div>
+        <button onclick="addEditItem()" style="width:100%;margin-bottom:12px;background:#F5EFE6;border:1.5px dashed #DDD0BC;border-radius:10px;padding:10px;font-size:13px;color:#8e9775;font-weight:700;cursor:pointer;">＋ 新增品項</button>
         <div style="display:flex;gap:10px;">
-            <button onclick="saveEditBatch()" class="btn-primary" style="flex:1;">儲存修改</button>
+            <button onclick="saveEditBatch()" class="btn-primary" style="flex:1;">儲存修改（同步庫存）</button>
             <button onclick="closeEditBatch()" class="btn-secondary" style="flex:0 0 auto;padding:10px 20px;">取消</button>
         </div>
     </div>
@@ -267,7 +273,10 @@
 <div class="main-area">
     <div class="main-header">
         <div class="main-header-title">🚚 進貨管理</div>
-        <div class="main-header-store" id="storeLabel">請選擇據點</div>
+        <div style="display:flex;align-items:center;gap:8px;">
+            <div class="main-header-store" id="storeLabel">請選擇據點</div>
+            <button class="mobile-gas-btn" onclick="openApiModal()"><span class="gas-dot"></span>⚙️ API</button>
+        </div>
     </div>
 
     <div class="store-chips">
@@ -397,13 +406,19 @@ document.getElementById('apiModal').addEventListener('click', function(e) {
 
 // ══ GAS 狀態 ══
 function setGas(state) {
-    const dot   = document.getElementById('gasDot');
+    document.querySelectorAll('.gas-dot').forEach(d => d.className = 'gas-dot ' + state);
     const label = document.getElementById('gasLabel');
     const info  = document.getElementById('statusInfo');
-    dot.className = 'gas-dot ' + state;
-    if (state === 'loading') { label.innerText = '同步中'; if(info) info.innerText = '同步中...'; }
-    if (state === 'ok')      { label.innerText = '正常';   if(info) info.innerText = '✅ 連線正常'; }
-    if (state === 'error')   { label.innerText = '錯誤';   if(info) info.innerText = '❌ API 連線錯誤'; }
+    if (label) {
+        if (state === 'loading') label.innerText = '同步中';
+        if (state === 'ok')      label.innerText = '正常';
+        if (state === 'error')   label.innerText = '錯誤';
+    }
+    if (info) {
+        if (state === 'loading') info.innerText = '同步中...';
+        if (state === 'ok')      info.innerText = '✅ 連線正常';
+        if (state === 'error')   info.innerText = '❌ API 連線錯誤';
+    }
 }
 
 function saveApi() {
@@ -454,7 +469,7 @@ function flowerSuggestions() {
 
 // ══ 花材清單 CRUD（新設計）══
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0 });
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0 });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
     // 自動捲到新品項並 focus
@@ -475,6 +490,8 @@ function removeItemRow(idx) {
 
 function onFieldChange(idx, field, val) {
     procItems[idx][field] = (field === 'flowerName' || field === 'category') ? val : (Number(val) || 0);
+    // 售價欄位若清空則設 0，讓 updateCalcDisplay 補建議值
+    if (field === 'salePrice' && val === '') procItems[idx].salePrice = 0;
     updateCalcDisplay(idx);
     updateTotal();
 }
@@ -489,14 +506,19 @@ function updateCalcDisplay(idx) {
     const suggestedPrice = Math.round(costPerStem * 3.8);
     const itemCost       = ppb * bq;
 
+    // 若售價尚未手動設定，自動填入建議售價
+    if (costPerStem > 0 && !procItems[idx].salePrice) {
+        procItems[idx].salePrice = suggestedPrice;
+        const sp = document.getElementById(`salePrice-${idx}`);
+        if (sp && !sp.dataset.manualEdit) sp.value = suggestedPrice;
+    }
+
     const el = document.getElementById(`calc-${idx}`);
     if (el) {
         el.innerHTML = `
             <span class="calc-chip">總枝數 <strong>${totalStems}</strong></span>
             <span style="color:#DDD0BC;">·</span>
             <span class="calc-chip">枝成本 <strong>NT$${costPerStem.toFixed(1)}</strong></span>
-            <span style="color:#DDD0BC;">·</span>
-            <span class="calc-chip">建議售價 <strong>NT$${suggestedPrice}</strong></span>
             <span style="color:#DDD0BC;">·</span>
             <span class="calc-chip" style="color:#8e9775;font-weight:700;">小計 NT$${itemCost.toLocaleString()}</span>
         `;
@@ -574,6 +596,13 @@ function renderItemList() {
                     value="${item.pricePerBunch || ''}"
                     oninput="onFieldChange(${idx},'pricePerBunch',this.value)">
             </div>
+            <div>
+                <label class="f-label-xs" style="color:#6d7756;">🏷 收銀台售價</label>
+                <input type="number" min="0" inputmode="numeric" placeholder="自動計算" class="f-input-sm sale-price-input"
+                    id="salePrice-${idx}"
+                    value="${item.salePrice || ''}"
+                    oninput="this.dataset.manualEdit='1';onFieldChange(${idx},'salePrice',this.value)">
+            </div>
         </div>
 
         <!-- 第三行：自動計算結果 -->
@@ -624,6 +653,7 @@ async function submitProcurement() {
                     stemsPerBunch: Number(it.stemsPerBunch),
                     bunchesQty   : Number(it.bunchesQty),
                     pricePerBunch: Number(it.pricePerBunch),
+                    salePrice    : Number(it.salePrice) || 0,
                 })),
             }
         };
@@ -698,6 +728,7 @@ function renderBatches() {
                         <p style="font-size:10px;color:#C4A87A;margin-top:2px;">${_expandedBatch===b.batchId?'▲ 收合':'▼ 展開'}</p>
                     </div>
                     <button onclick="event.stopPropagation();openEditBatch('${b.batchId}')" style="background:#F5EFE6;border:1.5px solid #DDD0BC;border-radius:8px;padding:5px 10px;font-size:11px;color:#7A6550;cursor:pointer;font-weight:600;white-space:nowrap;">✏️ 編輯</button>
+                    <button onclick="event.stopPropagation();deleteBatch('${b.batchId}')" style="background:rgba(196,146,138,0.1);border:1.5px solid rgba(196,146,138,0.35);border-radius:8px;padding:5px 10px;font-size:11px;color:#C4928A;cursor:pointer;font-weight:600;white-space:nowrap;">🗑 刪除</button>
                 </div>
             </div>
             ${_expandedBatch === b.batchId ? `<div id="detail-${b.batchId}" style="margin-top:10px;border-top:1px solid #EDE5D8;padding-top:10px;">
@@ -794,7 +825,7 @@ function renderEditItems() {
                 </select>
             </div>
         </div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;">
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
             <div>
                 <label class="f-label-xs">枝/把</label>
                 <input type="number" min="1" class="f-input-sm" value="${it.stemsPerBunch||''}" oninput="_editBatchItems[${i}].stemsPerBunch=Number(this.value)||0">
@@ -806,6 +837,10 @@ function renderEditItems() {
             <div>
                 <label class="f-label-xs">每把單價</label>
                 <input type="number" min="0" class="f-input-sm" value="${it.pricePerBunch||''}" oninput="_editBatchItems[${i}].pricePerBunch=Number(this.value)||0">
+            </div>
+            <div>
+                <label class="f-label-xs" style="color:#6d7756;">🏷 收銀台售價</label>
+                <input type="number" min="0" class="f-input-sm" style="border-color:rgba(109,119,86,0.4);" placeholder="選填" value="${it.salePrice||''}" oninput="_editBatchItems[${i}].salePrice=Number(this.value)||0">
             </div>
         </div>
     </div>`).join('');
@@ -857,6 +892,44 @@ function closeEditBatch() {
 document.getElementById('editBatchModal').addEventListener('click', function(e) {
     if (e.target === this) closeEditBatch();
 });
+
+// ══ 新增品項（在編輯模態中）══
+function addEditItem() {
+    _editBatchItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, bunchesQty:0, pricePerBunch:0, salePrice:0 });
+    renderEditItems();
+    // 自動捲到新品項
+    const list = document.getElementById('editItemsList');
+    if (list) list.lastElementChild && list.lastElementChild.scrollIntoView({ behavior:'smooth', block:'nearest' });
+}
+
+// ══ 刪除整筆進貨批次 ══
+async function deleteBatch(batchId) {
+    if (!API_URL) return alert('請先設定 API 網址');
+    const batch = _batchData.find(b => b.batchId === batchId);
+    const label = batch
+        ? `${batch.source || '未知供應商'} · ${String(batch.date||'').slice(0,10)}`
+        : batchId;
+    if (!confirm(`確定要刪除這筆進貨紀錄嗎？\n\n${label}\n\n⚠️ 此操作將同步還原對應的庫存數量，且無法復原。`)) return;
+    try {
+        setGas('loading');
+        const res    = await fetch(API_URL, {
+            method: 'POST',
+            body  : JSON.stringify({ action: 'deleteProcurementBatch', data: { batchId } })
+        });
+        const result = await res.json();
+        if (result.success) {
+            setGas('ok');
+            showToast('✅ 進貨紀錄已刪除，庫存已同步還原');
+            loadBatches();
+        } else {
+            setGas('error');
+            alert('刪除失敗：' + (result.error || '未知錯誤'));
+        }
+    } catch(e) {
+        setGas('error');
+        alert('連線失敗，請確認 API 網址');
+    }
+}
 
 // ══ Toast ══
 let _toastTimer;
