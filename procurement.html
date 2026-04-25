@@ -527,13 +527,15 @@ function updateCalcDisplay(idx) {
 
     const el = document.getElementById(`calc-${idx}`);
     if (el) {
-        el.innerHTML = `
+        el.innerHTML = costPerStem > 0 ? `
             <span class="calc-chip">總枝數 <strong>${totalStems}</strong></span>
             <span style="color:#DDD0BC;">·</span>
             <span class="calc-chip">枝成本 <strong>NT$${costPerStem.toFixed(1)}</strong></span>
             <span style="color:#DDD0BC;">·</span>
             <span class="calc-chip" style="color:#8e9775;font-weight:700;">小計 NT$${itemCost.toLocaleString()}</span>
-        `;
+            <span style="color:#DDD0BC;">·</span>
+            <span class="calc-chip" style="color:#C4A87A;font-weight:700;">建議售價 NT$${suggestedPrice}</span>
+        ` : `<span class="calc-chip" style="color:#A89278;">輸入數量與單價後自動計算</span>`;
     }
 }
 
