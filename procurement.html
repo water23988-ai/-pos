@@ -103,6 +103,18 @@
         .item-detail-row { font-size: 12px; padding: 7px 0; border-bottom: 1px solid #EDE5D8; display: flex; justify-content: space-between; align-items: center; }
         .item-detail-row:last-child { border-bottom: none; }
 
+        /* ── 分配欄 ── */
+        .alloc-section { background: rgba(142,151,117,0.07); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
+        .alloc-section-label { font-size: 10px; font-weight: 700; color: #8e9775; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 7px; }
+        .alloc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .alloc-cell label { font-size: 10px; color: #A89278; font-weight: 600; display: block; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .alloc-cell input { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 8px; padding: 5px 8px; font-size: 13px; outline: none; background: #FAF7F2; color: #3D2E1E; text-align: center; -webkit-appearance: none; }
+        .alloc-cell input:focus { border-color: #8e9775; }
+        .alloc-status { font-size: 11px; margin-top: 6px; font-weight: 600; }
+        .alloc-ok   { color: #8e9775; }
+        .alloc-over { color: #C4928A; }
+        .alloc-less { color: #A89278; }
+
         /* ── 固定底部 bar ── */
         .checkout-bar { position: fixed; left: 220px; right: 0; bottom: 0; background: #7A6550; padding: 14px 24px; display: flex; align-items: center; justify-content: space-between; z-index: 100; box-shadow: 0 -2px 12px rgba(61,46,30,0.15); }
         .checkout-bar-info { color: rgba(255,255,255,0.7); font-size: 13px; }
@@ -292,10 +304,11 @@
     </div>
 
     <div class="store-chips">
-        <span class="store-chip-label">據點</span>
-        <button onclick="setStore('高雄FOCUS 13')" id="btn-kh" class="chip">高雄 FOCUS</button>
-        <button onclick="setStore('台南FOCUS')"    id="btn-tn" class="chip">台南 FOCUS</button>
-        <button onclick="setStore('誠品生活台南')" id="btn-es" class="chip">誠品台南</button>
+        <span class="store-chip-label">一鍵全配</span>
+        <button onclick="quickAllocAll('高雄FOCUS 13')" class="chip">➜ 高雄 FOCUS</button>
+        <button onclick="quickAllocAll('台南FOCUS')"    class="chip">➜ 台南 FOCUS</button>
+        <button onclick="quickAllocAll('誠品生活台南')" class="chip">➜ 誠品台南</button>
+        <span style="font-size:10px;color:#C4A87A;margin-left:4px;">點擊可把所有品項一次全分給同一據點</span>
     </div>
 
     <div class="main-content">
@@ -480,8 +493,12 @@ function flowerSuggestions() {
 }
 
 // ══ 花材清單 CRUD（新設計）══
+function emptyAlloc() {
+    return { '高雄FOCUS 13': 0, '台南FOCUS': 0, '誠品生活台南': 0 };
+}
+
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0 });
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, allocation: emptyAlloc() });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
     // 自動捲到新品項並 focus
@@ -502,10 +519,43 @@ function removeItemRow(idx) {
 
 function onFieldChange(idx, field, val) {
     procItems[idx][field] = (field === 'flowerName' || field === 'category') ? val : (Number(val) || 0);
-    // 售價欄位若清空則設 0，讓 updateCalcDisplay 補建議值
     if (field === 'salePrice' && val === '') procItems[idx].salePrice = 0;
     updateCalcDisplay(idx);
+    if (field === 'bunchesQty') updateAllocStatus(idx);
     updateTotal();
+}
+
+function onAllocChange(idx, store, val) {
+    if (!procItems[idx].allocation) procItems[idx].allocation = emptyAlloc();
+    procItems[idx].allocation[store] = Number(val) || 0;
+    updateAllocStatus(idx);
+}
+
+function updateAllocStatus(idx) {
+    const item  = procItems[idx];
+    const bq    = Number(item.bunchesQty) || 0;
+    const alloc = item.allocation || {};
+    const total = Object.values(alloc).reduce((s, v) => s + Number(v), 0);
+    const el    = document.getElementById(`alloc-status-${idx}`);
+    if (!el) return;
+    if (!bq) { el.innerHTML = ''; return; }
+    if (total === bq) {
+        el.innerHTML = `<span class="alloc-ok">✅ 已分配 ${total}/${bq} 把</span>`;
+    } else if (total > bq) {
+        el.innerHTML = `<span class="alloc-over">⚠️ 超過！已分配 ${total}/${bq} 把</span>`;
+    } else {
+        el.innerHTML = `<span class="alloc-less">尚有 ${bq - total} 把未分配（已分配 ${total}/${bq}）</span>`;
+    }
+}
+
+// 一鍵把所有品項全部分配到同一據點（據點 chip 快捷功能）
+function quickAllocAll(store) {
+    procItems.forEach((it, idx) => {
+        if (!it.allocation) it.allocation = emptyAlloc();
+        Object.keys(it.allocation).forEach(k => it.allocation[k] = 0);
+        it.allocation[store] = Number(it.bunchesQty) || 0;
+    });
+    renderItemList();
 }
 
 function updateCalcDisplay(idx) {
@@ -623,10 +673,25 @@ function renderItemList() {
         <div class="item-row-calc" id="calc-${idx}">
             <span class="calc-chip" style="color:#A89278;">輸入數量與單價後自動計算</span>
         </div>
+
+        <!-- 第四行：據點分配 -->
+        <div class="alloc-section">
+            <div class="alloc-section-label">📦 分配到各據點（把）</div>
+            <div class="alloc-grid">
+                ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['誠品生活台南','誠品台南']].map(([key, label]) => `
+                <div class="alloc-cell">
+                    <label>${label}</label>
+                    <input type="number" min="0" inputmode="numeric"
+                        value="${(item.allocation||{})[key]||0}"
+                        oninput="onAllocChange(${idx},'${key}',this.value)">
+                </div>`).join('')}
+            </div>
+            <div class="alloc-status" id="alloc-status-${idx}"></div>
+        </div>
     </div>`).join('') + addMoreBtn;
 
     // 重新計算所有
-    procItems.forEach((_, i) => updateCalcDisplay(i));
+    procItems.forEach((_, i) => { updateCalcDisplay(i); updateAllocStatus(i); });
     updateTotal();
 }
 
@@ -637,7 +702,6 @@ function escHtml(str) {
 // ══ 送出進貨 ══
 async function submitProcurement() {
     if (!API_URL) return alert('請先設定 API 網址');
-    if (!currentStore) return alert('請先選擇進貨據點');
     if (!selectedSource) return alert('請選擇供應商');
     if (procItems.length === 0) return alert('請至少新增一項花材');
 
@@ -647,6 +711,12 @@ async function submitProcurement() {
         if (!it.stemsPerBunch || it.stemsPerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入枝/把`);
         if (!it.bunchesQty   || it.bunchesQty   <= 0)  return alert(`品項 ${i+1}「${it.flowerName}」：請輸入購入把數`);
         if (!it.pricePerBunch|| it.pricePerBunch <= 0)  return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把單價`);
+        // 分配驗證
+        const allocTotal = Object.values(it.allocation || {}).reduce((s, v) => s + Number(v), 0);
+        if (allocTotal > it.bunchesQty) return alert(`品項 ${i+1}「${it.flowerName}」：分配把數 (${allocTotal}) 超過購入把數 (${it.bunchesQty})，請重新調整`);
+        if (allocTotal < it.bunchesQty) {
+            if (!confirm(`品項 ${i+1}「${it.flowerName}」尚有 ${it.bunchesQty - allocTotal} 把未分配據點（不會計入任何庫存）。\n\n確定要繼續送出嗎？`)) return;
+        }
     }
 
     const btn = document.getElementById('submitBtn');
@@ -668,6 +738,7 @@ async function submitProcurement() {
                     bunchesQty   : Number(it.bunchesQty),
                     pricePerBunch: Number(it.pricePerBunch),
                     salePrice    : Number(it.salePrice) || 0,
+                    allocation   : it.allocation || emptyAlloc(),
                 })),
             }
         };
@@ -769,20 +840,33 @@ async function loadBatchItems(batchId) {
             el.innerHTML = '<p style="font-size:12px;color:#A89278;padding:8px 0;">無品項資料</p>';
             return;
         }
-        el.innerHTML = items.map(it => `
-        <div class="item-detail-row">
-            <div>
-                <span style="font-size:13px;font-weight:700;color:#3D2E1E;">${it.flowerName}</span>
-                <span style="font-size:10px;color:#A89278;margin-left:6px;">${it.category}</span>
+        el.innerHTML = items.map(it => {
+            const alloc = it.allocation || {};
+            const allocEntries = Object.entries(alloc).filter(([,v]) => Number(v) > 0);
+            const allocHtml = allocEntries.length
+                ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${
+                    allocEntries.map(([store, b]) => {
+                        const label = store === '高雄FOCUS 13' ? '高雄' : store === '台南FOCUS' ? '台南' : '誠品';
+                        return `<span style="background:#f0f3ec;color:#6d7756;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:600;">${label} ${b}把</span>`;
+                    }).join('')
+                  }</div>`
+                : it.store ? `<span style="font-size:10px;color:#A89278;">${it.store}</span>` : '';
+            return `
+            <div class="item-detail-row">
+                <div>
+                    <span style="font-size:13px;font-weight:700;color:#3D2E1E;">${it.flowerName}</span>
+                    <span style="font-size:10px;color:#A89278;margin-left:6px;">${it.category}</span>
+                    ${allocHtml}
+                </div>
+                <div style="text-align:right;font-size:12px;flex-shrink:0;margin-left:8px;">
+                    <span style="color:#6d7756;font-weight:700;">${it.bunchesQty}把/${it.totalStems}枝</span>
+                    <span style="background:#f0f3ec;color:#6d7756;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:11px;">建議 NT$${it.suggestedPrice}</span>
+                </div>
             </div>
-            <div style="text-align:right;font-size:12px;">
-                <span style="color:#6d7756;font-weight:700;">${it.bunchesQty}把/${it.totalStems}枝</span>
-                <span style="background:#f0f3ec;color:#6d7756;border-radius:8px;padding:2px 8px;margin-left:6px;font-size:11px;">建議 NT$${it.suggestedPrice}</span>
-            </div>
-        </div>
-        <div style="font-size:11px;color:#A89278;padding-bottom:6px;">
-            ${it.stemsPerBunch}枝/把 · 每把 NT$${it.pricePerBunch} · 枝成本 NT$${Number(it.costPerStem).toFixed(1)}
-        </div>`).join('');
+            <div style="font-size:11px;color:#A89278;padding-bottom:6px;">
+                ${it.stemsPerBunch}枝/把 · 每把 NT$${it.pricePerBunch} · 枝成本 NT$${Number(it.costPerStem).toFixed(1)}
+            </div>`;
+        }).join('');
     } catch(e) {
         el.innerHTML = '<p style="font-size:12px;color:#C4928A;padding:8px 0;">載入失敗</p>';
     }
@@ -909,7 +993,7 @@ document.getElementById('editBatchModal').addEventListener('click', function(e) 
 
 // ══ 新增品項（在編輯模態中）══
 function addEditItem() {
-    _editBatchItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, bunchesQty:0, pricePerBunch:0, salePrice:0 });
+    _editBatchItems.push({ flowerName:'', category:'主花', stemsPerBunch:0, bunchesQty:0, pricePerBunch:0, salePrice:0, allocation: emptyAlloc() });
     renderEditItems();
     // 自動捲到新品項
     const list = document.getElementById('editItemsList');

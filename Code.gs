@@ -82,7 +82,7 @@ function setupProcurementSheets() {
   }
   // [v2.2 修復] 補上 store 欄位，讓進貨記錄可以按點位查詢
   ensureSheet(SH_PROC.BATCHES, ['batchId','date','source','store','note','totalItems','totalCost']);
-  ensureSheet(SH_PROC.ITEMS,   ['itemId','batchId','flowerName','category','stemsPerBunch','bunchesQty','pricePerBunch','totalStems','costPerStem','suggestedPrice','store','date']);
+  ensureSheet(SH_PROC.ITEMS,   ['itemId','batchId','flowerName','category','stemsPerBunch','bunchesQty','pricePerBunch','totalStems','costPerStem','suggestedPrice','store','date','allocation']);
   Logger.log('✅ 進貨工作表初始化完成');
 }
 
@@ -1513,6 +1513,7 @@ function getProcurementItems(batchId) {
     suggestedPrice: Number(r.suggestedPrice) || 0,
     store         : r.store,
     date          : r.date,
+    allocation    : safeJson(r.allocation, {}),
   }));
 }
 
@@ -1537,21 +1538,32 @@ function addProcurement(data) {
     const costPerStem    = stemsPerBunch > 0 ? Math.round(pricePerBunch / stemsPerBunch * 100) / 100 : 0;
     const suggestedPrice = Math.round(costPerStem * 3.8);
     totalCost += pricePerBunch * bunchesQty;
+    // [v2.6] allocation：各據點分配把數
+    const allocation = (item.allocation && typeof item.allocation === 'object') ? item.allocation : {};
+    const allocJson  = JSON.stringify(allocation);
     itemRows.push([
       batchId + '-' + String(idx + 1).padStart(2, '0'),
       batchId, item.flowerName || '', item.category || '主花',
       stemsPerBunch, bunchesQty, pricePerBunch,
-      totalStems, costPerStem, suggestedPrice, item.store || data.store || '', date,
+      totalStems, costPerStem, suggestedPrice,
+      '', // store（多點位進貨不用此欄，留空）
+      date,
+      allocJson, // allocation JSON
     ]);
-    // [v2.4] 商品不存在時自動建立，再更新成本與庫存
+    // [v2.4] 商品不存在時自動建立
     ensureProductExists(item.flowerName, item.category, costPerStem, suggestedPrice);
-    updateProductCostWeighted({ flowerName: item.flowerName, store: item.store || data.store, newStems: totalStems, newCost: costPerStem });
+    // [v2.6] 使用多據點版本更新成本與庫存
+    if (Object.keys(allocation).length > 0) {
+      updateProductCostWeightedWithAlloc({ flowerName: item.flowerName, stemsPerBunch, allocation, costPerStem });
+    } else {
+      // 向下相容：若無 allocation 則用原本邏輯
+      updateProductCostWeighted({ flowerName: item.flowerName, store: data.store || '', newStems: totalStems, newCost: costPerStem });
+    }
     // [v2.5] 若有手動設定收銀台售價，同步更新商品 price 欄位
     if (Number(item.salePrice) > 0) {
       updateProductPrice(item.flowerName, Number(item.salePrice));
     }
-
-    // [v2.3] 進貨時同步記錄價格歷史（修復：以前只有「本週進花」流程才會寫入）
+    // [v2.3] 進貨時同步記錄價格歷史
     const phSh = getSheet(SH.PRICE_LOG);
     if (phSh) {
       phSh.appendRow([
@@ -1567,8 +1579,8 @@ function addProcurement(data) {
     }
   });
 
-  // [v2.2 修復] 加入 store 欄位寫入
-  batchSh.appendRow([batchId, date, data.source || '', data.store || '', data.note || '', items.length, Math.round(totalCost)]);
+  // [v2.6] store 欄位留空（多點位進貨不再有批次級別的單一據點）
+  batchSh.appendRow([batchId, date, data.source || '', '', data.note || '', items.length, Math.round(totalCost)]);
   if (itemRows.length > 0) {
     itemSh.getRange(itemSh.getLastRow() + 1, 1, itemRows.length, itemRows[0].length).setValues(itemRows);
   }
@@ -1639,6 +1651,59 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
     return;
   }
   Logger.log(`⚠️ 進貨警告：找不到「${flowerName}」，成本未回寫`);
+}
+
+// [v2.6] 多據點分配版：根據 allocation 物件按店分別加庫存，加權成本用總量計算
+// allocation 格式：{ '高雄FOCUS 13': bunchCount, '台南FOCUS': bunchCount, '誠品生活台南': bunchCount }
+function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocation, costPerStem }) {
+  if (!flowerName || !allocation) return;
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameCol    = headers.indexOf('name');
+  const costCol    = headers.indexOf('cost');
+  const stockKHCol = headers.indexOf('stockKH');
+  const stockTNCol = headers.indexOf('stockTN');
+  const stockESCol = headers.indexOf('stockES');
+  const storeColMap = {
+    '高雄FOCUS 13': stockKHCol,
+    '台南FOCUS':    stockTNCol,
+    '誠品生活台南': stockESCol,
+  };
+  // 計算本次進貨總枝數（用於加權成本）
+  const totalNewStems = Object.values(allocation).reduce((s, b) => s + Number(b), 0) * (stemsPerBunch || 0);
+
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][nameCol] || '').trim() !== String(flowerName).trim()) continue;
+    const row = i + 1;
+    // ── 加權平均成本（用全館總庫存做分母）──
+    const totalOldStock = [stockKHCol, stockTNCol, stockESCol]
+      .filter(c => c >= 0).reduce((s, c) => s + (Number(vals[i][c]) || 0), 0);
+    const oldCost      = Number(vals[i][costCol]) || 0;
+    const weightedCost = (totalOldStock + totalNewStems) > 0
+      ? Math.round(((oldCost * totalOldStock) + (costPerStem * totalNewStems)) / (totalOldStock + totalNewStems) * 100) / 100
+      : costPerStem;
+    sh.getRange(row, costCol + 1).setValue(weightedCost);
+
+    // ── 按據點分別加庫存 ──
+    Object.entries(allocation).forEach(([store, bunches]) => {
+      const stems  = Number(bunches) * (stemsPerBunch || 0);
+      if (!stems) return;
+      const colIdx = storeColMap[store];
+      if (colIdx === undefined || colIdx < 0) return;
+      const current = Number(vals[i][colIdx]) || 0;
+      sh.getRange(row, colIdx + 1).setValue(current + stems);
+      vals[i][colIdx] = current + stems; // 更新 in-memory，避免同批多品項互相覆蓋
+      getSheet(SH.INV_LOG).appendRow([
+        taipeiNow(), vals[i][headers.indexOf('id')], flowerName,
+        store, current, current + stems, stems,
+        `進貨入庫（${store}，加權成本 ${weightedCost}）`, 'receive',
+      ]);
+    });
+    Logger.log(`✅ 成本加權更新：${flowerName} → NT$${weightedCost}`);
+    return;
+  }
+  Logger.log(`⚠️ 進貨警告：找不到「${flowerName}」`);
 }
 
 // ══════════════════════════════════════════════════════
@@ -1779,23 +1844,26 @@ function reverseStockForItems_(items, fallbackStore) {
   const stockESIdx = headers.indexOf('stockES');
   if (nameIdx < 0) return;
 
-  items.forEach(it => {
-    const store    = String(it.store || fallbackStore || '');
-    const stockIdx = store === '台南FOCUS'    ? stockTNIdx
-                   : store === '誠品生活台南'  ? stockESIdx
-                   : stockKHIdx;
-    if (stockIdx < 0) return;
-    const stems = Number(it.totalStems) || 0;
-    if (!stems) return;
-    const name = String(it.flowerName || '').trim();
-    if (!name) return;
+  const storeColMap = {
+    '高雄FOCUS 13': stockKHIdx,
+    '台南FOCUS':    stockTNIdx,
+    '誠品生活台南': stockESIdx,
+  };
 
+  // 輔助：對單一據點還原庫存
+  function reverseOneStore_(name, store, stems) {
+    if (!stems || !name) return;
+    const colIdx = storeColMap[store] !== undefined ? storeColMap[store]
+                 : store === '台南FOCUS' ? stockTNIdx
+                 : store === '誠品生活台南' ? stockESIdx
+                 : stockKHIdx;
+    if (colIdx < 0) return;
     for (let r = 1; r < vals.length; r++) {
       if (String(vals[r][nameIdx]).trim() === name) {
-        const current  = Number(vals[r][stockIdx]) || 0;
+        const current  = Number(vals[r][colIdx]) || 0;
         const newStock = Math.max(0, current - stems);
-        sh.getRange(r + 1, stockIdx + 1).setValue(newStock);
-        vals[r][stockIdx] = newStock;
+        sh.getRange(r + 1, colIdx + 1).setValue(newStock);
+        vals[r][colIdx] = newStock;
         const logSh = getSheet(SH.INV_LOG);
         if (logSh) logSh.appendRow([
           taipeiNow(), vals[r][idIdx], name,
@@ -1804,6 +1872,23 @@ function reverseStockForItems_(items, fallbackStore) {
         ]);
         break;
       }
+    }
+  }
+
+  items.forEach(it => {
+    const name = String(it.flowerName || '').trim();
+    if (!name) return;
+    // [v2.6] 新格式：有 allocation 物件
+    if (it.allocation && typeof it.allocation === 'object' && Object.keys(it.allocation).length > 0) {
+      const spb = Number(it.stemsPerBunch) || 0;
+      Object.entries(it.allocation).forEach(([store, bunches]) => {
+        const stems = Number(bunches) * spb;
+        reverseOneStore_(name, store, stems);
+      });
+    } else {
+      // 舊格式：單一 store + totalStems
+      const store = String(it.store || fallbackStore || '高雄FOCUS 13');
+      reverseOneStore_(name, store, Number(it.totalStems) || 0);
     }
   });
 }
@@ -1843,14 +1928,20 @@ function deleteProcurementBatch(data) {
     const tsCol = iHdr.indexOf('totalStems');
     const sCol  = iHdr.indexOf('store');
 
-    // [v2.5] 收集品項，反轉庫存
+    // [v2.5/v2.6] 收集品項，反轉庫存（支援 allocation 格式）
+    const spbCol   = iHdr.indexOf('stemsPerBunch');
+    const allocCol = iHdr.indexOf('allocation');
     const toReverse = [];
     for (let i = 1; i < iVals.length; i++) {
       if (String(iVals[i][ibCol]) === bId) {
+        const allocRaw = allocCol >= 0 ? iVals[i][allocCol] : '';
+        const allocation = safeJson(String(allocRaw || ''), null);
         toReverse.push({
-          flowerName: iVals[i][fnCol],
-          totalStems: iVals[i][tsCol],
-          store:      iVals[i][sCol] || batchStore,
+          flowerName  : iVals[i][fnCol],
+          totalStems  : iVals[i][tsCol],
+          store       : iVals[i][sCol] || batchStore,
+          stemsPerBunch: spbCol >= 0 ? Number(iVals[i][spbCol]) : 0,
+          allocation  : allocation,
         });
       }
     }
@@ -1908,21 +1999,27 @@ function updateProcurementBatch(data) {
   if (colOf('totalCost')  >= 0) batchSh.getRange(batchRow, colOf('totalCost') +1).setValue(totalCost);
   if (colOf('totalItems') >= 0) batchSh.getRange(batchRow, colOf('totalItems')+1).setValue(totalItems);
 
-  // ── [v2.5] 取得舊品項，先反轉舊庫存 ──
+  // ── [v2.5/v2.6] 取得舊品項，先反轉舊庫存（支援 allocation 格式）──
   const oldItems = [];
   if (itemSh.getLastRow() >= 2) {
-    const iVals = itemSh.getDataRange().getValues();
-    const iHdr  = iVals[0];
-    const ibCol = iHdr.indexOf('batchId');
-    const fnCol = iHdr.indexOf('flowerName');
-    const tsCol = iHdr.indexOf('totalStems');
-    const sCol  = iHdr.indexOf('store');
+    const iVals   = itemSh.getDataRange().getValues();
+    const iHdr    = iVals[0];
+    const ibCol   = iHdr.indexOf('batchId');
+    const fnCol   = iHdr.indexOf('flowerName');
+    const tsCol   = iHdr.indexOf('totalStems');
+    const sCol    = iHdr.indexOf('store');
+    const spbCol2 = iHdr.indexOf('stemsPerBunch');
+    const acCol   = iHdr.indexOf('allocation');
     for (let i = 1; i < iVals.length; i++) {
       if (String(iVals[i][ibCol]) === bId) {
+        const allocRaw = acCol >= 0 ? iVals[i][acCol] : '';
+        const alloc    = safeJson(String(allocRaw || ''), null);
         oldItems.push({
-          flowerName: iVals[i][fnCol],
-          totalStems: iVals[i][tsCol],
-          store:      iVals[i][sCol] || oldBatchStore,
+          flowerName   : iVals[i][fnCol],
+          totalStems   : iVals[i][tsCol],
+          store        : iVals[i][sCol] || oldBatchStore,
+          stemsPerBunch: spbCol2 >= 0 ? Number(iVals[i][spbCol2]) : 0,
+          allocation   : alloc,
         });
       }
     }
@@ -1950,7 +2047,8 @@ function updateProcurementBatch(data) {
     const totalStems   = spb * bq;
     const costPerStem  = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
     const suggestedPrice = Math.round(costPerStem * 3.8);
-    const itemStore    = it.store || newStore;
+    const allocation   = (it.allocation && typeof it.allocation === 'object') ? it.allocation : {};
+    const allocJson    = JSON.stringify(allocation);
     const row = iHdr.map(h => {
       if (h === 'batchId')        return bId;
       if (h === 'flowerName')     return it.flowerName || '';
@@ -1963,15 +2061,19 @@ function updateProcurementBatch(data) {
       if (h === 'suggestedPrice') return suggestedPrice;
       if (h === 'totalCost')      return ppb * bq;
       if (h === 'seq')            return idx + 1;
-      if (h === 'store')          return itemStore;
+      if (h === 'store')          return ''; // 多點位進貨不用此欄
+      if (h === 'allocation')     return allocJson;
       return '';
     });
     if (iHdr.length > 0) itemSh.appendRow(row);
 
-    // [v2.5] 同步商品成本 + 庫存（加權）
+    // [v2.6] 同步商品成本 + 庫存（多據點加權）
     ensureProductExists(it.flowerName, it.category, costPerStem, suggestedPrice);
-    updateProductCostWeighted({ flowerName: it.flowerName, store: itemStore, newStems: totalStems, newCost: costPerStem });
-    // [v2.5] 如有設定收銀台售價，同步更新
+    if (Object.keys(allocation).length > 0) {
+      updateProductCostWeightedWithAlloc({ flowerName: it.flowerName, stemsPerBunch: spb, allocation, costPerStem });
+    } else {
+      updateProductCostWeighted({ flowerName: it.flowerName, store: newStore, newStems: totalStems, newCost: costPerStem });
+    }
     if (Number(it.salePrice) > 0) updateProductPrice(it.flowerName, Number(it.salePrice));
   });
 
