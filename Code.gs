@@ -2104,4 +2104,3 @@ function addAllocationColumn() {
   sh.getRange(1, newCol).setValue('allocation');
   Logger.log(`✅ 已在第 ${newCol} 欄新增 allocation 欄位`);
 }
-fix: v2.2 修復 Studio 分帳和廢棄成本
