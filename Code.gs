@@ -1764,7 +1764,52 @@ function voidTransaction(data) {
 }
 
 // ══════════════════════════════════════════════════════
-//  刪除進貨批次 [v2.4 新增]
+//  [v2.5] 庫存反轉輔助：將品項 totalStems 從對應點位庫存中扣除
+// ══════════════════════════════════════════════════════
+function reverseStockForItems_(items, fallbackStore) {
+  if (!items || !items.length) return;
+  const sh = getSheet(SH.PRODUCTS);
+  if (!sh) return;
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameIdx    = headers.indexOf('name');
+  const idIdx      = headers.indexOf('id');
+  const stockKHIdx = headers.indexOf('stockKH');
+  const stockTNIdx = headers.indexOf('stockTN');
+  const stockESIdx = headers.indexOf('stockES');
+  if (nameIdx < 0) return;
+
+  items.forEach(it => {
+    const store    = String(it.store || fallbackStore || '');
+    const stockIdx = store === '台南FOCUS'    ? stockTNIdx
+                   : store === '誠品生活台南'  ? stockESIdx
+                   : stockKHIdx;
+    if (stockIdx < 0) return;
+    const stems = Number(it.totalStems) || 0;
+    if (!stems) return;
+    const name = String(it.flowerName || '').trim();
+    if (!name) return;
+
+    for (let r = 1; r < vals.length; r++) {
+      if (String(vals[r][nameIdx]).trim() === name) {
+        const current  = Number(vals[r][stockIdx]) || 0;
+        const newStock = Math.max(0, current - stems);
+        sh.getRange(r + 1, stockIdx + 1).setValue(newStock);
+        vals[r][stockIdx] = newStock;
+        const logSh = getSheet(SH.INV_LOG);
+        if (logSh) logSh.appendRow([
+          taipeiNow(), vals[r][idIdx], name,
+          store, current, newStock, -stems,
+          '進貨刪除/編輯（庫存還原）', 'adjustment',
+        ]);
+        break;
+      }
+    }
+  });
+}
+
+// ══════════════════════════════════════════════════════
+//  刪除進貨批次 [v2.4 → v2.5 加庫存反轉]
 // ══════════════════════════════════════════════════════
 function deleteProcurementBatch(data) {
   // data: { batchId }
@@ -1772,26 +1817,50 @@ function deleteProcurementBatch(data) {
   const itemSh  = getSheet(SH_PROC.ITEMS);
   if (!batchSh || !itemSh) return { success: false, error: '進貨工作表不存在' };
 
-  // 刪 batch 列
-  const bVals  = batchSh.getDataRange().getValues();
-  const bIdCol = bVals[0].indexOf('batchId');
-  let deleted  = false;
+  const bId = String(data.batchId);
+
+  // 取得 batch store，並刪 batch 列
+  const bVals     = batchSh.getDataRange().getValues();
+  const bHdr      = bVals[0];
+  const bIdCol    = bHdr.indexOf('batchId');
+  const bStoreCol = bHdr.indexOf('store');
+  let batchStore  = '';
+  let deleted     = false;
   for (let i = bVals.length - 1; i >= 1; i--) {
-    if (String(bVals[i][bIdCol]) === String(data.batchId)) {
+    if (String(bVals[i][bIdCol]) === bId) {
+      batchStore = String(bVals[i][bStoreCol] || '');
       batchSh.deleteRow(i + 1);
       deleted = true;
       break;
     }
   }
 
-  // 刪對應 items（逆序，避免 row index 錯位）
   if (itemSh.getLastRow() >= 2) {
     const iVals = itemSh.getDataRange().getValues();
-    const ibCol = iVals[0].indexOf('batchId');
-    for (let i = iVals.length - 1; i >= 1; i--) {
-      if (String(iVals[i][ibCol]) === String(data.batchId)) {
-        itemSh.deleteRow(i + 1);
+    const iHdr  = iVals[0];
+    const ibCol = iHdr.indexOf('batchId');
+    const fnCol = iHdr.indexOf('flowerName');
+    const tsCol = iHdr.indexOf('totalStems');
+    const sCol  = iHdr.indexOf('store');
+
+    // [v2.5] 收集品項，反轉庫存
+    const toReverse = [];
+    for (let i = 1; i < iVals.length; i++) {
+      if (String(iVals[i][ibCol]) === bId) {
+        toReverse.push({
+          flowerName: iVals[i][fnCol],
+          totalStems: iVals[i][tsCol],
+          store:      iVals[i][sCol] || batchStore,
+        });
       }
+    }
+    reverseStockForItems_(toReverse, batchStore);
+
+    // 刪對應 items（逆序）
+    const iVals2 = itemSh.getDataRange().getValues();
+    const ibCol2 = iVals2[0].indexOf('batchId');
+    for (let i = iVals2.length - 1; i >= 1; i--) {
+      if (String(iVals2[i][ibCol2]) === bId) itemSh.deleteRow(i + 1);
     }
   }
 
@@ -1801,7 +1870,7 @@ function deleteProcurementBatch(data) {
 }
 
 // ══════════════════════════════════════════════════════
-//  更新進貨批次（含品項）
+//  更新進貨批次 [v2.4 → v2.5 加庫存/商品連動]
 // ══════════════════════════════════════════════════════
 function updateProcurementBatch(data) {
   // data: { batchId, source, date, note, items: [...] }
@@ -1812,44 +1881,76 @@ function updateProcurementBatch(data) {
   const bId = String(data.batchId);
 
   // ── 更新 batch 列的基本資料 ──
-  const bVals  = batchSh.getDataRange().getValues();
-  const bHdr   = bVals[0];
-  const bIdCol = bHdr.indexOf('batchId');
-  let batchRow = -1;
+  const bVals     = batchSh.getDataRange().getValues();
+  const bHdr      = bVals[0];
+  const bIdCol    = bHdr.indexOf('batchId');
+  const bStoreCol = bHdr.indexOf('store');
+  let batchRow    = -1;
+  let oldBatchStore = '';
   for (let i = 1; i < bVals.length; i++) {
-    if (String(bVals[i][bIdCol]) === bId) { batchRow = i + 1; break; }
+    if (String(bVals[i][bIdCol]) === bId) {
+      batchRow      = i + 1;
+      oldBatchStore = String(bVals[i][bStoreCol] || '');
+      break;
+    }
   }
   if (batchRow === -1) return { success: false, error: '找不到此進貨批次' };
 
-  // 更新欄位：source / date / note / totalCost（重算）
-  const colOf = name => bHdr.indexOf(name);
-  const items = Array.isArray(data.items) ? data.items : [];
+  const colOf    = name => bHdr.indexOf(name);
+  const items    = Array.isArray(data.items) ? data.items : [];
+  const newStore = data.store || oldBatchStore;
   const totalCost  = items.reduce((s, it) => s + (Number(it.pricePerBunch)||0) * (Number(it.bunchesQty)||0), 0);
   const totalItems = items.length;
 
-  if (colOf('source') >= 0) batchSh.getRange(batchRow, colOf('source')+1).setValue(data.source || '');
-  if (colOf('date')   >= 0) batchSh.getRange(batchRow, colOf('date')  +1).setValue(data.date   || '');
-  if (colOf('note')   >= 0) batchSh.getRange(batchRow, colOf('note')  +1).setValue(data.note   || '');
+  if (colOf('source')     >= 0) batchSh.getRange(batchRow, colOf('source')    +1).setValue(data.source || '');
+  if (colOf('date')       >= 0) batchSh.getRange(batchRow, colOf('date')      +1).setValue(data.date   || '');
+  if (colOf('note')       >= 0) batchSh.getRange(batchRow, colOf('note')      +1).setValue(data.note   || '');
   if (colOf('totalCost')  >= 0) batchSh.getRange(batchRow, colOf('totalCost') +1).setValue(totalCost);
   if (colOf('totalItems') >= 0) batchSh.getRange(batchRow, colOf('totalItems')+1).setValue(totalItems);
 
-  // ── 刪除舊 items，重新寫入 ──
+  // ── [v2.5] 取得舊品項，先反轉舊庫存 ──
+  const oldItems = [];
   if (itemSh.getLastRow() >= 2) {
     const iVals = itemSh.getDataRange().getValues();
-    const ibCol = iVals[0].indexOf('batchId');
-    for (let i = iVals.length - 1; i >= 1; i--) {
-      if (String(iVals[i][ibCol]) === bId) itemSh.deleteRow(i + 1);
+    const iHdr  = iVals[0];
+    const ibCol = iHdr.indexOf('batchId');
+    const fnCol = iHdr.indexOf('flowerName');
+    const tsCol = iHdr.indexOf('totalStems');
+    const sCol  = iHdr.indexOf('store');
+    for (let i = 1; i < iVals.length; i++) {
+      if (String(iVals[i][ibCol]) === bId) {
+        oldItems.push({
+          flowerName: iVals[i][fnCol],
+          totalStems: iVals[i][tsCol],
+          store:      iVals[i][sCol] || oldBatchStore,
+        });
+      }
+    }
+  }
+  reverseStockForItems_(oldItems, oldBatchStore);
+
+  // ── 刪除舊 items ──
+  if (itemSh.getLastRow() >= 2) {
+    const iVals2 = itemSh.getDataRange().getValues();
+    const ibCol2 = iVals2[0].indexOf('batchId');
+    for (let i = iVals2.length - 1; i >= 1; i--) {
+      if (String(iVals2[i][ibCol2]) === bId) itemSh.deleteRow(i + 1);
     }
   }
 
-  // 寫入新 items
-  const iHdr = itemSh.getRange(1, 1, 1, itemSh.getLastColumn()).getValues()[0];
+  // ── 寫入新 items，同步商品資料與庫存 ──
+  const iHdr = itemSh.getLastRow() >= 1
+    ? itemSh.getRange(1, 1, 1, itemSh.getLastColumn()).getValues()[0]
+    : [];
+
   items.forEach((it, idx) => {
-    const spb  = Number(it.stemsPerBunch) || 0;
-    const bq   = Number(it.bunchesQty)   || 0;
-    const ppb  = Number(it.pricePerBunch) || 0;
-    const costPerStem    = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
+    const spb          = Number(it.stemsPerBunch) || 0;
+    const bq           = Number(it.bunchesQty)   || 0;
+    const ppb          = Number(it.pricePerBunch) || 0;
+    const totalStems   = spb * bq;
+    const costPerStem  = spb > 0 ? Math.round(ppb / spb * 100) / 100 : 0;
     const suggestedPrice = Math.round(costPerStem * 3.8);
+    const itemStore    = it.store || newStore;
     const row = iHdr.map(h => {
       if (h === 'batchId')        return bId;
       if (h === 'flowerName')     return it.flowerName || '';
@@ -1857,14 +1958,21 @@ function updateProcurementBatch(data) {
       if (h === 'stemsPerBunch')  return spb;
       if (h === 'bunchesQty')     return bq;
       if (h === 'pricePerBunch')  return ppb;
-      if (h === 'totalStems')     return spb * bq;
+      if (h === 'totalStems')     return totalStems;
       if (h === 'costPerStem')    return costPerStem;
       if (h === 'suggestedPrice') return suggestedPrice;
       if (h === 'totalCost')      return ppb * bq;
       if (h === 'seq')            return idx + 1;
+      if (h === 'store')          return itemStore;
       return '';
     });
-    itemSh.appendRow(row);
+    if (iHdr.length > 0) itemSh.appendRow(row);
+
+    // [v2.5] 同步商品成本 + 庫存（加權）
+    ensureProductExists(it.flowerName, it.category, costPerStem, suggestedPrice);
+    updateProductCostWeighted({ flowerName: it.flowerName, store: itemStore, newStems: totalStems, newCost: costPerStem });
+    // [v2.5] 如有設定收銀台售價，同步更新
+    if (Number(it.salePrice) > 0) updateProductPrice(it.flowerName, Number(it.salePrice));
   });
 
   return { success: true, totalCost, totalItems };
