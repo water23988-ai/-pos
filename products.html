@@ -261,6 +261,12 @@
                     <input type="number" id="fieldStockES" class="f-input" min="0" placeholder="0">
                 </div>
             </div>
+            <div class="modal-grid-3">
+                <div>
+                    <label class="f-label" style="color:#8A9BA8;">市集 (MK)</label>
+                    <input type="number" id="fieldStockMarket" class="f-input" min="0" placeholder="0">
+                </div>
+            </div>
         </div>
 
         <div class="modal-actions">
@@ -459,6 +465,7 @@ function productCardHtml(p) {
     const stockKH  = Number(p.stockKH || p.庫存KH || 0);
     const stockTN  = Number(p.stockTN || p.庫存TN || 0);
     const stockES  = Number(p.stockES || p.庫存ES || 0);
+    const stockMK  = Number(p.stockMarket || 0);
     // status: 'active' = 收銀台顯示, 'hidden' = 管理可見但不在收銀台, 'inactive' = 已刪除
     const status  = p.status || 'active';
     const posOn   = status === 'active';    // 是否顯示在收銀台
@@ -467,6 +474,7 @@ function productCardHtml(p) {
     const khClass  = stockKH <= 3 ? 'stock-low' : '';
     const tnClass  = stockTN <= 3 ? 'stock-low' : '';
     const esClass  = stockES <= 3 ? 'stock-low' : '';
+    const mkClass  = stockMK <= 3 ? 'stock-low' : '';
 
     return `<div class="product-card" style="${deleted ? 'opacity:0.55;' : ''}">
         <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
@@ -488,6 +496,10 @@ function productCardHtml(p) {
             <div class="stock-badge ${esClass}">
                 <div class="stock-badge-val">${stockES}</div>
                 <div class="stock-badge-lbl">誠品</div>
+            </div>
+            <div class="stock-badge ${mkClass}">
+                <div class="stock-badge-val">${stockMK}</div>
+                <div class="stock-badge-lbl">市集</div>
             </div>
         </div>
         <div class="toggle-wrap">
@@ -511,7 +523,7 @@ function openAddModal() {
     document.getElementById('modalTitle').innerText = '新增商品';
     document.getElementById('editProductId').value = '';
     document.getElementById('deleteBtn').style.display = 'none';
-    ['fieldName','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES'].forEach(id => {
+    ['fieldName','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES','fieldStockMarket'].forEach(id => {
         document.getElementById(id).value = '';
     });
     document.getElementById('fieldCategory').value = '主花';
@@ -532,6 +544,7 @@ function openEditModal(jsonStr) {
     document.getElementById('fieldStockKH').value      = p.stockKH || p.庫存KH || '';
     document.getElementById('fieldStockTN').value      = p.stockTN || p.庫存TN || '';
     document.getElementById('fieldStockES').value      = p.stockES || p.庫存ES || '';
+    document.getElementById('fieldStockMarket').value  = p.stockMarket || '';
     document.getElementById('deleteBtn').style.display = '';
     document.getElementById('productModal').classList.add('show');
 }
@@ -561,6 +574,7 @@ async function saveProduct() {
             stockKH         : Number(document.getElementById('fieldStockKH').value) || 0,
             stockTN         : Number(document.getElementById('fieldStockTN').value) || 0,
             stockES         : Number(document.getElementById('fieldStockES').value) || 0,
+            stockMarket     : Number(document.getElementById('fieldStockMarket').value) || 0,
             visible         : id ? undefined : true, // 新增時預設顯示，編輯時不改變
         }
     };

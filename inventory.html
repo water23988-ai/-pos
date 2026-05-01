@@ -376,9 +376,11 @@ function renderAlerts() {
         const kh = Number(p.stockKH || p.庫存KH || 0);
         const tn = Number(p.stockTN || p.庫存TN || 0);
         const es = Number(p.stockES || p.庫存ES || 0);
+        const mk = Number(p.stockMarket || 0);
         if (kh <= LOW) alerts.push(`${name} (高雄 ${kh})`);
         if (tn <= LOW) alerts.push(`${name} (台南 ${tn})`);
         if (es <= LOW) alerts.push(`${name} (誠品 ${es})`);
+        if (mk <= LOW) alerts.push(`${name} (市集 ${mk})`);
     });
     const banner = document.getElementById('alertBanner');
     const chips  = document.getElementById('alertChips');
@@ -436,7 +438,8 @@ function renderTable() {
         const kh   = Number(p.stockKH || p.庫存KH || 0);
         const tn   = Number(p.stockTN || p.庫存TN || 0);
         const es   = Number(p.stockES || p.庫存ES || 0);
-        const total = kh + tn + es;
+        const mk   = Number(p.stockMarket || 0);
+        const total = kh + tn + es + mk;
         const pJson = escHtml(JSON.stringify(p));
 
         return `<tr>
@@ -465,6 +468,13 @@ function renderTable() {
                     <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','ES',+1,'${name}',${es})" title="加 1">＋</button>
                 </div>
             </td>
+            <td class="stock-cell">
+                <div class="stock-control">
+                    <button class="stock-btn minus" onclick="quickAdj('${escHtml(id)}','MK',-1,'${name}',${mk})" title="減 1">−</button>
+                    <span class="stock-val ${mk <= 3 ? 'low' : ''}" id="mk_${escHtml(id)}">${mk}</span>
+                    <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','MK',+1,'${name}',${mk})" title="加 1">＋</button>
+                </div>
+            </td>
             <td style="text-align:center;">
                 <span style="font-size:14px;font-weight:800;color:#6d7756;">${total}</span>
             </td>
@@ -486,6 +496,7 @@ function renderTable() {
                         <th class="center">高雄</th>
                         <th class="center">台南</th>
                         <th class="center">誠品</th>
+                        <th class="center">市集</th>
                         <th class="center">總計</th>
                         <th class="center">操作</th>
                     </tr>
@@ -509,8 +520,8 @@ async function quickAdj(id, store, delta, name, currentVal) {
             // 樂觀更新
             const p = allProducts.find(p => (p.id || p.productId) == id);
             if (p) {
-                const key = store === 'KH' ? 'stockKH' : store === 'TN' ? 'stockTN' : 'stockES';
-                const oldKey = store === 'KH' ? '庫存KH' : store === 'TN' ? '庫存TN' : '庫存ES';
+                const key = store === 'KH' ? 'stockKH' : store === 'TN' ? 'stockTN' : store === 'MK' ? 'stockMarket' : 'stockES';
+                const oldKey = store === 'KH' ? '庫存KH' : store === 'TN' ? '庫存TN' : store === 'MK' ? 'stockMarket' : '庫存ES';
                 const newVal = Math.max(0, Number(p[key] || p[oldKey] || 0) + delta);
                 p[key] = newVal;
                 const el = document.getElementById(`${store.toLowerCase()}_${id}`);
@@ -552,6 +563,7 @@ function openAdjModal(p) {
                 <option value="KH">高雄 (KH)</option>
                 <option value="TN">台南 (TN)</option>
                 <option value="ES">誠品 (ES)</option>
+                <option value="MK">市集 (MK)</option>
             </select>
             <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">調整數量（正數加庫存，負數減庫存）</label>
             <input type="number" id="adjDelta" class="f-input" style="width:100%;margin-bottom:12px;" placeholder="例：10 或 -5">
@@ -611,6 +623,7 @@ function openWasteModal(p) {
     const kh   = Number(p.stockKH || 0);
     const tn   = Number(p.stockTN || 0);
     const es   = Number(p.stockES || 0);
+    const mk   = Number(p.stockMarket || 0);
 
     document.getElementById('wasteProductName').innerText = name;
     document.getElementById('wasteQty').value  = '';
@@ -618,11 +631,12 @@ function openWasteModal(p) {
     document.getElementById('wasteBtn').disabled = false;
     document.getElementById('wasteBtn').innerText = '確認報廢';
 
-    // 三個點位選擇按鈕
+    // 四個點位選擇按鈕
     const stores = [
         { code:'KH', label:'高雄', stock: kh },
         { code:'TN', label:'台南', stock: tn },
         { code:'ES', label:'誠品', stock: es },
+        { code:'MK', label:'市集', stock: mk },
     ];
     document.getElementById('wasteStoreGrid').innerHTML = stores.map(s => `
         <button class="waste-store-btn ${s.code === 'KH' ? 'active' : ''}"
@@ -657,10 +671,10 @@ async function submitWaste() {
     if (isNaN(qty) || qty <= 0) { showToast('請輸入報廢數量'); return; }
     if (!API_URL) { showToast('請先設定 API 網址'); return; }
 
-    const storeLabel = wasteStore === 'KH' ? '高雄FOCUS 13' : wasteStore === 'TN' ? '台南FOCUS' : '誠品生活台南';
+    const storeLabel = wasteStore === 'KH' ? '高雄FOCUS 13' : wasteStore === 'TN' ? '台南FOCUS' : wasteStore === 'MK' ? '市集' : '誠品生活台南';
     const id   = wasteTarget.id || wasteTarget.productId;
     const name = wasteTarget.name || wasteTarget.productName || '';
-    const stockKey = wasteStore === 'KH' ? 'stockKH' : wasteStore === 'TN' ? 'stockTN' : 'stockES';
+    const stockKey = wasteStore === 'KH' ? 'stockKH' : wasteStore === 'TN' ? 'stockTN' : wasteStore === 'MK' ? 'stockMarket' : 'stockES';
     const curStock = Number(wasteTarget[stockKey] || 0);
 
     if (qty > curStock) {

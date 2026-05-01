@@ -106,7 +106,7 @@
         /* ── 分配欄 ── */
         .alloc-section { background: rgba(142,151,117,0.07); border-radius: 8px; padding: 8px 10px; margin-top: 8px; }
         .alloc-section-label { font-size: 10px; font-weight: 700; color: #8e9775; letter-spacing: 0.06em; text-transform: uppercase; margin-bottom: 7px; }
-        .alloc-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .alloc-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
         .alloc-cell label { font-size: 10px; color: #A89278; font-weight: 600; display: block; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .alloc-cell input { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 8px; padding: 5px 8px; font-size: 13px; outline: none; background: #FAF7F2; color: #3D2E1E; text-align: center; -webkit-appearance: none; }
         .alloc-cell input:focus { border-color: #8e9775; }
@@ -492,7 +492,7 @@ function flowerSuggestions() {
 
 // ══ 花材清單 CRUD（新設計）══
 function emptyAlloc() {
-    return { '高雄FOCUS 13': 0, '台南FOCUS': 0, '誠品生活台南': 0 };
+    return { '高雄FOCUS 13': 0, '台南FOCUS': 0, '誠品生活台南': 0, '市集': 0 };
 }
 
 function addItemRow() {
@@ -676,7 +676,7 @@ function renderItemList() {
         <div class="alloc-section">
             <div class="alloc-section-label">📦 分配到各據點（把）</div>
             <div class="alloc-grid">
-                ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['誠品生活台南','誠品台南']].map(([key, label]) => `
+                ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['誠品生活台南','誠品台南'],['市集','市集']].map(([key, label]) => `
                 <div class="alloc-cell">
                     <label>${label}</label>
                     <input type="number" min="0" inputmode="numeric"

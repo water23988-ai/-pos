@@ -665,6 +665,7 @@
                 <button onclick="setHistoryStore('高雄FOCUS 13')" id="hs-kh"  class="source-chip source-hist" style="font-size:11px;">高雄</button>
                 <button onclick="setHistoryStore('台南FOCUS')"    id="hs-tn"  class="source-chip source-hist" style="font-size:11px;">台南</button>
                 <button onclick="setHistoryStore('誠品生活台南')" id="hs-es"  class="source-chip source-hist" style="font-size:11px;">誠品</button>
+                <button onclick="setHistoryStore('市集')"      id="hs-mk"  class="source-chip source-hist" style="font-size:11px;">市集</button>
                 <button onclick="setHistoryStore('Studio')"   id="hs-st"  class="source-chip source-hist" style="font-size:11px;">Studio</button>
             </div>
         </div>
@@ -731,6 +732,13 @@
                     <div class="store-card-sub">誠品合作店面</div>
                 </div>
             </button>
+            <button onclick="pickStore('市集')" class="store-card">
+                <div class="store-card-icon">🌸</div>
+                <div>
+                    <div class="store-card-name">市集</div>
+                    <div class="store-card-sub">市集擺攤</div>
+                </div>
+            </button>
         </div>
     </div>
 </div>
@@ -791,8 +799,9 @@ const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加�
 
 function isKH()           { return currentStore === '高雄FOCUS 13'; }  // [v2.2] Studio 已獨立
 function getStoreStock(p) {
-    if (currentStore === '台南FOCUS')   return Number(p.stockTN)  || 0;
-    if (currentStore === '誠品生活台南') return Number(p.stockES) || 0;
+    if (currentStore === '台南FOCUS')   return Number(p.stockTN)     || 0;
+    if (currentStore === '誠品生活台南') return Number(p.stockES)    || 0;
+    if (currentStore === '市集')        return Number(p.stockMarket) || 0;
     return Number(p.stockKH) || 0;
 }
 function storeForGAS()    { return currentStore; }  // [v2.2 修復] Studio 直接以 'Studio' 存入，不再映射到高雄
@@ -1036,7 +1045,7 @@ function addToCart(id) {
         existing.qty++;
         showToast(`${p.name} × ${existing.qty} ✓`);
     } else {
-        cart.push({ id: p.id, name: p.name, qty: 1, price: p.price||0, priceTN: p.price||0, priceKH: p.price||0, stockTN: p.stockTN||0, stockKH: p.stockKH||0, stockES: p.stockES||0, cost: p.cost || 0 });
+        cart.push({ id: p.id, name: p.name, qty: 1, price: p.price||0, priceTN: p.price||0, priceKH: p.price||0, stockTN: p.stockTN||0, stockKH: p.stockKH||0, stockES: p.stockES||0, stockMarket: p.stockMarket||0, cost: p.cost || 0 });
         showToast(`已加入 ${p.name} ✓`);
     }
     renderCart();

@@ -62,7 +62,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','status','visible']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','stockMarket','status','visible']);
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -237,9 +237,10 @@ function getProducts() {
     category: r.category || '其他加購',
     price   : Number(r.price)   || 0,
     cost    : Number(r.cost)    || 0,
-    stockKH : Number(r.stockKH) || 0,
-    stockTN : Number(r.stockTN) || 0,
-    stockES : Number(r.stockES) || 0,
+    stockKH     : Number(r.stockKH)     || 0,
+    stockTN     : Number(r.stockTN)     || 0,
+    stockES     : Number(r.stockES)     || 0,
+    stockMarket : Number(r.stockMarket) || 0,
     status  : r.status || 'active',   // active | hidden | inactive
     visible : r.visible === false || r.visible === 'false' ? false : true,
   }));
@@ -257,9 +258,10 @@ function addProduct(data) {
     data.category || '其他加購',
     Number(data.price)   || 0,
     Number(data.cost)    || 0,
-    Number(data.stockKH) || 0,
-    Number(data.stockTN) || 0,
-    Number(data.stockES) || 0,
+    Number(data.stockKH)     || 0,
+    Number(data.stockTN)     || 0,
+    Number(data.stockES)     || 0,
+    Number(data.stockMarket) || 0,
     'active',  // [v2.3] status 欄位
     true,      // [v2.4] visible 欄位：新增商品預設顯示在收銀台
   ]);
@@ -280,9 +282,10 @@ function updateProduct(data) {
       if (data.category !== undefined) set('category', data.category);
       if (data.price    !== undefined) set('price',    Number(data.price));
       if (data.cost     !== undefined) set('cost',     Number(data.cost));
-      if (data.stockKH  !== undefined) set('stockKH',  Number(data.stockKH));
-      if (data.stockTN  !== undefined) set('stockTN',  Number(data.stockTN));
-      if (data.stockES  !== undefined) set('stockES',  Number(data.stockES));
+      if (data.stockKH     !== undefined) set('stockKH',     Number(data.stockKH));
+      if (data.stockTN     !== undefined) set('stockTN',     Number(data.stockTN));
+      if (data.stockES     !== undefined) set('stockES',     Number(data.stockES));
+      if (data.stockMarket !== undefined) set('stockMarket', Number(data.stockMarket));
       // status 欄位：active | hidden | inactive
       if (data.status !== undefined) {
         let statusCol = headers.indexOf('status');
@@ -353,6 +356,16 @@ function reactivateProduct(data) {
 }
 
 // ══════════════════════════════════════════════════════
+//  共用：據點名稱 → Products 庫存欄 key
+// ══════════════════════════════════════════════════════
+function storeToColKey_(store) {
+  if (store === '台南FOCUS')    return 'stockTN';
+  if (store === '誠品生活台南') return 'stockES';
+  if (store === '市集')         return 'stockMarket';
+  return 'stockKH'; // 高雄FOCUS 13 / 預設
+}
+
+// ══════════════════════════════════════════════════════
 //  庫存操作
 // ══════════════════════════════════════════════════════
 function updateStock(data) {
@@ -361,7 +374,7 @@ function updateStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
+  const storeCol = headers.indexOf(storeToColKey_(data.store));
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -393,7 +406,7 @@ function receiveStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN') : data.store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
+  const storeCol = headers.indexOf(storeToColKey_(data.store));
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -431,8 +444,9 @@ function adjustStock(data) {
     'KH': '高雄FOCUS 13',
     'TN': '台南FOCUS',
     'ES': '誠品生活台南',
+    'MK': '市集',
   };
-  // 支援短代碼（KH/TN/ES）或完整店名
+  // 支援短代碼（KH/TN/ES/MK）或完整店名
   const storeName = storeMap[data.store] || data.store || '高雄FOCUS 13';
   const delta     = Number(data.delta) || 0;
   if (delta === 0) return { success: false, error: 'delta 不可為 0' };
@@ -441,8 +455,7 @@ function adjustStock(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const colKey  = storeName === '台南FOCUS' ? 'stockTN' : storeName === '誠品生活台南' ? 'stockES' : 'stockKH';
-  const storeCol = headers.indexOf(colKey);
+  const storeCol = headers.indexOf(storeToColKey_(storeName));
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -1631,7 +1644,8 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
   const stockKHCol = headers.indexOf('stockKH');
   const stockTNCol = headers.indexOf('stockTN');
   const stockESCol = headers.indexOf('stockES');
-  const storeCol   = store === '台南FOCUS' ? stockTNCol : store === '誠品生活台南' ? stockESCol : stockKHCol;
+  const stockMarketCol = headers.indexOf('stockMarket');
+  const storeCol   = store === '台南FOCUS' ? stockTNCol : store === '誠品生活台南' ? stockESCol : store === '市集' ? stockMarketCol : stockKHCol;
 
   for (let i = 1; i < vals.length; i++) {
     if (String(vals[i][nameCol] || '').trim() !== String(flowerName || '').trim()) continue;
@@ -1665,10 +1679,12 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
   const stockKHCol = headers.indexOf('stockKH');
   const stockTNCol = headers.indexOf('stockTN');
   const stockESCol = headers.indexOf('stockES');
+  const stockMarketCol2 = headers.indexOf('stockMarket');
   const storeColMap = {
     '高雄FOCUS 13': stockKHCol,
     '台南FOCUS':    stockTNCol,
     '誠品生活台南': stockESCol,
+    '市集':         stockMarketCol2,
   };
   // 計算本次進貨總枝數（用於加權成本）
   const totalNewStems = Object.values(allocation).reduce((s, b) => s + Number(b), 0) * (stemsPerBunch || 0);
@@ -1677,7 +1693,7 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
     if (String(vals[i][nameCol] || '').trim() !== String(flowerName).trim()) continue;
     const row = i + 1;
     // ── 加權平均成本（用全館總庫存做分母）──
-    const totalOldStock = [stockKHCol, stockTNCol, stockESCol]
+    const totalOldStock = [stockKHCol, stockTNCol, stockESCol, stockMarketCol2]
       .filter(c => c >= 0).reduce((s, c) => s + (Number(vals[i][c]) || 0), 0);
     const oldCost      = Number(vals[i][costCol]) || 0;
     const weightedCost = (totalOldStock + totalNewStems) > 0
@@ -1844,10 +1860,12 @@ function reverseStockForItems_(items, fallbackStore) {
   const stockESIdx = headers.indexOf('stockES');
   if (nameIdx < 0) return;
 
+  const stockMarketIdx = headers.indexOf('stockMarket');
   const storeColMap = {
     '高雄FOCUS 13': stockKHIdx,
     '台南FOCUS':    stockTNIdx,
     '誠品生活台南': stockESIdx,
+    '市集':         stockMarketIdx,
   };
 
   // 輔助：對單一據點還原庫存
@@ -2092,6 +2110,28 @@ function safeJson(str, fallback) {
 //  [v2.6 遷移] 替現有 ProcurementItems 工作表加上 allocation 欄位
 //  執行一次即可，已有 allocation 欄位時會自動跳過
 // ══════════════════════════════════════════════════════
+// [v2.7 遷移] 替現有 Products 工作表加上 stockMarket 欄位
+function addMarketColumn() {
+  const sh = getSheet(SH.PRODUCTS);
+  if (!sh) { Logger.log('❌ 找不到 Products 工作表'); return; }
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (headers.includes('stockMarket')) {
+    Logger.log('✅ stockMarket 欄位已存在，無需重複新增');
+    return;
+  }
+  // 插入在 stockES 後面（保持欄位順序）
+  const esIdx = headers.indexOf('stockES');
+  const insertCol = esIdx >= 0 ? esIdx + 2 : sh.getLastColumn() + 1;
+  sh.insertColumnAfter(esIdx >= 0 ? esIdx + 1 : sh.getLastColumn());
+  sh.getRange(1, insertCol).setValue('stockMarket');
+  // 新欄位預設值 0（對現有所有資料列）
+  const lastRow = sh.getLastRow();
+  if (lastRow > 1) {
+    sh.getRange(2, insertCol, lastRow - 1, 1).setValue(0);
+  }
+  Logger.log(`✅ 已在第 ${insertCol} 欄新增 stockMarket 欄位（${lastRow - 1} 筆商品預設為 0）`);
+}
+
 function addAllocationColumn() {
   const sh = getSheet(SH_PROC.ITEMS);
   if (!sh) { Logger.log('❌ 找不到 ProcurementItems 工作表'); return; }
