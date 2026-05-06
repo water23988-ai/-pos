@@ -322,8 +322,11 @@
             <span class="count-badge" id="productCount">—</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
-            <button onclick="openMergeModal()" class="btn-secondary" style="padding:10px 16px;font-size:13px;">🔀 合併商品</button>
-            <button onclick="openAddModal()" class="btn-primary" style="padding:10px 20px;font-size:13px;">＋ 新增商品</button>
+            <!-- [v2.11] 視圖切換 tab -->
+            <button id="tabProducts" onclick="switchTab('products')" class="btn-primary" style="padding:9px 16px;font-size:13px;">🌹 商品列表</button>
+            <button id="tabPriceLog" onclick="switchTab('pricelog')" class="btn-secondary" style="padding:9px 16px;font-size:13px;">💰 價格歷史</button>
+            <button onclick="openMergeModal()" class="btn-secondary" style="padding:9px 12px;font-size:12px;" id="btnMerge">🔀 合併</button>
+            <button onclick="openAddModal()" class="btn-primary" style="padding:9px 16px;font-size:13px;" id="btnAdd">＋ 新增</button>
             <button class="mobile-gas-btn" onclick="openApiModal()"><span class="gas-dot"></span>⚙️ API</button>
         </div>
     </div>
@@ -331,8 +334,39 @@
     <!-- 主內容 -->
     <div class="main-content">
 
+        <!-- ── 價格歷史 Panel [v2.11] ── -->
+        <div id="priceLogPanel" style="display:none;">
+            <div style="background:#FAF7F2;border:1px solid #DDD0BC;border-radius:14px;padding:14px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+                <span style="font-size:11px;font-weight:700;color:#A89278;letter-spacing:0.06em;text-transform:uppercase;">🔍 搜尋</span>
+                <input type="text" id="plSearchInput" class="f-input" placeholder="輸入商品名稱（留空顯示全部）" style="max-width:220px;padding:8px 12px;font-size:13px;" oninput="filterPriceLog()">
+                <button onclick="loadPriceLog()" class="btn-secondary" style="padding:8px 14px;font-size:13px;">🔄 重新載入</button>
+                <span id="plCount" style="font-size:12px;color:#A89278;margin-left:4px;"></span>
+            </div>
+            <div style="background:#FAF7F2;border:1px solid #DDD0BC;border-radius:16px;overflow:hidden;">
+                <div style="overflow-x:auto;">
+                    <table style="width:100%;border-collapse:collapse;font-size:13px;">
+                        <thead>
+                            <tr style="background:#F0E9DF;border-bottom:2px solid #DDD0BC;">
+                                <th style="padding:11px 14px;text-align:left;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;white-space:nowrap;">時間</th>
+                                <th style="padding:11px 14px;text-align:left;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;">商品名稱</th>
+                                <th style="padding:11px 14px;text-align:left;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;">分類</th>
+                                <th style="padding:11px 14px;text-align:right;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;white-space:nowrap;">枝/把</th>
+                                <th style="padding:11px 14px;text-align:right;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;white-space:nowrap;">枝成本</th>
+                                <th style="padding:11px 14px;text-align:right;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;white-space:nowrap;">每把進價</th>
+                                <th style="padding:11px 14px;text-align:right;font-size:10px;font-weight:700;color:#6d7756;letter-spacing:0.08em;white-space:nowrap;">收銀台售價</th>
+                                <th style="padding:11px 14px;text-align:left;font-size:10px;font-weight:700;color:#A89278;letter-spacing:0.08em;">來源</th>
+                            </tr>
+                        </thead>
+                        <tbody id="priceLogBody">
+                            <tr><td colspan="8" style="padding:32px;text-align:center;color:#A89278;">載入中…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
         <!-- 篩選列 -->
-        <div class="filter-bar">
+        <div class="filter-bar" id="productFilterBar">
             <div class="filter-chips" id="catChips">
                 <button class="chip active" onclick="setCatFilter(this,'全部')">全部</button>
                 <button class="chip" onclick="setCatFilter(this,'主花')">主花</button>
@@ -808,7 +842,82 @@ function closeNav() {
     document.querySelector('.side-nav').classList.remove('nav-open');
     document.getElementById('navOverlay').classList.remove('show');
 }
+
+// ══ [v2.11] PriceLog 視圖 ══
+let _plAllRows = [];
+
+function switchTab(tab) {
+    const isProd = tab === 'products';
+    // 面板切換
+    document.getElementById('productFilterBar').style.display = isProd ? '' : 'none';
+    document.getElementById('productsContainer').style.display = isProd ? '' : 'none';
+    document.getElementById('priceLogPanel').style.display = isProd ? 'none' : '';
+    // header 按鈕
+    document.getElementById('btnMerge').style.display = isProd ? '' : 'none';
+    document.getElementById('btnAdd').style.display = isProd ? '' : 'none';
+    // tab 樣式
+    const tabProd = document.getElementById('tabProducts');
+    const tabPL   = document.getElementById('tabPriceLog');
+    tabProd.className = isProd ? 'btn-primary' : 'btn-secondary';
+    tabPL.className   = isProd ? 'btn-secondary' : 'btn-primary';
+    tabProd.style.cssText = 'padding:9px 16px;font-size:13px;';
+    tabPL.style.cssText   = 'padding:9px 16px;font-size:13px;';
+    // 第一次切換時自動載入
+    if (!isProd && _plAllRows.length === 0) loadPriceLog();
+}
+
+async function loadPriceLog() {
+    if (!API_URL) { showToast('請先設定 API 網址'); openApiModal(); return; }
+    const body = document.getElementById('priceLogBody');
+    body.innerHTML = '<tr><td colspan="8" style="padding:32px;text-align:center;color:#A89278;"><span style="display:inline-block;width:18px;height:18px;border:2px solid #DDD0BC;border-top-color:#8e9775;border-radius:50%;animation:spin 0.7s linear infinite;vertical-align:middle;margin-right:8px;"></span>載入中…</td></tr>';
+    document.getElementById('plCount').innerText = '';
+    try {
+        const res  = await fetch(`${API_URL}?action=getPriceHistory`);
+        const text = await res.text();
+        let data;
+        try { data = JSON.parse(text); } catch(e) { throw new Error('GAS 回傳格式錯誤'); }
+        if (data && data.error) throw new Error(data.error);
+        _plAllRows = Array.isArray(data) ? data : (data.records || data.data || []);
+        filterPriceLog();
+    } catch(e) {
+        body.innerHTML = `<tr><td colspan="8" style="padding:32px;text-align:center;color:#C4928A;">載入失敗：${escHtml(e.message || '請確認 API 連線')}</td></tr>`;
+    }
+}
+
+function filterPriceLog() {
+    const q = (document.getElementById('plSearchInput').value || '').trim().toLowerCase();
+    const rows = q ? _plAllRows.filter(r => (r.name || '').toLowerCase().includes(q)) : _plAllRows;
+    renderPriceLog(rows);
+}
+
+function renderPriceLog(rows) {
+    const body = document.getElementById('priceLogBody');
+    document.getElementById('plCount').innerText = `共 ${rows.length} 筆`;
+    if (!rows.length) {
+        body.innerHTML = '<tr><td colspan="8" style="padding:40px;text-align:center;color:#A89278;">查無資料</td></tr>';
+        return;
+    }
+    body.innerHTML = rows.map((r, i) => {
+        const bg       = i % 2 === 0 ? '' : 'background:#F9F5F0;';
+        const timeStr  = (r.time || '').replace('T', ' ').slice(0, 16) || '—';
+        const unitCost = r.unitCost  ? `NT$${Number(r.unitCost).toLocaleString()}`  : '—';
+        const bundle   = r.bundlePrice ? `NT$${Number(r.bundlePrice).toLocaleString()}` : '—';
+        const sale     = r.salePrice   ? `NT$${Number(r.salePrice).toLocaleString()}`   : '—';
+        return `<tr style="${bg}">
+            <td style="padding:10px 14px;color:#A89278;font-size:12px;white-space:nowrap;">${escHtml(timeStr)}</td>
+            <td style="padding:10px 14px;font-weight:600;color:#3D2E1E;">${escHtml(r.name || '')}</td>
+            <td style="padding:10px 14px;"><span style="background:#f0f3ec;color:#6d7756;border-radius:6px;padding:2px 8px;font-size:11px;font-weight:700;">${escHtml(r.category || '')}</span></td>
+            <td style="padding:10px 14px;text-align:right;color:#5a4535;">${r.stems || '—'}</td>
+            <td style="padding:10px 14px;text-align:right;color:#5a4535;">${escHtml(unitCost)}</td>
+            <td style="padding:10px 14px;text-align:right;color:#5a4535;">${escHtml(bundle)}</td>
+            <td style="padding:10px 14px;text-align:right;font-weight:700;color:#4d6145;">${escHtml(sale)}</td>
+            <td style="padding:10px 14px;color:#A89278;font-size:12px;">${escHtml(r.note || '')}</td>
+        </tr>`;
+    }).join('');
+}
 </script>
+
+<div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
 
 <!-- 手機底部導航 -->
 <nav class="mobile-bottom-nav">
