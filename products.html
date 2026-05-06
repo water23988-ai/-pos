@@ -665,7 +665,7 @@ async function saveProduct() {
             stockES         : Number(document.getElementById('fieldStockES').value) || 0,
             stockMarket     : Number(document.getElementById('fieldStockMarket').value) || 0,
             code            : document.getElementById('fieldCode').value.trim(),
-            visible         : id ? undefined : true, // 新增時預設顯示，編輯時不改變
+            // visible 欄已由 status 統一管理（v2.12），不再傳送
         }
     };
 
@@ -736,7 +736,7 @@ async function toggleVisibility(id, checkbox) {
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
             action: 'updateProduct',
-            data: { id, status: newStatus, visible: posOn }
+            data: { id, status: newStatus }
         })});
         const result = await res.json();
         if (result.success) {
@@ -746,7 +746,7 @@ async function toggleVisibility(id, checkbox) {
                 label.className = 'toggle-label-text' + (posOn ? ' on' : '');
             }
             const p = allProducts.find(p => (p.id || p.productId) == id);
-            if (p) { p.status = newStatus; p.visible = posOn; }
+            if (p) { p.status = newStatus; }
         } else {
             showToast('更新失敗');
             checkbox.checked = !posOn;

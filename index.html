@@ -952,8 +952,8 @@ async function fetchProducts() {
     try {
         const res   = await fetch(`${API_URL}?action=getProducts`);
         const all   = await res.json();
-        // 收銀台只顯示 status==='active' 且 visible!==false 的商品
-        rawProducts = all.filter(p => p.status === 'active' && p.visible !== false);
+        // 收銀台只顯示 status==='active' 的商品（v2.12 起 visible 已由 status 統一管理）
+        rawProducts = all.filter(p => p.status === 'active');
         document.getElementById('statusInfo').innerText = '✅ 連線正常';
         setGasStatus('ok');
         renderModalCategories();

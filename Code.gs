@@ -248,8 +248,7 @@ function getProducts() {
     stockTN     : Number(r.stockTN)     || 0,
     stockES     : Number(r.stockES)     || 0,
     stockMarket : Number(r.stockMarket) || 0,
-    status  : r.status || 'active',   // active | hidden | inactive
-    visible : r.visible === false || r.visible === 'false' ? false : true,
+    status  : r.status || 'active',   // active | hidden | inactive（v2.12 起 visible 欄由 status 統一管理）
     code    : String(r.code || ''),   // [v2.8] 花材編號
   }));
 }
@@ -270,8 +269,8 @@ function addProduct(data) {
     Number(data.stockTN)     || 0,
     Number(data.stockES)     || 0,
     Number(data.stockMarket) || 0,
-    'active',              // [v2.3] status 欄位
-    true,                  // [v2.4] visible 欄位：新增商品預設顯示在收銀台
+    'active',              // [v2.3] status 欄位（active|hidden|inactive，v2.12 起取代 visible）
+    true,                  // visible 欄保留佔位（不再使用，以 status 為準）
     data.code || '',       // [v2.8] 花材編號
   ]);
   return { success: true, id };
@@ -305,15 +304,7 @@ function updateProduct(data) {
         }
         sh.getRange(row, statusCol + 1).setValue(data.status);
       }
-      // [v2.4] visible 欄位：動態新增欄若不存在
-      if (data.visible !== undefined) {
-        let visCol = headers.indexOf('visible');
-        if (visCol === -1) {
-          visCol = headers.length;
-          sh.getRange(1, visCol + 1).setValue('visible');
-        }
-        sh.getRange(row, visCol + 1).setValue(data.visible === true || data.visible === 'true');
-      }
+      // [v2.12] visible 欄已由 status 統一管理，不再寫入
       // [v2.8] code 欄位：花材編號
       if (data.code !== undefined) {
         let codeCol = headers.indexOf('code');
