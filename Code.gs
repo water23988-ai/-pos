@@ -1653,6 +1653,7 @@ function addProcurement(data) {
     // [v2.3] 進貨時同步記錄價格歷史
     const phSh = getSheet(SH.PRICE_LOG);
     if (phSh) {
+      // [v2.11 Fix] 記錄實際填入的售價，而非固定 costPerStem*4
       phSh.appendRow([
         taipeiNow(),
         item.flowerName || '',
@@ -1660,7 +1661,7 @@ function addProcurement(data) {
         pricePerBunch,
         stemsPerBunch,
         costPerStem,
-        Math.round(costPerStem * 4),
+        Number(item.salePrice) || 0,   // 使用者本次填入的收銀台售價
         `進貨（${data.source || ''}）`,
       ]);
     }

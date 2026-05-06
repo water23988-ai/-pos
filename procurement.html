@@ -520,7 +520,7 @@ function emptyAlloc() {
 }
 
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, allocation: emptyAlloc() });
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, code:'', currentPrice:0, allocation: emptyAlloc() });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
     // 自動捲到新品項並 focus
@@ -579,14 +579,17 @@ function _selectCodeMatch(idx, i) {
 }
 
 function _applyCodeProduct(idx, p) {
-    procItems[idx].flowerName = p.name;
+    procItems[idx].flowerName    = p.name;
+    procItems[idx].code          = p.code || '';
+    // [v2.11] 帶入商品管理的現有售價，讓使用者評估是否要調整
+    procItems[idx].currentPrice  = Number(p.price) || 0;
     if (p.category) procItems[idx].category = p.category;
-    const codeInput = document.getElementById(`codeInput_${idx}`);
-    if (codeInput) codeInput.value = p.code;
-    const drop = document.getElementById(`codeDrop_${idx}`);
-    if (drop) drop.style.display = 'none';
+    // salePrice 若還沒手動輸入，預設帶入現有售價
+    if (!procItems[idx].salePrice && procItems[idx].currentPrice > 0) {
+        procItems[idx].salePrice = procItems[idx].currentPrice;
+    }
     renderItemList();
-    showToast(`✅ ${p.code} → ${p.name}`);
+    showToast(`✅ ${p.code} → ${p.name}　現售 NT$${Number(p.price)||0}`);
 }
 
 function onFieldChange(idx, field, val) {
@@ -647,6 +650,12 @@ function updateCalcDisplay(idx) {
         sp.value = suggestedPrice;
     }
 
+    // [v2.11] 現售價提示（來自商品管理）
+    const currentPrice = procItems[idx].currentPrice || 0;
+    const currentPriceHint = currentPrice > 0
+        ? `<span style="color:#DDD0BC;">·</span><span class="calc-chip" style="color:#A89278;">商品管理現售 <strong style="color:#7a5c3a;">NT$${currentPrice}</strong></span>`
+        : '';
+
     const el = document.getElementById(`calc-${idx}`);
     if (el) {
         el.innerHTML = costPerStem > 0 ? `
@@ -657,6 +666,7 @@ function updateCalcDisplay(idx) {
             <span class="calc-chip" style="color:#8e9775;font-weight:700;">小計 NT$${itemCost.toLocaleString()}</span>
             <span style="color:#DDD0BC;">·</span>
             <span class="calc-chip" style="color:#C4A87A;font-weight:700;">建議售價 NT$${suggestedPrice}</span>
+            ${currentPriceHint}
         ` : `<span class="calc-chip" style="color:#A89278;">輸入數量與單價後自動計算</span>`;
     }
 }
@@ -702,7 +712,8 @@ function renderItemList() {
                         placeholder="編號"
                         style="width:66px;text-align:center;"
                         autocomplete="off"
-                        oninput="lookupByCode(${idx},this.value)"
+                        value="${escHtml(item.code || '')}"
+                        oninput="procItems[${idx}].code=this.value;lookupByCode(${idx},this.value)"
                         onblur="setTimeout(()=>{const d=document.getElementById('codeDrop_${idx}');if(d)d.style.display='none';},200)">
                     <div id="codeDrop_${idx}" class="code-drop" style="display:none;"></div>
                 </div>
