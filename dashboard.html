@@ -316,30 +316,6 @@
             </div>
         </div>
 
-        <!-- 日期查詢列 -->
-        <div class="query-bar">
-            <div class="query-row">
-                <div>
-                    <label class="f-label" style="margin-bottom:4px;">查詢日期</label>
-                    <div style="display:flex;gap:8px;align-items:center;">
-                        <input type="date" id="queryDate" class="query-date-input">
-                        <button onclick="queryReport()" class="btn-primary" style="padding:10px 20px;font-size:13px;">查詢</button>
-                        <button onclick="queryToday()" class="btn-secondary" style="padding:9px 16px;font-size:12px;">今天</button>
-                        <button onclick="queryYesterday()" class="btn-secondary" style="padding:9px 16px;font-size:12px;">昨天</button>
-                    </div>
-                </div>
-            </div>
-            <div class="store-filter-row">
-                <span class="filter-label">點位篩選</span>
-                <button class="chip active" onclick="setStoreFilter(this,'全部')">全部</button>
-                <button class="chip" onclick="setStoreFilter(this,'高雄')">高雄 FOCUS</button>
-                <button class="chip" onclick="setStoreFilter(this,'台南')">台南 FOCUS</button>
-                <button class="chip" onclick="setStoreFilter(this,'誠品')">誠品台南</button>
-                <button class="chip" onclick="setStoreFilter(this,'市集')">市集</button>
-                <button class="chip" onclick="setStoreFilter(this,'Studio')">Studio</button>
-            </div>
-        </div>
-
         <!-- 排行 & 業績 日期區間查詢列 -->
         <div class="query-bar" style="margin-bottom:20px;">
             <div class="query-row">
@@ -445,7 +421,7 @@
             <div id="payBreakdownGrid" class="store-grid">
                 <p style="color:#A89278;font-size:13px;">請選擇日期區間後查詢</p>
             </div>
-            <div id="payTotalRow" style="display:none;margin-top:12px;padding:12px 16px;background:#FAF7F2;border:1px solid #DDD0BC;border-radius:12px;display:none;">
+            <div id="payTotalRow" style="display:none;margin-top:12px;padding:12px 16px;background:#FAF7F2;border:1px solid #DDD0BC;border-radius:12px;">
                 <span style="font-size:12px;color:#A89278;font-weight:600;">合計：</span>
                 <span id="payTotal" style="font-size:16px;font-weight:800;color:#3d2e1e;margin-left:8px;">NT$ 0</span>
             </div>

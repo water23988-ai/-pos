@@ -431,7 +431,7 @@ function openDetail(jsonStr) {
         itemsHtml = `<div class="detail-items-list">` +
             items.map(i => `<div class="detail-item-row">
                 <span>${escHtml(i.name || i.商品名稱 || '')}${i.qty > 1 ? ' ×'+i.qty : ''}</span>
-                <span style="color:#8e9775;font-weight:700;">NT$ ${Number(i.subtotal || i.price*i.qty || i.price || 0).toLocaleString()}</span>
+                <span style="color:#8e9775;font-weight:700;">NT$ ${((Number(i.unitPrice||i.price||0))*(Number(i.qty)||1)).toLocaleString()}</span>
             </div>`).join('') +
             `</div>`;
     }
