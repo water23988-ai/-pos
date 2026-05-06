@@ -1193,6 +1193,13 @@ async function init() {
 
 window.onload = init;
 
+// ══ 鎖定數字輸入框：防止滑鼠滾輪意外改值 ══
+document.addEventListener('wheel', function() {
+    if (document.activeElement && document.activeElement.type === 'number') {
+        document.activeElement.blur();
+    }
+}, { passive: true });
+
 // ══ 側邊抽屜 ══
 function toggleNav() {
     const nav = document.querySelector('.side-nav');

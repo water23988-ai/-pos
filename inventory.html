@@ -735,6 +735,13 @@ function showToast(msg, dur=2500) {
 
 // ── 初始化 ──
 window.onload = function() {
+
+// 鎖定數字輸入框：防止滑鼠滾輪意外改值
+document.addEventListener("wheel", function() {
+    if (document.activeElement && document.activeElement.type === "number") {
+        document.activeElement.blur();
+    }
+}, { passive: true });
     if (!API_URL) { setGas('error'); document.getElementById('gasLabel').innerText = '未設定'; }
     loadProducts();
 };

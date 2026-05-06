@@ -857,6 +857,13 @@ function reopenStorePicker() {
 
 // ── 初始化 ──
 window.onload = async () => {
+
+// 鎖定數字輸入框：防止滑鼠滾輪意外改值
+document.addEventListener("wheel", function() {
+    if (document.activeElement && document.activeElement.type === "number") {
+        document.activeElement.blur();
+    }
+}, { passive: true });
     setPayment('現金');
     setSource('walk');
     document.getElementById('reportDate').valueAsDate = new Date();
