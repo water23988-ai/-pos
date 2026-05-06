@@ -218,7 +218,8 @@
             </div>
             <div>
                 <label class="f-label">花材編號 <span style="font-weight:400;color:#b8a898;font-size:10px;">（選填，方便進貨查詢）</span></label>
-                <input type="text" id="fieldCode" class="f-input" placeholder="例：001">
+                <input type="text" id="fieldCode" class="f-input" placeholder="例：001" oninput="checkCodeDuplicate()">
+                <div id="codeDupWarn" style="display:none;margin-top:5px;font-size:11px;color:#b85c3a;background:#fdf0ec;border-radius:7px;padding:5px 10px;"></div>
             </div>
         </div>
 
@@ -595,6 +596,7 @@ function openAddModal() {
         document.getElementById(id).value = '';
     });
     document.getElementById('fieldCategory').value = '主花';
+    document.getElementById('codeDupWarn').style.display = 'none';
     document.getElementById('productModal').classList.add('show');
 }
 
@@ -615,7 +617,10 @@ function openEditModal(jsonStr) {
     document.getElementById('fieldStockMarket').value  = p.stockMarket || '';
     document.getElementById('fieldCode').value          = p.code || '';
     document.getElementById('deleteBtn').style.display = '';
+    document.getElementById('codeDupWarn').style.display = 'none';
     document.getElementById('productModal').classList.add('show');
+    // 編輯時也即時檢查（萬一本來就跟別人撞）
+    checkCodeDuplicate();
 }
 
 function closeProductModal() {
@@ -841,6 +846,27 @@ function openNav() {
 function closeNav() {
     document.querySelector('.side-nav').classList.remove('nav-open');
     document.getElementById('navOverlay').classList.remove('show');
+}
+
+// ══ [v2.11] 花材編號重複提醒 ══
+function checkCodeDuplicate() {
+    const code    = (document.getElementById('fieldCode').value || '').trim();
+    const editId  = (document.getElementById('editProductId').value || '').trim();
+    const warn    = document.getElementById('codeDupWarn');
+    if (!code) { warn.style.display = 'none'; return; }
+    // 找出同編號但不是自己的商品（排除已停用的）
+    const conflict = allProducts.find(p =>
+        (p.code || '').trim() === code &&
+        String(p.id || p.productId || '') !== editId &&
+        (p.status || 'active') !== 'inactive'
+    );
+    if (conflict) {
+        const name = conflict.name || conflict.productName || '未命名';
+        warn.innerHTML = `⚠️ 編號「${escHtml(code)}」已被「${escHtml(name)}」使用，儲存後兩個商品會共用同一編號`;
+        warn.style.display = 'block';
+    } else {
+        warn.style.display = 'none';
+    }
 }
 
 // ══ [v2.11] PriceLog 視圖 ══
