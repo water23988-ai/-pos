@@ -133,6 +133,8 @@ function doGet(e) {
       // [v2.8] 付款方式區間查詢 + 花材編號查詢
       case 'getPayBreakdownRange':    return jsonOut(getPayBreakdownRange(e.parameter.store, e.parameter.from, e.parameter.to));
       case 'getProductByCode':        return jsonOut(getProductByCode(e.parameter.code));
+      // [v2.9] 花材各點位銷售明細
+      case 'getItemStoreSplit':       return jsonOut(getItemStoreSplit(e.parameter.name, e.parameter.from, e.parameter.to));
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -915,6 +917,37 @@ function getItemRanking(store, date, fromDate, toDate) {
   const maxSales = sorted.length > 0 ? (sorted[0].revenue || 1) : 1;
   sorted.forEach(it => { it.pct = Math.round(it.revenue / maxSales * 100); });
   return sorted;
+}
+
+// [v2.9] 指定花材在日期區間的各點位銷售明細
+function getItemStoreSplit(name, from, to) {
+  if (!name) return [];
+  const sh       = getSheet(SH.TRANSACTIONS);
+  const rows     = sheetToObjects(sh);
+  const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
+  const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const byStore = {};
+  rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && notVoid(r) && d >= fromDate && d <= toDate;
+  }).forEach(r => {
+    const items = safeJson(String(r.items || '[]'), []);
+    items.forEach(item => {
+      if (String(item.name || '').trim() !== String(name).trim()) return;
+      const s = r.store || '未知';
+      if (!byStore[s]) byStore[s] = { qty: 0, revenue: 0 };
+      const qty = Number(item.qty) || 1;
+      const up  = Number(item.unitPrice || item.price || 0);
+      byStore[s].qty     += qty;
+      byStore[s].revenue += up * qty;
+    });
+  });
+
+  return Object.entries(byStore)
+    .map(([store, v]) => ({ store, qty: v.qty, revenue: Math.round(v.revenue) }))
+    .sort((a, b) => b.qty - a.qty);
 }
 
 // [v2.7] 各點位業績（依日期區間查詢）
