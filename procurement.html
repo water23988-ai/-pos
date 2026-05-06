@@ -600,11 +600,11 @@ function updateCalcDisplay(idx) {
     const suggestedPrice = Math.round(costPerStem * 3.8);
     const itemCost       = ppb * bq;
 
-    // 若售價尚未手動設定，自動填入建議售價
-    if (costPerStem > 0 && !procItems[idx].salePrice) {
+    // [v2.10 Fix] 只要沒有手動編輯過，就跟著成本自動更新建議售價（原本用 !salePrice 判斷，改完成本後不會更新）
+    const sp = document.getElementById(`salePrice-${idx}`);
+    if (sp && !sp.dataset.manualEdit && costPerStem > 0) {
         procItems[idx].salePrice = suggestedPrice;
-        const sp = document.getElementById(`salePrice-${idx}`);
-        if (sp && !sp.dataset.manualEdit) sp.value = suggestedPrice;
+        sp.value = suggestedPrice;
     }
 
     const el = document.getElementById(`calc-${idx}`);

@@ -607,11 +607,12 @@ function getSalesReport(store, from, to) {
   const sh   = getSheet(SH.TRANSACTIONS);
   const rows = sheetToObjects(sh);
 
-  const fromDate = from ? new Date(from) : new Date(0);
-  const toDate   = to   ? new Date(to + 'T23:59:59') : new Date();
+  // [v2.10 Fix] 補上 +08:00 避免 YYYY-MM-DD 被當 UTC midnight 解析
+  const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
 
   const filtered = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     if (isNaN(d)) return false;
     if (store && r.store !== store) return false;
     if (r.voided === true || String(r.voided).toLowerCase() === 'true') return false; // [v2.4] 排除已退款
@@ -673,8 +674,9 @@ function getDailyReport(store, date) {
 
   const filt    = storeFilter_(store);
   const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true'); // [v2.4]
+  // [v2.10 Fix] 使用 parseTaipei_ 解析交易日期，避免 taipeiNow() 字串被誤當 UTC 解讀（差 8 小時）
   const todayTxs = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date);
     return !isNaN(d) && filt(r) && notVoid(r) && d >= from && d <= to;
   });
 
@@ -682,7 +684,7 @@ function getDailyReport(store, date) {
   const lwFrom = new Date(from); lwFrom.setDate(lwFrom.getDate() - 7);
   const lwTo   = new Date(to);   lwTo.setDate(lwTo.getDate() - 7);
   const lwTxs  = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date);
     return !isNaN(d) && filt(r) && notVoid(r) && d >= lwFrom && d <= lwTo;
   });
 
@@ -690,7 +692,7 @@ function getDailyReport(store, date) {
   const lmFrom = new Date(from); lmFrom.setMonth(lmFrom.getMonth() - 1);
   const lmTo   = new Date(to);   lmTo.setMonth(lmTo.getMonth() - 1);
   const lmTxs  = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date);
     return !isNaN(d) && filt(r) && notVoid(r) && d >= lmFrom && d <= lmTo;
   });
 
@@ -698,7 +700,7 @@ function getDailyReport(store, date) {
   const lyFrom = new Date(from); lyFrom.setFullYear(lyFrom.getFullYear() - 1);
   const lyTo   = new Date(to);   lyTo.setFullYear(lyTo.getFullYear() - 1);
   const lyTxs  = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date);
     return !isNaN(d) && filt(r) && notVoid(r) && d >= lyFrom && d <= lyTo;
   });
 
@@ -792,7 +794,7 @@ function getPayBreakdown(store, date) {
 
   const result = {};
   rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     return !isNaN(d) && filt(r) && d >= from && d <= to;
   }).forEach(r => {
     const pay = r.pay || '其他';
@@ -813,7 +815,7 @@ function getPayBreakdownRange(store, from, to) {
   const result = {};
   let total = 0;
   rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     return !isNaN(d) && filt(r) && notVoid(r) && d >= fromDate && d <= toDate;
   }).forEach(r => {
     const pay = r.pay || '其他';
@@ -932,7 +934,7 @@ function getItemStoreSplit(name, from, to) {
 
   const byStore = {};
   rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     return !isNaN(d) && notVoid(r) && d >= fromDate && d <= toDate;
   }).forEach(r => {
     const items = safeJson(String(r.items || '[]'), []);
@@ -963,7 +965,7 @@ function getStoreStats(store, fromDate, toDate) {
 
   const byStore = {};
   rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     return !isNaN(d) && filt(r) && notVoid(r) && d >= from && d <= to;
   }).forEach(r => {
     const s = r.store || '未知';
@@ -1087,7 +1089,7 @@ function getAllStoresReport(period) {
   }
 
   const filtered = rows.filter(r => {
-    const d = new Date(r.date);
+    const d = parseTaipei_(r.date); // [v2.10 Fix] 用 parseTaipei_ 補上 +08:00，避免台北時間被誤當 UTC
     const isVoided = r.voided === true || String(r.voided).toLowerCase() === 'true';
     return !isNaN(d) && d >= from && d <= to && !isVoided; // [v2.4] 排除已退款
   });
