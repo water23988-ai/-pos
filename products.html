@@ -218,7 +218,7 @@
             </div>
             <div>
                 <label class="f-label">花材編號 <span style="font-weight:400;color:#b8a898;font-size:10px;">（選填，方便進貨查詢）</span></label>
-                <input type="text" id="fieldCode" class="f-input" placeholder="例：001" oninput="checkCodeDuplicate()">
+                <input type="text" id="fieldCode" class="f-input" placeholder="例：001" oninput="checkCodeDuplicate()" onchange="checkCodeDuplicate()" onblur="checkCodeDuplicate()">
                 <div id="codeDupWarn" style="display:none;margin-top:5px;font-size:11px;color:#b85c3a;background:#fdf0ec;border-radius:7px;padding:5px 10px;"></div>
             </div>
         </div>
@@ -636,6 +636,21 @@ async function saveProduct() {
     const name = document.getElementById('fieldName').value.trim();
     if (!name) { showToast('請輸入商品名稱'); return; }
 
+    // [v2.11] 儲存前再確認一次編號是否重複
+    const codeVal = (document.getElementById('fieldCode').value || '').trim();
+    if (codeVal) {
+        const codeLower2 = codeVal.toLowerCase();
+        const dup = allProducts.find(p =>
+            (p.code || '').trim().toLowerCase() === codeLower2 &&
+            String(p.id || p.productId || '') !== id &&
+            (p.status || 'active') !== 'inactive'
+        );
+        if (dup) {
+            const dupName = dup.name || '未命名';
+            if (!confirm(`⚠️ 花材編號「${codeVal}」已被「${dupName}」使用。\n確定要儲存並共用此編號嗎？`)) return;
+        }
+    }
+
     const payload = {
         action: id ? 'updateProduct' : 'addProduct',
         data: {
@@ -855,8 +870,9 @@ function checkCodeDuplicate() {
     const warn    = document.getElementById('codeDupWarn');
     if (!code) { warn.style.display = 'none'; return; }
     // 找出同編號但不是自己的商品（排除已停用的）
+    const codeLower = code.toLowerCase();
     const conflict = allProducts.find(p =>
-        (p.code || '').trim() === code &&
+        (p.code || '').trim().toLowerCase() === codeLower &&
         String(p.id || p.productId || '') !== editId &&
         (p.status || 'active') !== 'inactive'
     );
