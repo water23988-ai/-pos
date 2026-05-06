@@ -267,20 +267,30 @@
     <!-- 主內容 -->
     <div class="main-content">
 
+        <!-- 日報日期選擇器 [v2.10] -->
+        <div style="background:#FAF7F2;border:1px solid #DDD0BC;border-radius:14px;padding:13px 18px;margin-bottom:16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
+            <span style="font-size:11px;font-weight:700;color:#A89278;letter-spacing:0.06em;text-transform:uppercase;white-space:nowrap;">📅 查詢日期</span>
+            <input type="date" id="queryDate" class="f-input" style="max-width:160px;padding:8px 12px;font-size:13px;">
+            <button onclick="queryReport()" class="btn-primary" style="padding:9px 20px;font-size:13px;">查詢</button>
+            <button onclick="queryToday()" class="btn-secondary" style="padding:8px 14px;font-size:12px;">今日</button>
+            <button onclick="queryYesterday()" class="btn-secondary" style="padding:8px 14px;font-size:12px;">昨日</button>
+            <span style="font-size:11px;color:#A89278;margin-left:4px;">↑ 選日期後，上方摘要與同期比較同步更新</span>
+        </div>
+
         <!-- 摘要卡片 4格 -->
         <div class="summary-grid">
             <div class="summary-card accent">
-                <div class="summary-card-label">今日業績</div>
+                <div class="summary-card-label" id="labelDaySales">業績</div>
                 <div class="summary-card-value" id="statTodaySales">—</div>
                 <div class="summary-card-sub" id="statTodaySalesSub">載入中</div>
             </div>
             <div class="summary-card profit-card">
-                <div class="summary-card-label">今日毛利</div>
+                <div class="summary-card-label" id="labelDayProfit">毛利</div>
                 <div class="summary-card-value" id="statTodayProfit">—</div>
                 <div class="summary-card-sub" id="statTodayMargin">毛利率 —%</div>
             </div>
             <div class="summary-card">
-                <div class="summary-card-label">今日筆數 / 均單</div>
+                <div class="summary-card-label" id="labelDayCount">筆數 / 均單</div>
                 <div class="summary-card-value" id="statTodayCount">—</div>
                 <div class="summary-card-sub" id="statAvgOrder">均單 —</div>
             </div>
@@ -662,6 +672,12 @@ async function queryReport() {
         const count  = td.customers || 0;
         const avg    = td.avg       || 0;
 
+        // [v2.10] 動態更新卡片標題，顯示查詢的是哪一天
+        const dispDate = date.slice(5).replace('-', '/');  // "MM/DD"
+        const lb1 = document.getElementById('labelDaySales');   if (lb1) lb1.innerText = dispDate + ' 業績';
+        const lb2 = document.getElementById('labelDayProfit');  if (lb2) lb2.innerText = dispDate + ' 毛利';
+        const lb3 = document.getElementById('labelDayCount');   if (lb3) lb3.innerText = dispDate + ' 筆數/均單';
+
         document.getElementById('statTodaySales').innerText   = 'NT$ ' + rev.toLocaleString();
         document.getElementById('statTodaySalesSub').innerText = date + ' · 業績';
         document.getElementById('statTodayProfit').innerText  = 'NT$ ' + profit.toLocaleString();
@@ -678,6 +694,19 @@ async function queryReport() {
         const lm = td.lastMonth || {};
         const ly = td.lastYear  || {};
         const nt = v => 'NT$ ' + (v || 0).toLocaleString();
+
+        // [v2.10] 動態更新比較卡片的「對比日期」標題
+        const d = new Date(date + 'T12:00:00+08:00');
+        const lwDate = new Date(d); lwDate.setDate(d.getDate()-7);
+        const lmDate = new Date(d); lmDate.setMonth(d.getMonth()-1);
+        const lyDate = new Date(d); lyDate.setFullYear(d.getFullYear()-1);
+        const fmtD = x => `${x.getMonth()+1}/${x.getDate()}`;
+        const lwEl = document.querySelector('.compare-card:nth-child(1) .compare-card-label');
+        const lmEl = document.querySelector('.compare-card:nth-child(2) .compare-card-label');
+        const lyEl = document.querySelector('.compare-card:nth-child(3) .compare-card-label');
+        if (lwEl) lwEl.innerText = `📅 上週同日（${fmtD(lwDate)}）`;
+        if (lmEl) lmEl.innerText = `🗓 上月同日（${fmtD(lmDate)}）`;
+        if (lyEl) lyEl.innerText = `📆 去年同日（${lyDate.getFullYear()}/${fmtD(lyDate)}）`;
 
         document.getElementById('lwRevenue').innerText      = nt(lw.revenue);
         document.getElementById('lwRevenueChip').innerHTML  = chip(rev, lw.revenue || 0);
@@ -923,7 +952,10 @@ function init() {
     const today = taipeiStr(new Date());
     const dispEl = document.getElementById('dateDisplay');
     if (dispEl) dispEl.innerText = today;
-    loadSummary();
+    // [v2.10] 預設日期選今天，透過 queryReport 統一載入摘要+比較卡片
+    const qd = document.getElementById('queryDate');
+    if (qd) qd.value = today;
+    queryReport();
     // 預設本月區間
     rangeThisMonth();
     queryRange();
