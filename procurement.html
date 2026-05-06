@@ -503,15 +503,16 @@ async function loadFlowerLibrary() {
         const catSet = new Set(PROC_CATEGORIES);
         if (Array.isArray(products)) {
             products.forEach(p => { if (p.category) catSet.add(p.category); });
-            // [v2.10] 存有編號的商品供前綴搜尋
-            allProcProducts = products.filter(p => p.code && String(p.code).trim() !== '');
+            // [v2.12] 以 Products 為主：保留全部未停用商品（含無編號的）
+            allProcProducts = products.filter(p => (p.status || 'active') !== 'inactive');
         }
         PROC_CATEGORIES = Array.from(catSet);
     } catch(e) {}
 }
 
 function flowerSuggestions() {
-    return flowerLibrary.map(f => f.name);
+    // [v2.12] 改以 Products 資料為主；datalist 已由自訂 dropdown 取代，保留空陣列
+    return [];
 }
 
 // ══ 花材清單 CRUD（新設計）══
@@ -578,6 +579,46 @@ function _selectCodeMatch(idx, i) {
     if (p) _applyCodeProduct(idx, p);
 }
 
+// [v2.12] 商品名稱關鍵字搜尋（以 Products 為主，含無編號商品）
+const _nameMatchCache = {};
+
+function lookupByName(idx, val) {
+    const drop = document.getElementById(`nameDrop_${idx}`);
+    if (!drop) return;
+    const v = val.trim().toLowerCase();
+    if (!v) { drop.style.display = 'none'; return; }
+
+    const matches = allProcProducts.filter(p =>
+        (p.name || '').toLowerCase().includes(v)
+    );
+
+    if (matches.length === 0) {
+        drop.innerHTML = `<div class="code-drop-item" style="color:#A89278;cursor:default;">找不到「${escHtml(val)}」</div>`;
+        drop.style.display = 'block';
+        return;
+    }
+
+    // 唯一完全相符 → 直接帶入
+    if (matches.length === 1 && matches[0].name.toLowerCase() === v) {
+        _applyCodeProduct(idx, matches[0]);
+        drop.style.display = 'none';
+        return;
+    }
+
+    _nameMatchCache[idx] = matches.slice(0, 8);
+    drop.innerHTML = _nameMatchCache[idx].map((p, i) => {
+        const codeTag = p.code ? `<span class="cd-code">${escHtml(p.code)}</span>` : '';
+        const priceTag = `<span style="color:#A89278;font-size:11px;margin-left:auto;padding-left:6px;">NT$${p.price || 0}</span>`;
+        return `<div class="code-drop-item" style="display:flex;align-items:center;gap:4px;" onmousedown="_selectNameMatch(${idx},${i})">${codeTag}<span>${escHtml(p.name)}</span>${priceTag}</div>`;
+    }).join('');
+    drop.style.display = 'block';
+}
+
+function _selectNameMatch(idx, i) {
+    const p = (_nameMatchCache[idx] || [])[i];
+    if (p) _applyCodeProduct(idx, p);
+}
+
 function _applyCodeProduct(idx, p) {
     procItems[idx].flowerName    = p.name;
     procItems[idx].code          = p.code || '';
@@ -589,7 +630,8 @@ function _applyCodeProduct(idx, p) {
         procItems[idx].salePrice = procItems[idx].currentPrice;
     }
     renderItemList();
-    showToast(`✅ ${p.code} → ${p.name}　現售 NT$${Number(p.price)||0}`);
+    const codeStr = p.code ? `${p.code} → ` : '';
+    showToast(`✅ ${codeStr}${p.name}　現售 NT$${Number(p.price)||0}`);
 }
 
 function onFieldChange(idx, field, val) {
@@ -717,13 +759,17 @@ function renderItemList() {
                         onblur="setTimeout(()=>{const d=document.getElementById('codeDrop_${idx}');if(d)d.style.display='none';},200)">
                     <div id="codeDrop_${idx}" class="code-drop" style="display:none;"></div>
                 </div>
-                <input type="text"
-                    class="f-input-sm item-name-input"
-                    placeholder="花材名稱"
-                    list="${suggList.length ? 'flowerSuggList' : ''}"
-                    value="${escHtml(item.flowerName)}"
-                    oninput="onFieldChange(${idx},'flowerName',this.value)"
-                    style="flex:1;">
+                <div class="code-input-wrap" style="flex:1;">
+                    <input type="text"
+                        class="f-input-sm item-name-input"
+                        placeholder="花材名稱（輸入關鍵字選商品）"
+                        autocomplete="off"
+                        value="${escHtml(item.flowerName)}"
+                        oninput="onFieldChange(${idx},'flowerName',this.value);lookupByName(${idx},this.value)"
+                        onblur="setTimeout(()=>{const d=document.getElementById('nameDrop_${idx}');if(d)d.style.display='none';},200)"
+                        style="width:100%;">
+                    <div id="nameDrop_${idx}" class="code-drop" style="display:none;"></div>
+                </div>
             </div>
             <select class="f-select-sm" style="width:80px;" onchange="onFieldChange(${idx},'category',this.value)">
                 ${PROC_CATEGORIES.map(c => `<option value="${c}" ${item.category===c?'selected':''}>${c}</option>`).join('')}
