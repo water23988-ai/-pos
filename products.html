@@ -322,6 +322,7 @@
             <span class="count-badge" id="productCount">—</span>
         </div>
         <div style="display:flex;align-items:center;gap:8px;">
+            <button onclick="openMergeModal()" class="btn-secondary" style="padding:10px 16px;font-size:13px;">🔀 合併商品</button>
             <button onclick="openAddModal()" class="btn-primary" style="padding:10px 20px;font-size:13px;">＋ 新增商品</button>
             <button class="mobile-gas-btn" onclick="openApiModal()"><span class="gas-dot"></span>⚙️ API</button>
         </div>
@@ -352,6 +353,28 @@
             <div class="loading-state"><div class="spinner"></div></div>
         </div>
 
+    </div>
+</div>
+
+<!-- [v2.9] 合併商品 Modal -->
+<div id="mergeModal" style="display:none;position:fixed;inset:0;background:rgba(61,46,30,0.5);backdrop-filter:blur(6px);z-index:500;align-items:center;justify-content:center;" onclick="if(event.target===this)closeMergeModal()">
+    <div style="background:#FAF7F2;border-radius:20px;padding:24px;width:100%;max-width:440px;margin:16px;border:1px solid #DDD0BC;box-shadow:0 8px 32px rgba(0,0,0,0.15);">
+        <div style="font-size:15px;font-weight:800;color:#3D2E1E;margin-bottom:4px;">🔀 合併重複商品</div>
+        <div style="font-size:12px;color:#A89278;margin-bottom:20px;">庫存加總、成本加權平均、售價保留最高，並同步更新歷史交易紀錄</div>
+        <div style="margin-bottom:14px;">
+            <label class="f-label">✅ 保留這個商品</label>
+            <select id="mergeKeepSel" class="f-select" onchange="previewMerge()"></select>
+        </div>
+        <div style="margin-bottom:18px;">
+            <label class="f-label">❌ 合併（停用）這個</label>
+            <select id="mergeMergeSel" class="f-select" onchange="previewMerge()"></select>
+        </div>
+        <!-- 預覽 -->
+        <div id="mergePreview" style="display:none;background:#F5EFE6;border-radius:12px;padding:14px;margin-bottom:18px;font-size:12px;color:#5a4535;line-height:1.8;"></div>
+        <div style="display:flex;gap:10px;">
+            <button onclick="closeMergeModal()" class="btn-secondary" style="flex:1;">取消</button>
+            <button onclick="confirmMerge()" class="btn-primary" style="flex:1;background:#C4928A;" id="mergeConfirmBtn">確認合併</button>
+        </div>
     </div>
 </div>
 
@@ -696,6 +719,76 @@ function init() {
 }
 
 window.onload = init;
+
+// ══ [v2.9] 合併商品 ══
+function openMergeModal() {
+    const active = allProducts.filter(p => p.status !== 'inactive');
+    const opts   = active.map(p => `<option value="${p.id}">[#${p.id}] ${escHtml(p.name)} (NT$${p.price} / 成本${p.cost})</option>`).join('');
+    document.getElementById('mergeKeepSel').innerHTML  = opts;
+    document.getElementById('mergeMergeSel').innerHTML = opts;
+    // default: 選不同的兩個
+    if (active.length >= 2) document.getElementById('mergeMergeSel').selectedIndex = 1;
+    document.getElementById('mergePreview').style.display = 'none';
+    document.getElementById('mergeModal').style.display = 'flex';
+    previewMerge();
+}
+function closeMergeModal() {
+    document.getElementById('mergeModal').style.display = 'none';
+}
+function previewMerge() {
+    const keepId  = Number(document.getElementById('mergeKeepSel').value);
+    const mergeId = Number(document.getElementById('mergeMergeSel').value);
+    const preview = document.getElementById('mergePreview');
+    if (keepId === mergeId) {
+        preview.style.display = 'block';
+        preview.innerHTML = '⚠️ 請選擇不同的兩個商品';
+        return;
+    }
+    const k = allProducts.find(p => Number(p.id) === keepId);
+    const m = allProducts.find(p => Number(p.id) === mergeId);
+    if (!k || !m) return;
+    const kTotal = (k.stockKH||0)+(k.stockTN||0)+(k.stockES||0)+(k.stockMarket||0);
+    const mTotal = (m.stockKH||0)+(m.stockTN||0)+(m.stockES||0)+(m.stockMarket||0);
+    const avgCost = (kTotal+mTotal) > 0
+        ? Math.round(((k.cost||0)*kTotal+(m.cost||0)*mTotal)/(kTotal+mTotal)*100)/100
+        : Math.round(((k.cost||0)+(m.cost||0))/2*100)/100;
+    const maxPrice = Math.max(k.price||0, m.price||0);
+    preview.style.display = 'block';
+    preview.innerHTML = `
+        <b>合併後結果（保留「${escHtml(k.name)}」）</b><br>
+        售價：NT$ ${maxPrice}（原 ${k.price} / ${m.price} → 取最高）<br>
+        成本：NT$ ${avgCost}（加權平均）<br>
+        庫存高雄：${(k.stockKH||0)+(m.stockKH||0)} 支 &nbsp;
+        台南：${(k.stockTN||0)+(m.stockTN||0)} 支 &nbsp;
+        誠品：${(k.stockES||0)+(m.stockES||0)} 支 &nbsp;
+        市集：${(k.stockMarket||0)+(m.stockMarket||0)} 支<br>
+        「${escHtml(m.name)}」將被停用，歷史交易名稱同步更新`;
+}
+async function confirmMerge() {
+    const keepId  = Number(document.getElementById('mergeKeepSel').value);
+    const mergeId = Number(document.getElementById('mergeMergeSel').value);
+    if (keepId === mergeId) return alert('請選擇不同的兩個商品');
+    const k = allProducts.find(p => Number(p.id) === keepId);
+    const m = allProducts.find(p => Number(p.id) === mergeId);
+    if (!confirm(`確認將「${m.name}」合併進「${k.name}」？\n此操作會修改歷史交易紀錄，無法還原。`)) return;
+    const btn = document.getElementById('mergeConfirmBtn');
+    btn.disabled = true; btn.innerText = '合併中...';
+    try {
+        const res  = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'mergeProducts', data:{ keepId, mergeId } }) });
+        const data = await res.json();
+        if (data.success) {
+            showToast(`✅ ${data.message}（更新 ${data.txUpdated} 筆交易、${data.logUpdated} 筆庫存記錄）`);
+            closeMergeModal();
+            loadProducts();
+        } else {
+            alert('合併失敗：' + data.error);
+        }
+    } catch(e) {
+        alert('網路錯誤');
+    } finally {
+        btn.disabled = false; btn.innerText = '確認合併';
+    }
+}
 
 // ══ 側邊抽屜 ══
 function toggleNav() {

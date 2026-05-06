@@ -413,6 +413,8 @@ let API_URL      = localStorage.getItem('moment_flor_api') || '';
 let currentStore = '';
 let selectedSource = '高雄深綠';
 let flowerLibrary  = [];
+// [v2.9] 從商品資料動態同步分類，預設值與 products.html 一致
+let PROC_CATEGORIES = ['主花','配花','葉材','花束','花瓶','其他加購','其他'];
 let procItems      = [];   // [{ flowerName, category, stemsPerBunch, bunchesQty, pricePerBunch }]
 let _expandedBatch = null;
 let _batchData     = [];
@@ -477,12 +479,23 @@ function setSrc(btn, src) {
     }
 }
 
-// ══ 花材庫 ══
+// ══ 花材庫 + 分類同步 ══
 async function loadFlowerLibrary() {
     if (!API_URL) return;
     try {
-        const res = await fetch(`${API_URL}?action=getFlowerLibrary`);
-        flowerLibrary = await res.json();
+        // 同時載入花材庫和商品分類（以 getProducts 為準）
+        const [libRes, prodRes] = await Promise.all([
+            fetch(`${API_URL}?action=getFlowerLibrary`),
+            fetch(`${API_URL}?action=getProducts`)
+        ]);
+        flowerLibrary = await libRes.json();
+        const products = await prodRes.json();
+        // 從商品資料提取所有分類，合併到 PROC_CATEGORIES 並去重
+        const catSet = new Set(PROC_CATEGORIES);
+        if (Array.isArray(products)) {
+            products.forEach(p => { if (p.category) catSet.add(p.category); });
+        }
+        PROC_CATEGORIES = Array.from(catSet);
     } catch(e) {}
 }
 
@@ -656,11 +669,8 @@ function renderItemList() {
                     oninput="onFieldChange(${idx},'flowerName',this.value)"
                     style="flex:1;">
             </div>
-            <select class="f-select-sm" style="width:72px;" onchange="onFieldChange(${idx},'category',this.value)">
-                <option value="主花" ${item.category==='主花'?'selected':''}>主花</option>
-                <option value="配花" ${item.category==='配花'?'selected':''}>配花</option>
-                <option value="葉材" ${item.category==='葉材'?'selected':''}>葉材</option>
-                <option value="其他" ${item.category==='其他'?'selected':''}>其他</option>
+            <select class="f-select-sm" style="width:80px;" onchange="onFieldChange(${idx},'category',this.value)">
+                ${PROC_CATEGORIES.map(c => `<option value="${c}" ${item.category===c?'selected':''}>${c}</option>`).join('')}
             </select>
             <button class="item-del-btn" onclick="removeItemRow(${idx})">×</button>
         </div>
@@ -941,10 +951,7 @@ function renderEditItems() {
             <div>
                 <label class="f-label-xs">分類</label>
                 <select class="f-select-sm" onchange="_editBatchItems[${i}].category=this.value">
-                    <option ${it.category==='主花'?'selected':''}>主花</option>
-                    <option ${it.category==='配花'?'selected':''}>配花</option>
-                    <option ${it.category==='葉材'?'selected':''}>葉材</option>
-                    <option ${it.category==='其他'?'selected':''}>其他</option>
+                    ${PROC_CATEGORIES.map(c => `<option value="${c}" ${it.category===c?'selected':''}>${c}</option>`).join('')}
                 </select>
             </div>
         </div>

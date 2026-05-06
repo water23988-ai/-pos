@@ -173,6 +173,8 @@ function doPost(e) {
       case 'deleteProcurementBatch':  return jsonOut(deleteProcurementBatch(data));
       // [v2.4] inventory.html 庫存管理頁面快速調整 +/-
       case 'adjustStock':             return jsonOut(adjustStock(data));
+      // [v2.9] 合併重複商品
+      case 'mergeProducts':           return jsonOut(mergeProducts(data));
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -1825,6 +1827,109 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
     return;
   }
   Logger.log(`⚠️ 進貨警告：找不到「${flowerName}」`);
+}
+
+// ══════════════════════════════════════════════════════
+//  [v2.9] 合併重複商品
+// ══════════════════════════════════════════════════════
+function mergeProducts(data) {
+  // data: { keepId, mergeId }
+  const sh      = getSheet(SH.PRODUCTS);
+  const rows    = sheetToObjects(sh);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+
+  const keepRow  = rows.find(r => Number(r.id) === Number(data.keepId));
+  const mergeRow = rows.find(r => Number(r.id) === Number(data.mergeId));
+  if (!keepRow)  return { success: false, error: '找不到保留商品' };
+  if (!mergeRow) return { success: false, error: '找不到合併來源商品' };
+  if (String(data.keepId) === String(data.mergeId)) return { success: false, error: '不能合併同一個商品' };
+
+  // ── 加權平均成本 ──
+  const kKH = Number(keepRow.stockKH)||0,  kTN = Number(keepRow.stockTN)||0;
+  const kES = Number(keepRow.stockES)||0,  kMK = Number(keepRow.stockMarket)||0;
+  const mKH = Number(mergeRow.stockKH)||0, mTN = Number(mergeRow.stockTN)||0;
+  const mES = Number(mergeRow.stockES)||0, mMK = Number(mergeRow.stockMarket)||0;
+  const kTotal = kKH + kTN + kES + kMK;
+  const mTotal = mKH + mTN + mES + mMK;
+  const avgCost = (kTotal + mTotal) > 0
+    ? Math.round(((Number(keepRow.cost)||0)*kTotal + (Number(mergeRow.cost)||0)*mTotal) / (kTotal+mTotal) * 100) / 100
+    : Math.round(((Number(keepRow.cost)||0) + (Number(mergeRow.cost)||0)) / 2 * 100) / 100;
+  const maxPrice = Math.max(Number(keepRow.price)||0, Number(mergeRow.price)||0);
+
+  // ── 更新保留商品：成本/售價/庫存 ──
+  const keepIdx = rows.indexOf(keepRow);
+  const setCell = (rowIdx, col, val) => {
+    const c = headers.indexOf(col);
+    if (c >= 0) sh.getRange(rowIdx + 2, c + 1).setValue(val);
+  };
+  setCell(keepIdx, 'cost',        avgCost);
+  setCell(keepIdx, 'price',       maxPrice);
+  setCell(keepIdx, 'stockKH',     kKH + mKH);
+  setCell(keepIdx, 'stockTN',     kTN + mTN);
+  setCell(keepIdx, 'stockES',     kES + mES);
+  setCell(keepIdx, 'stockMarket', kMK + mMK);
+
+  // ── 停用被合併商品（庫存歸零）──
+  const mergeIdx = rows.indexOf(mergeRow);
+  setCell(mergeIdx, 'status',      'inactive');
+  setCell(mergeIdx, 'stockKH',     0);
+  setCell(mergeIdx, 'stockTN',     0);
+  setCell(mergeIdx, 'stockES',     0);
+  setCell(mergeIdx, 'stockMarket', 0);
+
+  // ── Transactions：將 items JSON 中的舊名稱改為保留名稱 ──
+  const txSh   = getSheet(SH.TRANSACTIONS);
+  const txVals = txSh.getDataRange().getValues();
+  const txHdrs = txVals[0];
+  const itemsCol = txHdrs.indexOf('items');
+  let txUpdated = 0;
+  if (itemsCol >= 0) {
+    for (let i = 1; i < txVals.length; i++) {
+      const raw = String(txVals[i][itemsCol] || '');
+      if (!raw.includes(mergeRow.name)) continue;
+      try {
+        const items   = JSON.parse(raw);
+        let changed   = false;
+        items.forEach(item => {
+          if (String(item.name||'').trim() === String(mergeRow.name).trim()) {
+            item.name = keepRow.name;
+            item.id   = Number(data.keepId);
+            changed   = true;
+          }
+        });
+        if (changed) {
+          txSh.getRange(i + 1, itemsCol + 1).setValue(JSON.stringify(items));
+          txUpdated++;
+        }
+      } catch(e) {}
+    }
+  }
+
+  // ── InventoryLog：舊名稱改為保留名稱 ──
+  const logSh   = getSheet(SH.INV_LOG);
+  const logVals = logSh.getDataRange().getValues();
+  const logHdrs = logVals[0];
+  const logNameCol = logHdrs.indexOf('name');
+  const logPidCol  = logHdrs.indexOf('productId');
+  let logUpdated = 0;
+  if (logNameCol >= 0) {
+    for (let i = 1; i < logVals.length; i++) {
+      if (String(logVals[i][logNameCol]||'').trim() === String(mergeRow.name).trim()) {
+        logSh.getRange(i + 1, logNameCol + 1).setValue(keepRow.name);
+        if (logPidCol >= 0) logSh.getRange(i + 1, logPidCol + 1).setValue(Number(data.keepId));
+        logUpdated++;
+      }
+    }
+  }
+
+  return {
+    success   : true,
+    message   : `已將「${mergeRow.name}」合併至「${keepRow.name}」`,
+    avgCost, maxPrice,
+    newStock  : { kh: kKH+mKH, tn: kTN+mTN, es: kES+mES, mk: kMK+mMK },
+    txUpdated, logUpdated,
+  };
 }
 
 // ══════════════════════════════════════════════════════
