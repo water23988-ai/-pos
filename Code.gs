@@ -1834,6 +1834,10 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
 // ══════════════════════════════════════════════════════
 function mergeProducts(data) {
   // data: { keepId, mergeId }
+  // [v2.9b Fix] Guard against being called without arguments (e.g. from GAS editor)
+  if (!data || data.keepId === undefined || data.mergeId === undefined) {
+    return { success: false, error: '缺少必要參數 keepId / mergeId（請從前端商品管理頁觸發，不要直接在 GAS 編輯器執行）' };
+  }
   const sh      = getSheet(SH.PRODUCTS);
   const rows    = sheetToObjects(sh);
   const vals    = sh.getDataRange().getValues();
