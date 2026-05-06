@@ -90,6 +90,14 @@
         .f-label-xs { font-size: 10px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; display: block; margin-bottom: 5px; }
         .f-select-sm { width: 100%; border: 1.5px solid #DDD0BC; border-radius: 9px; padding: 7px 10px; font-size: 13px; outline: none; background: #FAF7F2; color: #3D2E1E; }
 
+        /* ── 編號下拉 ── */
+        .code-input-wrap { position: relative; display: inline-block; width: 66px; flex-shrink: 0; }
+        .code-drop { position: absolute; top: calc(100% + 4px); left: 0; min-width: 180px; background: #FAF7F2; border: 1.5px solid #8e9775; border-radius: 10px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); z-index: 500; overflow: hidden; }
+        .code-drop-item { padding: 9px 13px; font-size: 12px; color: #3D2E1E; cursor: pointer; border-bottom: 1px solid #EDE5D8; }
+        .code-drop-item:last-child { border-bottom: none; }
+        .code-drop-item:hover, .code-drop-item.hovered { background: #f0f3ec; }
+        .code-drop-item .cd-code { font-weight: 700; color: #6d7756; margin-right: 6px; }
+
         /* ── 合計 bar ── */
         .total-bar { background: #f0f3ec; border: 1.5px solid #8e9775; border-radius: 14px; padding: 14px 18px; margin-top: 4px; }
 
@@ -412,7 +420,8 @@
 let API_URL      = localStorage.getItem('moment_flor_api') || '';
 let currentStore = '';
 let selectedSource = '高雄深綠';
-let flowerLibrary  = [];
+let flowerLibrary    = [];
+let allProcProducts  = []; // [v2.10] 含 code 欄的完整商品清單，供編號前綴搜尋
 // [v2.9] 從商品資料動態同步分類，預設值與 products.html 一致
 let PROC_CATEGORIES = ['主花','配花','葉材','花束','花瓶','其他加購','其他'];
 let procItems      = [];   // [{ flowerName, category, stemsPerBunch, bunchesQty, pricePerBunch }]
@@ -494,6 +503,8 @@ async function loadFlowerLibrary() {
         const catSet = new Set(PROC_CATEGORIES);
         if (Array.isArray(products)) {
             products.forEach(p => { if (p.category) catSet.add(p.category); });
+            // [v2.10] 存有編號的商品供前綴搜尋
+            allProcProducts = products.filter(p => p.code && String(p.code).trim() !== '');
         }
         PROC_CATEGORIES = Array.from(catSet);
     } catch(e) {}
@@ -528,25 +539,54 @@ function removeItemRow(idx) {
     updateTotal();
 }
 
-// [v2.8] 花材編號查詢：輸入編號自動帶入花材名稱
-let _codeTimer = null;
-async function lookupByCode(idx, code) {
-    clearTimeout(_codeTimer);
-    if (!code || !API_URL) return;
-    _codeTimer = setTimeout(async () => {
-        try {
-            const res  = await fetch(`${API_URL}?action=getProductByCode&code=${encodeURIComponent(code.trim())}`);
-            const data = await res.json();
-            if (data.found) {
-                procItems[idx].flowerName = data.name;
-                if (data.category) procItems[idx].category = data.category;
-                renderItemList();
-                showToast(`✅ 編號 ${code} → ${data.name}`);
-            } else {
-                showToast(`找不到編號 ${code} 的花材`);
-            }
-        } catch(e) {/* 靜默失敗 */}
-    }, 500);
+// [v2.10] 花材編號前綴搜尋：輸入 ≥1 碼就顯示下拉，client-side 比對不需打 API
+const _codeMatchCache = {};
+
+function lookupByCode(idx, val) {
+    const drop = document.getElementById(`codeDrop_${idx}`);
+    if (!drop) return;
+    const v = val.trim().toUpperCase();
+    if (!v) { drop.style.display = 'none'; return; }
+
+    const matches = allProcProducts.filter(p =>
+        String(p.code).toUpperCase().startsWith(v)
+    );
+
+    if (matches.length === 0) {
+        drop.innerHTML = `<div class="code-drop-item" style="color:#A89278;">找不到編號 ${v}</div>`;
+        drop.style.display = 'block';
+        return;
+    }
+
+    // 精確唯一匹配 → 直接帶入，不顯示清單
+    if (matches.length === 1 && matches[0].code.toUpperCase() === v) {
+        _applyCodeProduct(idx, matches[0]);
+        drop.style.display = 'none';
+        return;
+    }
+
+    // 儲存比對結果供點擊時使用
+    _codeMatchCache[idx] = matches.slice(0, 8);
+    drop.innerHTML = _codeMatchCache[idx].map((p, i) =>
+        `<div class="code-drop-item" onmousedown="_selectCodeMatch(${idx},${i})"><span class="cd-code">${p.code}</span>${p.name}</div>`
+    ).join('');
+    drop.style.display = 'block';
+}
+
+function _selectCodeMatch(idx, i) {
+    const p = (_codeMatchCache[idx] || [])[i];
+    if (p) _applyCodeProduct(idx, p);
+}
+
+function _applyCodeProduct(idx, p) {
+    procItems[idx].flowerName = p.name;
+    if (p.category) procItems[idx].category = p.category;
+    const codeInput = document.getElementById(`codeInput_${idx}`);
+    if (codeInput) codeInput.value = p.code;
+    const drop = document.getElementById(`codeDrop_${idx}`);
+    if (drop) drop.style.display = 'none';
+    renderItemList();
+    showToast(`✅ ${p.code} → ${p.name}`);
 }
 
 function onFieldChange(idx, field, val) {
@@ -655,12 +695,17 @@ function renderItemList() {
         <div class="item-row-top">
             <div style="display:flex;align-items:center;gap:6px;flex:1;">
                 <span class="item-num-badge">${idx + 1}</span>
-                <input type="text"
-                    id="codeInput_${idx}"
-                    class="f-input-sm"
-                    placeholder="編號"
-                    style="width:60px;text-align:center;"
-                    oninput="lookupByCode(${idx},this.value)">
+                <div class="code-input-wrap">
+                    <input type="text"
+                        id="codeInput_${idx}"
+                        class="f-input-sm"
+                        placeholder="編號"
+                        style="width:66px;text-align:center;"
+                        autocomplete="off"
+                        oninput="lookupByCode(${idx},this.value)"
+                        onblur="setTimeout(()=>{const d=document.getElementById('codeDrop_${idx}');if(d)d.style.display='none';},200)">
+                    <div id="codeDrop_${idx}" class="code-drop" style="display:none;"></div>
+                </div>
                 <input type="text"
                     class="f-input-sm item-name-input"
                     placeholder="花材名稱"

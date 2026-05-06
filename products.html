@@ -468,7 +468,11 @@ function renderProducts() {
     const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
     let list = allProducts;
     if (currentCat !== '全部') list = list.filter(p => (p.category || p.分類 || '') === currentCat);
-    if (q) list = list.filter(p => (p.name || p.productName || p.商品名稱 || '').toLowerCase().includes(q));
+    // [v2.10] 同時搜尋商品名稱和編號
+    if (q) list = list.filter(p =>
+        (p.name || p.productName || p.商品名稱 || '').toLowerCase().includes(q) ||
+        (p.code || '').toLowerCase().includes(q)
+    );
 
     document.getElementById('productCount').innerText = list.length + ' 項商品';
 
