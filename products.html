@@ -211,9 +211,15 @@
 
         <input type="hidden" id="editProductId">
 
-        <div class="modal-row">
-            <label class="f-label">商品名稱</label>
-            <input type="text" id="fieldName" class="f-input" placeholder="例：玫瑰 / 滿天星 / 手綁花束">
+        <div class="modal-grid-2">
+            <div style="flex:2">
+                <label class="f-label">商品名稱</label>
+                <input type="text" id="fieldName" class="f-input" placeholder="例：玫瑰 / 滿天星 / 手綁花束">
+            </div>
+            <div>
+                <label class="f-label">花材編號 <span style="font-weight:400;color:#b8a898;font-size:10px;">（選填，方便進貨查詢）</span></label>
+                <input type="text" id="fieldCode" class="f-input" placeholder="例：001">
+            </div>
         </div>
 
         <div class="modal-grid-2">
@@ -466,6 +472,7 @@ function productCardHtml(p) {
     const stockTN  = Number(p.stockTN || p.庫存TN || 0);
     const stockES  = Number(p.stockES || p.庫存ES || 0);
     const stockMK  = Number(p.stockMarket || 0);
+    const code     = String(p.code || '');
     // status: 'active' = 收銀台顯示, 'hidden' = 管理可見但不在收銀台, 'inactive' = 已刪除
     const status  = p.status || 'active';
     const posOn   = status === 'active';    // 是否顯示在收銀台
@@ -478,7 +485,7 @@ function productCardHtml(p) {
 
     return `<div class="product-card" style="${deleted ? 'opacity:0.55;' : ''}">
         <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
-        <div class="product-card-name">${escHtml(name)}${deleted ? ' <span style="font-size:9px;background:#f3d6d4;color:#C4928A;border-radius:6px;padding:2px 6px;font-weight:700;">已停用</span>' : ''}</div>
+        <div class="product-card-name">${escHtml(name)}${deleted ? ' <span style="font-size:9px;background:#f3d6d4;color:#C4928A;border-radius:6px;padding:2px 6px;font-weight:700;">已停用</span>' : ''}${code ? ` <span style="font-size:9px;background:#e8f0e0;color:#6d7756;border-radius:6px;padding:2px 7px;font-weight:700;"># ${escHtml(code)}</span>` : ''}</div>
         <span class="product-card-cat">${escHtml(cat)}</span>
         <div class="product-card-price">NT$ ${price.toLocaleString()}</div>
         <div class="product-card-cost">成本 NT$ ${cost.toLocaleString()} ${sugprice > 0 ? '· 建議 NT$ ' + sugprice.toLocaleString() : ''}</div>
@@ -523,7 +530,7 @@ function openAddModal() {
     document.getElementById('modalTitle').innerText = '新增商品';
     document.getElementById('editProductId').value = '';
     document.getElementById('deleteBtn').style.display = 'none';
-    ['fieldName','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES','fieldStockMarket'].forEach(id => {
+    ['fieldName','fieldCode','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES','fieldStockMarket'].forEach(id => {
         document.getElementById(id).value = '';
     });
     document.getElementById('fieldCategory').value = '主花';
@@ -545,6 +552,7 @@ function openEditModal(jsonStr) {
     document.getElementById('fieldStockTN').value      = p.stockTN || p.庫存TN || '';
     document.getElementById('fieldStockES').value      = p.stockES || p.庫存ES || '';
     document.getElementById('fieldStockMarket').value  = p.stockMarket || '';
+    document.getElementById('fieldCode').value          = p.code || '';
     document.getElementById('deleteBtn').style.display = '';
     document.getElementById('productModal').classList.add('show');
 }
@@ -575,6 +583,7 @@ async function saveProduct() {
             stockTN         : Number(document.getElementById('fieldStockTN').value) || 0,
             stockES         : Number(document.getElementById('fieldStockES').value) || 0,
             stockMarket     : Number(document.getElementById('fieldStockMarket').value) || 0,
+            code            : document.getElementById('fieldCode').value.trim(),
             visible         : id ? undefined : true, // 新增時預設顯示，編輯時不改變
         }
     };

@@ -515,6 +515,27 @@ function removeItemRow(idx) {
     updateTotal();
 }
 
+// [v2.8] 花材編號查詢：輸入編號自動帶入花材名稱
+let _codeTimer = null;
+async function lookupByCode(idx, code) {
+    clearTimeout(_codeTimer);
+    if (!code || !API_URL) return;
+    _codeTimer = setTimeout(async () => {
+        try {
+            const res  = await fetch(`${API_URL}?action=getProductByCode&code=${encodeURIComponent(code.trim())}`);
+            const data = await res.json();
+            if (data.found) {
+                procItems[idx].flowerName = data.name;
+                if (data.category) procItems[idx].category = data.category;
+                renderItemList();
+                showToast(`✅ 編號 ${code} → ${data.name}`);
+            } else {
+                showToast(`找不到編號 ${code} 的花材`);
+            }
+        } catch(e) {/* 靜默失敗 */}
+    }, 500);
+}
+
 function onFieldChange(idx, field, val) {
     procItems[idx][field] = (field === 'flowerName' || field === 'category') ? val : (Number(val) || 0);
     if (field === 'salePrice' && val === '') procItems[idx].salePrice = 0;
@@ -619,8 +640,14 @@ function renderItemList() {
     <div class="item-row" id="irow-${idx}">
         <!-- 第一行：品名 + 分類 + 刪除 -->
         <div class="item-row-top">
-            <div style="display:flex;align-items:center;gap:8px;">
+            <div style="display:flex;align-items:center;gap:6px;flex:1;">
                 <span class="item-num-badge">${idx + 1}</span>
+                <input type="text"
+                    id="codeInput_${idx}"
+                    class="f-input-sm"
+                    placeholder="編號"
+                    style="width:60px;text-align:center;"
+                    oninput="lookupByCode(${idx},this.value)">
                 <input type="text"
                     class="f-input-sm item-name-input"
                     placeholder="花材名稱"

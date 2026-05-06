@@ -418,6 +418,39 @@
             </div>
         </div>
 
+        <!-- [v2.8] 付款方式區間查詢 -->
+        <div class="rank-section" style="margin-top:24px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:14px;">
+                <div>
+                    <div class="card-title" style="margin-bottom:2px;">💳 各付款方式總額</div>
+                    <span style="font-size:11px;color:#A89278;" id="payRangeLabel">請選擇日期區間後查詢</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+                <input type="date" id="payFrom" class="query-date-input">
+                <span style="font-size:13px;color:#A89278;">至</span>
+                <input type="date" id="payTo" class="query-date-input">
+                <select id="payStore" class="f-input" style="width:140px;padding:9px 12px;font-size:13px;">
+                    <option value="">全部點位</option>
+                    <option value="高雄FOCUS 13">高雄FOCUS 13</option>
+                    <option value="台南FOCUS">台南FOCUS</option>
+                    <option value="誠品生活台南">誠品生活台南</option>
+                    <option value="市集">市集</option>
+                    <option value="Studio">Studio</option>
+                </select>
+                <button onclick="loadPayBreakdown()" class="btn-primary" style="padding:10px 20px;font-size:13px;">查詢</button>
+                <button onclick="payRangeThisMonth()" class="btn-secondary" style="padding:9px 14px;font-size:12px;">本月</button>
+                <button onclick="payRangeLast7()" class="btn-secondary" style="padding:9px 14px;font-size:12px;">近7天</button>
+            </div>
+            <div id="payBreakdownGrid" class="store-grid">
+                <p style="color:#A89278;font-size:13px;">請選擇日期區間後查詢</p>
+            </div>
+            <div id="payTotalRow" style="display:none;margin-top:12px;padding:12px 16px;background:#FAF7F2;border:1px solid #DDD0BC;border-radius:12px;display:none;">
+                <span style="font-size:12px;color:#A89278;font-weight:600;">合計：</span>
+                <span id="payTotal" style="font-size:16px;font-weight:800;color:#3d2e1e;margin-left:8px;">NT$ 0</span>
+            </div>
+        </div>
+
     </div>
 </div>
 
@@ -609,13 +642,57 @@ async function queryRange() {
     }
 }
 
-// ══ 查詢日報（摘要卡片用） ══
+// ══ 查詢日報（摘要卡片用）[v2.8 修復：原為空殼，現在真的呼叫 API] ══
 async function queryReport() {
     if (!API_URL) return;
     const date = document.getElementById('queryDate').value;
     if (!date) return alert('請選擇查詢日期');
     setGas('loading');
     try {
+        const ym = date.slice(0, 7);
+        const [dayRes, monthRes] = await Promise.all([
+            fetch(`${API_URL}?action=getDailyReport&date=${date}`),
+            fetch(`${API_URL}?action=getMonthlyReport&ym=${ym}`)
+        ]);
+        const td = await dayRes.json();
+        const mo = await monthRes.json();
+
+        const rev    = td.revenue   || 0;
+        const profit = td.profit    || 0;
+        const margin = td.margin    || 0;
+        const count  = td.customers || 0;
+        const avg    = td.avg       || 0;
+
+        document.getElementById('statTodaySales').innerText   = 'NT$ ' + rev.toLocaleString();
+        document.getElementById('statTodaySalesSub').innerText = date + ' · 業績';
+        document.getElementById('statTodayProfit').innerText  = 'NT$ ' + profit.toLocaleString();
+        document.getElementById('statTodayMargin').innerText  = `毛利率 ${margin}%`;
+        document.getElementById('statTodayCount').innerText   = count + ' 筆';
+        document.getElementById('statAvgOrder').innerText     = `均單 NT$ ${avg.toLocaleString()}`;
+
+        const mRev    = mo.revenue || 0;
+        const mProfit = mo.profit  || 0;
+        document.getElementById('statMonthSales').innerText   = 'NT$ ' + mRev.toLocaleString();
+        document.getElementById('statMonthProfit').innerText  = `月毛利 NT$ ${mProfit.toLocaleString()}`;
+
+        const lw = td.lastWeek  || {};
+        const lm = td.lastMonth || {};
+        const ly = td.lastYear  || {};
+        const nt = v => 'NT$ ' + (v || 0).toLocaleString();
+
+        document.getElementById('lwRevenue').innerText      = nt(lw.revenue);
+        document.getElementById('lwRevenueChip').innerHTML  = chip(rev, lw.revenue || 0);
+        document.getElementById('lwProfit').innerText       = nt(lw.profit);
+        document.getElementById('lwProfitChip').innerHTML   = chip(profit, lw.profit || 0);
+        document.getElementById('lmRevenue').innerText      = nt(lm.revenue);
+        document.getElementById('lmRevenueChip').innerHTML  = chip(rev, lm.revenue || 0);
+        document.getElementById('lmProfit').innerText       = nt(lm.profit);
+        document.getElementById('lmProfitChip').innerHTML   = chip(profit, lm.profit || 0);
+        document.getElementById('lyRevenue').innerText      = nt(ly.revenue);
+        document.getElementById('lyRevenueChip').innerHTML  = chip(rev, ly.revenue || 0);
+        document.getElementById('lyProfit').innerText       = nt(ly.profit);
+        document.getElementById('lyProfitChip').innerHTML   = chip(profit, ly.profit || 0);
+
         setGas('ok');
     } catch(e) {
         setGas('error');
@@ -720,13 +797,67 @@ async function loadRanking() {
                 <td>${it.qty || 0}</td>
                 <td style="font-weight:700;color:#6d7756;">NT$ ${(it.revenue||0).toLocaleString()}</td>
                 <td>${it.margin || 0}%</td>
-                <td class="rank-bar-cell"><div class="rank-bar"><div class="rank-bar-fill" style="width:${pct}%"></div></div></td>
+                <td class="rank-bar-cell"><div style="display:flex;align-items:center;gap:5px;"><div class="rank-bar" style="flex:1"><div class="rank-bar-fill" style="width:${pct}%"></div></div><span style="font-size:11px;color:#6d7756;font-weight:700;min-width:30px;text-align:right;">${pct}%</span></div></td>
                 <td>${it.waste || 0}</td>
                 <td><span class="waste-rate-tag ${wTag}">${wasteRate}%</span></td>
             </tr>`;
         }).join('');
     } catch(e) {
         tbody.innerHTML = '<tr><td colspan="8" class="empty-table" style="color:#C4928A;">載入失敗</td></tr>';
+    }
+}
+
+// ══ [v2.8] 付款方式區間查詢 ══
+function payRangeThisMonth() {
+    const d = new Date();
+    const first = new Date(d.getFullYear(), d.getMonth(), 1);
+    document.getElementById('payFrom').value = taipeiStr(first);
+    document.getElementById('payTo').value   = taipeiStr(d);
+}
+function payRangeLast7() {
+    const d = new Date();
+    const from7 = new Date(); from7.setDate(d.getDate() - 6);
+    document.getElementById('payFrom').value = taipeiStr(from7);
+    document.getElementById('payTo').value   = taipeiStr(d);
+}
+async function loadPayBreakdown() {
+    if (!API_URL) return;
+    const from  = document.getElementById('payFrom').value;
+    const to    = document.getElementById('payTo').value;
+    const store = document.getElementById('payStore').value;
+    if (!from || !to) return alert('請選擇開始與結束日期');
+    const grid  = document.getElementById('payBreakdownGrid');
+    const label = document.getElementById('payRangeLabel');
+    label.innerText = (store || '全部') + '　' + from + ' ~ ' + to;
+    grid.innerHTML  = '<p style="color:#A89278;font-size:13px;"><span class="spinner"></span> 載入中...</p>';
+    document.getElementById('payTotalRow').style.display = 'none';
+    try {
+        const url = `${API_URL}?action=getPayBreakdownRange&from=${from}&to=${to}` + (store ? `&store=${encodeURIComponent(store)}` : '');
+        const res  = await fetch(url);
+        const data = await res.json();
+        const bd   = data.breakdown || {};
+        const total = data.total || 0;
+        const entries = Object.entries(bd).sort((a, b) => b[1] - a[1]);
+        if (!entries.length) {
+            grid.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無交易紀錄</p>';
+            return;
+        }
+        const maxAmt = Math.max(...entries.map(([,v]) => v), 1);
+        grid.innerHTML = entries.map(([pay, amt]) => {
+            const pct = Math.round(amt / maxAmt * 100);
+            const sharePct = total > 0 ? Math.round(amt / total * 100) : 0;
+            return `<div class="store-perf-card">
+                <div class="store-perf-name">${pay}</div>
+                <div class="store-perf-sales">NT$ ${amt.toLocaleString()}</div>
+                <div class="store-perf-count">佔比 ${sharePct}%</div>
+                <div class="store-perf-bar"><div class="store-perf-bar-fill" style="width:${pct}%"></div></div>
+            </div>`;
+        }).join('');
+        const totalRow = document.getElementById('payTotalRow');
+        document.getElementById('payTotal').innerText = 'NT$ ' + total.toLocaleString();
+        totalRow.style.display = 'block';
+    } catch(e) {
+        grid.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
 

@@ -62,7 +62,7 @@ function setupSheets() {
     return sh;
   }
 
-  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','stockMarket','status','visible']);
+  ensureSheet(SH.PRODUCTS,     ['id','name','category','price','cost','stockKH','stockTN','stockES','stockMarket','status','visible','code']); // [v2.8] 新增 code 欄
   ensureSheet(SH.TRANSACTIONS, ['id','date','store','memberId','memberName','subtotal','discount','total','cost','pay','earnedPoints','note','customerType','source','items']);
   ensureSheet(SH.MEMBERS,      ['id','name','phone','birthday','totalPoints','totalSpend','createdAt']);
   ensureSheet(SH.INV_LOG,      ['time','productId','name','store','oldQty','newQty','diff','note','type']);
@@ -130,6 +130,9 @@ function doGet(e) {
       case 'getFlowerProcHistory':    return jsonOut(getFlowerProcHistory(e.parameter.name));
       // [v2.4] sales.html 銷售紀錄頁面 — 與 getTransactionHistory 相同功能
       case 'getHistory':              return jsonOut(getTransactionHistory(e.parameter.store, e.parameter.date));
+      // [v2.8] 付款方式區間查詢 + 花材編號查詢
+      case 'getPayBreakdownRange':    return jsonOut(getPayBreakdownRange(e.parameter.store, e.parameter.from, e.parameter.to));
+      case 'getProductByCode':        return jsonOut(getProductByCode(e.parameter.code));
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -243,6 +246,7 @@ function getProducts() {
     stockMarket : Number(r.stockMarket) || 0,
     status  : r.status || 'active',   // active | hidden | inactive
     visible : r.visible === false || r.visible === 'false' ? false : true,
+    code    : String(r.code || ''),   // [v2.8] 花材編號
   }));
 }
 
@@ -262,8 +266,9 @@ function addProduct(data) {
     Number(data.stockTN)     || 0,
     Number(data.stockES)     || 0,
     Number(data.stockMarket) || 0,
-    'active',  // [v2.3] status 欄位
-    true,      // [v2.4] visible 欄位：新增商品預設顯示在收銀台
+    'active',              // [v2.3] status 欄位
+    true,                  // [v2.4] visible 欄位：新增商品預設顯示在收銀台
+    data.code || '',       // [v2.8] 花材編號
   ]);
   return { success: true, id };
 }
@@ -304,6 +309,15 @@ function updateProduct(data) {
           sh.getRange(1, visCol + 1).setValue('visible');
         }
         sh.getRange(row, visCol + 1).setValue(data.visible === true || data.visible === 'true');
+      }
+      // [v2.8] code 欄位：花材編號
+      if (data.code !== undefined) {
+        let codeCol = headers.indexOf('code');
+        if (codeCol === -1) {
+          codeCol = headers.length;
+          sh.getRange(1, codeCol + 1).setValue('code');
+        }
+        sh.getRange(row, codeCol + 1).setValue(String(data.code || ''));
       }
       return { success: true };
     }
@@ -566,7 +580,7 @@ function updateStockDelta(id, store, delta, note) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = store === '台南FOCUS' ? headers.indexOf('stockTN') : store === '誠品生活台南' ? headers.indexOf('stockES') : headers.indexOf('stockKH');
+  const storeCol = headers.indexOf(storeToColKey_(store));  // [v2.8 Fix] 改用 helper，市集不再回退 KH
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(id)) {
@@ -781,6 +795,29 @@ function getPayBreakdown(store, date) {
     result[pay] = (result[pay]||0) + (Number(r.total)||0);
   });
   return result;
+}
+
+// [v2.8] 各付款方式總額 — 支援日期區間查詢
+function getPayBreakdownRange(store, from, to) {
+  const sh       = getSheet(SH.TRANSACTIONS);
+  const rows     = sheetToObjects(sh);
+  const filt     = storeFilter_(store);
+  const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
+  const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const result = {};
+  let total = 0;
+  rows.filter(r => {
+    const d = new Date(r.date);
+    return !isNaN(d) && filt(r) && notVoid(r) && d >= fromDate && d <= toDate;
+  }).forEach(r => {
+    const pay = r.pay || '其他';
+    const amt = Number(r.total) || 0;
+    result[pay] = (result[pay] || 0) + amt;
+    total += amt;
+  });
+  return { breakdown: result, total };
 }
 
 function getWeeklyTrend(store) {
@@ -1613,7 +1650,8 @@ function ensureProductExists(name, category, cost, price) {
   }
   // 不存在 → 自動建立
   const maxId = vals.slice(1).reduce((m, r) => Math.max(m, Number(r[headers.indexOf('id')]) || 0), 0);
-  sh.appendRow([maxId + 1, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 'active']);
+  // [v2.8 Fix] 修正欄數：補上 stockMarket(0)、visible(true)、code('') 共 12 欄
+  sh.appendRow([maxId + 1, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 0, 'active', true, '']);
   Logger.log(`✅ 自動建立商品：${name}`);
 }
 
@@ -1633,6 +1671,40 @@ function updateProductPrice(name, price) {
       return;
     }
   }
+}
+
+// [v2.8] 依花材編號查詢商品基本資料（進貨頁面快速帶入）
+function getProductByCode(code) {
+  if (!code) return { found: false };
+  const sh   = getSheet(SH.PRODUCTS);
+  const rows = sheetToObjects(sh);
+  const match = rows.find(r =>
+    String(r.code || '').trim() !== '' &&
+    String(r.code || '').trim() === String(code).trim() &&
+    r.status !== 'inactive'
+  );
+  if (!match) return { found: false };
+  return {
+    found   : true,
+    id      : Number(match.id),
+    name    : match.name,
+    category: match.category || '主花',
+    price   : Number(match.price) || 0,
+    code    : String(match.code || ''),
+  };
+}
+
+// [v2.8] 一次性遷移：為現有 Products 工作表新增 code 欄位（手動執行一次即可）
+function addCodeColumn() {
+  const sh      = getSheet(SH.PRODUCTS);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  if (headers.indexOf('code') >= 0) {
+    Logger.log('✅ code 欄位已存在，不需再新增');
+    return;
+  }
+  const newCol = headers.length + 1;
+  sh.getRange(1, newCol).setValue('code');
+  Logger.log(`✅ code 欄位已新增（第 ${newCol} 欄）`);
 }
 
 function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
@@ -1764,9 +1836,7 @@ function reportWaste(data) {
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
   const idCol   = headers.indexOf('id');
-  const storeCol = data.store === '台南FOCUS' ? headers.indexOf('stockTN')
-                 : data.store === '誠品生活台南' ? headers.indexOf('stockES')
-                 : headers.indexOf('stockKH');
+  const storeCol = headers.indexOf(storeToColKey_(data.store));  // [v2.8 Fix] 改用 helper，市集正確扣減
 
   for (let i = 1; i < vals.length; i++) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
@@ -1811,7 +1881,8 @@ function voidTransaction(data) {
   }
 
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][idCol]) !== String(data.txId)) continue;
+    const txId = data.txId || data.id;   // [v2.8 Fix] 前端送 data.id，後端統一接受兩者
+    if (String(vals[i][idCol]) !== String(txId)) continue;
 
     // 已退款則拒絕
     const alreadyVoided = vals[i][voidedCol];
