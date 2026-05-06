@@ -1769,7 +1769,7 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
 }
 
 // [v2.6] 多據點分配版：根據 allocation 物件按店分別加庫存，加權成本用總量計算
-// allocation 格式：{ '高雄FOCUS 13': bunchCount, '台南FOCUS': bunchCount, '誠品生活台南': bunchCount }
+// [v2.12] allocation 格式改為枝數：{ '高雄FOCUS 13': stemCount, '台南FOCUS': stemCount, ... }
 function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocation, costPerStem }) {
   if (!flowerName || !allocation) return;
   const sh      = getSheet(SH.PRODUCTS);
@@ -1787,8 +1787,8 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
     '誠品生活台南': stockESCol,
     '市集':         stockMarketCol2,
   };
-  // 計算本次進貨總枝數（用於加權成本）
-  const totalNewStems = Object.values(allocation).reduce((s, b) => s + Number(b), 0) * (stemsPerBunch || 0);
+  // [v2.12] allocation 值已是枝數，直接加總（不再 × stemsPerBunch）
+  const totalNewStems = Object.values(allocation).reduce((s, b) => s + Number(b), 0);
 
   for (let i = 1; i < vals.length; i++) {
     if (String(vals[i][nameCol] || '').trim() !== String(flowerName).trim()) continue;
@@ -1802,9 +1802,9 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
       : costPerStem;
     sh.getRange(row, costCol + 1).setValue(weightedCost);
 
-    // ── 按據點分別加庫存 ──
-    Object.entries(allocation).forEach(([store, bunches]) => {
-      const stems  = Number(bunches) * (stemsPerBunch || 0);
+    // ── 按據點分別加庫存（[v2.12] allocation 值已是枝數，直接使用）──
+    Object.entries(allocation).forEach(([store, stemVal]) => {
+      const stems  = Number(stemVal);
       if (!stems) return;
       const colIdx = storeColMap[store];
       if (colIdx === undefined || colIdx < 0) return;

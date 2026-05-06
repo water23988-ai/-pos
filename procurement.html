@@ -649,19 +649,19 @@ function onAllocChange(idx, store, val) {
 }
 
 function updateAllocStatus(idx) {
-    const item  = procItems[idx];
-    const bq    = Number(item.bunchesQty) || 0;
-    const alloc = item.allocation || {};
-    const total = Object.values(alloc).reduce((s, v) => s + Number(v), 0);
-    const el    = document.getElementById(`alloc-status-${idx}`);
+    const item       = procItems[idx];
+    const totalStems = (Number(item.stemsPerBunch) || 0) * (Number(item.bunchesQty) || 0);
+    const alloc      = item.allocation || {};
+    const allocated  = Object.values(alloc).reduce((s, v) => s + Number(v), 0);
+    const el         = document.getElementById(`alloc-status-${idx}`);
     if (!el) return;
-    if (!bq) { el.innerHTML = ''; return; }
-    if (total === bq) {
-        el.innerHTML = `<span class="alloc-ok">✅ 已分配 ${total}/${bq} 把</span>`;
-    } else if (total > bq) {
-        el.innerHTML = `<span class="alloc-over">⚠️ 超過！已分配 ${total}/${bq} 把</span>`;
+    if (!totalStems) { el.innerHTML = ''; return; }
+    if (allocated === totalStems) {
+        el.innerHTML = `<span class="alloc-ok">✅ 已分配 ${allocated}/${totalStems} 枝</span>`;
+    } else if (allocated > totalStems) {
+        el.innerHTML = `<span class="alloc-over">⚠️ 超過！已分配 ${allocated}/${totalStems} 枝</span>`;
     } else {
-        el.innerHTML = `<span class="alloc-less">尚有 ${bq - total} 把未分配（已分配 ${total}/${bq}）</span>`;
+        el.innerHTML = `<span class="alloc-less">尚有 ${totalStems - allocated} 枝未分配（已分配 ${allocated}/${totalStems}）</span>`;
     }
 }
 
@@ -670,7 +670,8 @@ function quickAllocAll(store) {
     procItems.forEach((it, idx) => {
         if (!it.allocation) it.allocation = emptyAlloc();
         Object.keys(it.allocation).forEach(k => it.allocation[k] = 0);
-        it.allocation[store] = Number(it.bunchesQty) || 0;
+        // [v2.12] 分配單位改為枝，一鍵分配填入總枝數
+        it.allocation[store] = (Number(it.stemsPerBunch) || 0) * (Number(it.bunchesQty) || 0);
     });
     renderItemList();
 }
@@ -813,7 +814,7 @@ function renderItemList() {
 
         <!-- 第四行：據點分配 -->
         <div class="alloc-section">
-            <div class="alloc-section-label">📦 分配到各據點（把）</div>
+            <div class="alloc-section-label">📦 分配到各據點（枝）${(Number(item.stemsPerBunch)||0)*(Number(item.bunchesQty)||0) > 0 ? `<span style="color:#8e9775;font-weight:600;margin-left:6px;">共 ${(Number(item.stemsPerBunch)||0)*(Number(item.bunchesQty)||0)} 枝可分配</span>` : ''}</div>
             <div class="alloc-grid">
                 ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['誠品生活台南','誠品台南'],['市集','市集']].map(([key, label]) => `
                 <div class="alloc-cell">
@@ -848,11 +849,12 @@ async function submitProcurement() {
         if (!it.stemsPerBunch || it.stemsPerBunch <= 0) return alert(`品項 ${i+1}「${it.flowerName}」：請輸入枝/把`);
         if (!it.bunchesQty   || it.bunchesQty   <= 0)  return alert(`品項 ${i+1}「${it.flowerName}」：請輸入購入把數`);
         if (!it.pricePerBunch|| it.pricePerBunch <= 0)  return alert(`品項 ${i+1}「${it.flowerName}」：請輸入每把單價`);
-        // 分配驗證
-        const allocTotal = Object.values(it.allocation || {}).reduce((s, v) => s + Number(v), 0);
-        if (allocTotal > it.bunchesQty) return alert(`品項 ${i+1}「${it.flowerName}」：分配把數 (${allocTotal}) 超過購入把數 (${it.bunchesQty})，請重新調整`);
-        if (allocTotal < it.bunchesQty) {
-            if (!confirm(`品項 ${i+1}「${it.flowerName}」尚有 ${it.bunchesQty - allocTotal} 把未分配據點（不會計入任何庫存）。\n\n確定要繼續送出嗎？`)) return;
+        // 分配驗證（[v2.12] 改以枝為單位）
+        const totalStems_ = (Number(it.stemsPerBunch) || 0) * (Number(it.bunchesQty) || 0);
+        const allocTotal  = Object.values(it.allocation || {}).reduce((s, v) => s + Number(v), 0);
+        if (allocTotal > totalStems_) return alert(`品項 ${i+1}「${it.flowerName}」：分配枝數 (${allocTotal}) 超過總枝數 (${totalStems_})，請重新調整`);
+        if (allocTotal < totalStems_) {
+            if (!confirm(`品項 ${i+1}「${it.flowerName}」尚有 ${totalStems_ - allocTotal} 枝未分配據點（不會計入任何庫存）。\n\n確定要繼續送出嗎？`)) return;
         }
     }
 
