@@ -77,6 +77,14 @@
         .alert-chips.collapsed { display: none; }
         .alert-chip { font-size: 11px; font-weight: 600; background: rgba(196,146,138,0.15); color: #C4928A; border-radius: 8px; padding: 4px 10px; }
 
+        /* ── 點位 Tabs ── */
+        .store-tabs { display: flex; gap: 0; background: #FAF7F2; border-bottom: 1.5px solid #DDD0BC; padding: 0 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
+        .store-tabs::-webkit-scrollbar { display: none; }
+        .store-tab { position: relative; display: flex; align-items: center; gap: 6px; padding: 13px 20px; font-size: 13px; font-weight: 600; color: #A89278; background: none; border: none; border-bottom: 2.5px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.15s; margin-bottom: -1.5px; -webkit-tap-highlight-color: transparent; }
+        .store-tab:hover { color: #6d7756; }
+        .store-tab.active { color: #4d3520; border-bottom-color: #8e9775; font-weight: 700; }
+        .tab-badge { background: #C4928A; color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; min-width: 18px; text-align: center; }
+
         /* ── 庫存表格 ── */
         .inv-table-wrap { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; overflow: hidden; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
         .inv-table { width: 100%; border-collapse: collapse; }
@@ -265,6 +273,22 @@
         </div>
     </div>
 
+    <!-- 點位 Tabs -->
+    <div class="store-tabs" id="storeTabs">
+        <button class="store-tab active" id="tab_KH" onclick="setStore(this,'KH')">
+            高雄 <span class="tab-badge" id="badge_KH" style="display:none;"></span>
+        </button>
+        <button class="store-tab" id="tab_TN" onclick="setStore(this,'TN')">
+            台南 <span class="tab-badge" id="badge_TN" style="display:none;"></span>
+        </button>
+        <button class="store-tab" id="tab_ES" onclick="setStore(this,'ES')">
+            誠品 <span class="tab-badge" id="badge_ES" style="display:none;"></span>
+        </button>
+        <button class="store-tab" id="tab_MK" onclick="setStore(this,'MK')">
+            市集 <span class="tab-badge" id="badge_MK" style="display:none;"></span>
+        </button>
+    </div>
+
     <!-- 主內容 -->
     <div class="main-content">
 
@@ -309,10 +333,11 @@
 </div>
 
 <script>
-let API_URL     = localStorage.getItem('moment_flor_api') || '';
-let allProducts = [];
-let currentCat  = '全部';
-let adjTarget   = null; // { id, store, name, currentVal }
+let API_URL      = localStorage.getItem('moment_flor_api') || '';
+let allProducts  = [];
+let currentCat   = '全部';
+let currentStore = localStorage.getItem('inv_store') || 'KH'; // 記住上次選的點位
+let adjTarget    = null;
 
 // ── API Modal ──
 function openApiModal() {
@@ -382,17 +407,28 @@ let _alertCollapsed = false;
 function renderAlerts() {
     const LOW = 3;
     const alerts = [];
+    const badgeCount = { KH: 0, TN: 0, ES: 0, MK: 0 };
+
     allProducts.forEach(p => {
-        const name = p.name || p.productName || p.商品名稱 || '未命名';
-        const kh = Number(p.stockKH || p.庫存KH || 0);
-        const tn = Number(p.stockTN || p.庫存TN || 0);
-        const es = Number(p.stockES || p.庫存ES || 0);
+        const name = p.name || '未命名';
+        const kh = Number(p.stockKH || 0);
+        const tn = Number(p.stockTN || 0);
+        const es = Number(p.stockES || 0);
         const mk = Number(p.stockMarket || 0);
-        if (kh <= LOW) alerts.push(`${name} (高雄 ${kh})`);
-        if (tn <= LOW) alerts.push(`${name} (台南 ${tn})`);
-        if (es <= LOW) alerts.push(`${name} (誠品 ${es})`);
-        if (mk <= LOW) alerts.push(`${name} (市集 ${mk})`);
+        if (kh <= LOW) { alerts.push(`${name}（高雄 ${kh}）`); badgeCount.KH++; }
+        if (tn <= LOW) { alerts.push(`${name}（台南 ${tn}）`); badgeCount.TN++; }
+        if (es <= LOW) { alerts.push(`${name}（誠品 ${es}）`); badgeCount.ES++; }
+        if (mk <= LOW) { alerts.push(`${name}（市集 ${mk}）`); badgeCount.MK++; }
     });
+
+    // 更新 Tab badge
+    ['KH','TN','ES','MK'].forEach(s => {
+        const badge = document.getElementById(`badge_${s}`);
+        if (!badge) return;
+        if (badgeCount[s] > 0) { badge.textContent = badgeCount[s]; badge.style.display = ''; }
+        else { badge.style.display = 'none'; }
+    });
+
     const banner = document.getElementById('alertBanner');
     const chips  = document.getElementById('alertChips');
     const title  = document.getElementById('alertBannerTitle');
@@ -424,14 +460,26 @@ function toggleAlertBanner() {
     }
 }
 
-// ── 渲染表格 ──
+// ── 切換點位 Tab ──
+function setStore(btn, store) {
+    currentStore = store;
+    localStorage.setItem('inv_store', store);
+    document.querySelectorAll('.store-tab').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    renderTable();
+}
+
+// ── 渲染表格（單點位模式）──
 function renderTable() {
     const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
     let list = allProducts;
-    if (currentCat !== '全部') list = list.filter(p => (p.category || p.分類 || '') === currentCat);
-    if (q) list = list.filter(p => (p.name || p.productName || p.商品名稱 || '').toLowerCase().includes(q));
+    if (currentCat !== '全部') list = list.filter(p => (p.category || '') === currentCat);
+    if (q) list = list.filter(p =>
+        (p.name || '').toLowerCase().includes(q) ||
+        (p.code || '').toLowerCase().includes(q)
+    );
 
-    document.getElementById('productCount').innerText = list.length + ' 項商品';
+    document.getElementById('productCount').innerText = list.length + ' 項';
 
     if (!list.length) {
         document.getElementById('inventoryContainer').innerHTML = `
@@ -442,18 +490,17 @@ function renderTable() {
         return;
     }
 
+    const storeKey = currentStore === 'KH' ? 'stockKH' : currentStore === 'TN' ? 'stockTN' : currentStore === 'MK' ? 'stockMarket' : 'stockES';
+    const storeLabel = currentStore === 'KH' ? '高雄 庫存' : currentStore === 'TN' ? '台南 庫存' : currentStore === 'MK' ? '市集 庫存' : '誠品 庫存';
+
     const rows = list.map(p => {
-        const id   = p.id || p.productId || p.商品ID || '';
-        const name = escHtml(p.name || p.productName || p.商品名稱 || '未命名');
-        const cat  = escHtml(p.category || p.分類 || '');
-        const kh   = Number(p.stockKH || p.庫存KH || 0);
-        const tn   = Number(p.stockTN || p.庫存TN || 0);
-        const es   = Number(p.stockES || p.庫存ES || 0);
-        const mk   = Number(p.stockMarket || 0);
-        const total = kh + tn + es + mk;
+        const id    = p.id || p.productId || '';
+        const name  = escHtml(p.name || '未命名');
+        const cat   = escHtml(p.category || '');
+        const stock = Number(p[storeKey] || 0);
+        const sid   = escHtml(id);
         const pJson = escHtml(JSON.stringify(p));
 
-        const sid = escHtml(id);
         return `<tr>
             <td>
                 <div class="prod-name">${name}</div>
@@ -461,48 +508,17 @@ function renderTable() {
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${sid}','KH',-1,'${name}')" title="減 1">−</button>
-                    <input class="stock-input ${kh <= 3 ? 'low' : ''}" type="number" id="kh_${sid}"
-                        value="${kh}" min="0" data-base="${kh}" data-id="${sid}" data-store="KH" data-name="${name}"
+                    <button class="stock-btn minus" onclick="quickAdj('${sid}','${currentStore}',-1,'${name}')" title="減 1">−</button>
+                    <input class="stock-input ${stock <= 3 ? 'low' : ''}" type="number"
+                        id="${currentStore.toLowerCase()}_${sid}"
+                        value="${stock}" min="0"
+                        data-base="${stock}" data-id="${sid}" data-store="${currentStore}" data-name="${name}"
                         onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="stock-btn plus" onclick="quickAdj('${sid}','KH',+1,'${name}')" title="加 1">＋</button>
+                    <button class="stock-btn plus" onclick="quickAdj('${sid}','${currentStore}',+1,'${name}')" title="加 1">＋</button>
                 </div>
             </td>
-            <td class="stock-cell">
-                <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${sid}','TN',-1,'${name}')" title="減 1">−</button>
-                    <input class="stock-input ${tn <= 3 ? 'low' : ''}" type="number" id="tn_${sid}"
-                        value="${tn}" min="0" data-base="${tn}" data-id="${sid}" data-store="TN" data-name="${name}"
-                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="stock-btn plus" onclick="quickAdj('${sid}','TN',+1,'${name}')" title="加 1">＋</button>
-                </div>
-            </td>
-            <td class="stock-cell">
-                <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${sid}','ES',-1,'${name}')" title="減 1">−</button>
-                    <input class="stock-input ${es <= 3 ? 'low' : ''}" type="number" id="es_${sid}"
-                        value="${es}" min="0" data-base="${es}" data-id="${sid}" data-store="ES" data-name="${name}"
-                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="stock-btn plus" onclick="quickAdj('${sid}','ES',+1,'${name}')" title="加 1">＋</button>
-                </div>
-            </td>
-            <td class="stock-cell">
-                <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${sid}','MK',-1,'${name}')" title="減 1">−</button>
-                    <input class="stock-input ${mk <= 3 ? 'low' : ''}" type="number" id="mk_${sid}"
-                        value="${mk}" min="0" data-base="${mk}" data-id="${sid}" data-store="MK" data-name="${name}"
-                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="stock-btn plus" onclick="quickAdj('${sid}','MK',+1,'${name}')" title="加 1">＋</button>
-                </div>
-            </td>
-            <td style="text-align:center;">
-                <span style="font-size:14px;font-weight:800;color:#6d7756;">${total}</span>
-            </td>
-            <td style="text-align:center;">
-                <div style="display:flex;gap:6px;justify-content:center;flex-wrap:wrap;">
-                    <button onclick='openAdjModal(${pJson})' class="btn-secondary" style="font-size:11px;padding:6px 10px;">手動調整</button>
-                    <button onclick='openWasteModal(${pJson})' class="btn-waste">🗑 報廢</button>
-                </div>
+            <td style="text-align:right;">
+                <button onclick='openWasteModal(${pJson})' class="btn-waste">🗑 報廢</button>
             </td>
         </tr>`;
     }).join('');
@@ -513,11 +529,7 @@ function renderTable() {
                 <thead>
                     <tr>
                         <th>商品</th>
-                        <th class="center">高雄</th>
-                        <th class="center">台南</th>
-                        <th class="center">誠品</th>
-                        <th class="center">市集</th>
-                        <th class="center">總計</th>
+                        <th class="center">${storeLabel}（枝）</th>
                         <th class="center">操作</th>
                     </tr>
                 </thead>
@@ -762,8 +774,9 @@ async function submitWaste() {
                 p[stockKey] = Math.max(0, curStock - qty);
                 const el = document.getElementById(`${wasteStore.toLowerCase()}_${id}`);
                 if (el) {
-                    el.innerText   = p[stockKey];
-                    el.className   = 'stock-val' + (p[stockKey] <= 3 ? ' low' : '');
+                    el.value           = p[stockKey];
+                    el.dataset.base    = p[stockKey];
+                    el.className       = 'stock-input' + (p[stockKey] <= 3 ? ' low' : '');
                 }
                 // 更新 modal 裡的庫存數字
                 const stkEl = document.getElementById('wasteStk_' + wasteStore);
@@ -805,6 +818,11 @@ document.addEventListener("wheel", function() {
         document.activeElement.blur();
     }
 }, { passive: true });
+    // 還原上次選的點位 Tab
+    document.querySelectorAll('.store-tab').forEach(b => b.classList.remove('active'));
+    const savedTab = document.getElementById(`tab_${currentStore}`);
+    if (savedTab) savedTab.classList.add('active');
+
     if (!API_URL) { setGas('error'); document.getElementById('gasLabel').innerText = '未設定'; }
     loadProducts();
 };
