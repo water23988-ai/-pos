@@ -139,6 +139,17 @@
         .waste-card-bar { height: 4px; background: #EDE5D8; border-radius: 2px; margin-top: 10px; overflow: hidden; }
         .waste-card-bar-fill { height: 100%; background: rgba(196,146,138,0.55); border-radius: 2px; transition: width 0.6s ease; }
 
+        /* 花材報廢排行 */
+        .waste-rank-table { width: 100%; background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; overflow: hidden; box-shadow: 0 1px 4px rgba(122,101,80,0.06); border-collapse: collapse; }
+        .waste-rank-table th { background: #F5EFE6; padding: 10px 16px; font-size: 10px; font-weight: 700; color: #A89278; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; border-bottom: 1px solid #DDD0BC; }
+        .waste-rank-table th.r { text-align: right; }
+        .waste-rank-table td { padding: 12px 16px; border-bottom: 1px solid #F5EFE6; font-size: 13px; vertical-align: middle; }
+        .waste-rank-table tr:last-child td { border-bottom: none; }
+        .waste-rank-table tr:hover td { background: rgba(0,0,0,0.015); }
+        .waste-rank-no { font-size: 11px; font-weight: 800; color: #C4928A; width: 24px; text-align: center; }
+        .waste-rank-bar { height: 5px; background: #EDE5D8; border-radius: 3px; margin-top: 5px; overflow: hidden; }
+        .waste-rank-bar-fill { height: 100%; background: rgba(196,146,138,0.6); border-radius: 3px; transition: width 0.5s ease; }
+
         /* 花材銷售排行 */
         .rank-section { margin-top: 28px; }
         .rank-filter-row { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
@@ -361,6 +372,17 @@
             </div>
             <div class="waste-grid" id="wasteGrid">
                 <p style="color:#A89278;font-size:13px;grid-column:1/-1;">請設定日期區間後查詢</p>
+            </div>
+        </div>
+
+        <!-- [v2.13] 花材報廢排行 -->
+        <div class="waste-section">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+                <div class="card-title" style="margin-bottom:0;">⚠️ 花材報廢排行</div>
+                <span style="font-size:11px;color:#A89278;">依廢棄量排序</span>
+            </div>
+            <div id="wasteRankContainer">
+                <p style="color:#A89278;font-size:13px;">請設定日期區間後查詢</p>
             </div>
         </div>
 
@@ -755,13 +777,15 @@ async function loadStoreGrid(from, to) {
     }
 }
 
-// ══ 報廢成本（日期區間） ══
+// ══ 報廢成本（日期區間）[v2.13 加花材排行] ══
 async function loadWaste(from, to) {
     const wasteGrid = document.getElementById('wasteGrid');
     const wasteDate = document.getElementById('wasteDate');
+    const rankCont  = document.getElementById('wasteRankContainer');
     if (!from || !to) return;
     wasteDate.innerText = from + ' ~ ' + to;
     wasteGrid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;"><span class="spinner"></span> 載入中...</p>';
+    if (rankCont) rankCont.innerHTML = '<p style="color:#A89278;font-size:13px;">載入中...</p>';
     try {
         const res  = await fetch(`${API_URL}?action=getWasteReport&from=${from}&to=${to}`);
         const data = await res.json();
@@ -769,6 +793,7 @@ async function loadWaste(from, to) {
         const entries = Object.entries(waste);
         if (!entries.length) {
             wasteGrid.innerHTML = '<p style="color:#A89278;font-size:13px;grid-column:1/-1;">此區間無報廢記錄</p>';
+            if (rankCont) rankCont.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無報廢記錄</p>';
             return;
         }
         const maxCost = Math.max(...entries.map(([,v]) => v.cost || 0), 1);
@@ -782,8 +807,44 @@ async function loadWaste(from, to) {
                 <div class="waste-card-bar"><div class="waste-card-bar-fill" style="width:${pct}%;"></div></div>
             </div>`;
         }).join('');
+
+        // [v2.13] 花材報廢排行
+        if (rankCont) {
+            const byProduct = data.byProduct || [];
+            if (!byProduct.length) {
+                rankCont.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無報廢記錄</p>';
+            } else {
+                const maxQty = Math.max(...byProduct.map(p => p.qty), 1);
+                const rows = byProduct.slice(0, 20).map((p, i) => {
+                    const pct = Math.round(p.qty / maxQty * 100);
+                    const rankColor = i === 0 ? '#C4928A' : i === 1 ? '#C4A87A' : '#A89278';
+                    return `<tr>
+                        <td style="text-align:center;"><span class="waste-rank-no" style="color:${rankColor};">${i + 1}</span></td>
+                        <td>
+                            <div style="font-weight:700;color:#3D2E1E;">${escHtml(p.name)}</div>
+                            <div class="waste-rank-bar"><div class="waste-rank-bar-fill" style="width:${pct}%;"></div></div>
+                        </td>
+                        <td style="text-align:right;font-weight:800;color:#C4928A;">${p.qty} 枝</td>
+                        <td style="text-align:right;font-size:12px;color:#A89278;">NT$ ${Math.round(p.cost).toLocaleString()}</td>
+                    </tr>`;
+                }).join('');
+                rankCont.innerHTML = `
+                    <table class="waste-rank-table">
+                        <thead>
+                            <tr>
+                                <th style="text-align:center;width:36px;">#</th>
+                                <th>花材</th>
+                                <th class="r">廢棄量</th>
+                                <th class="r">廢棄成本</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>`;
+            }
+        }
     } catch(e) {
         wasteGrid.innerHTML = '<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗</p>';
+        if (rankCont) rankCont.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
 

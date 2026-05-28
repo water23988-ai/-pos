@@ -993,16 +993,32 @@ function getWasteReport(store, fromDate, toDate) {
   });
 
   const byStore = {};
+  const byProduct = {};
+
   wasteRows.forEach(r => {
-    const s = r.store || '未知';
+    const s    = r.store || '未知';
+    const name = r.name  || `ID:${r.productId}`;
+    const qty  = Math.abs(Number(r.diff) || 0);
+    const cost = (prodMap[Number(r.productId)] || 0) * qty;
+
+    // 各點位彙總
     if (!byStore[s]) byStore[s] = { count: 0, cost: 0 };
     byStore[s].count++;
-    byStore[s].cost += (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0);
+    byStore[s].cost += cost;
+
+    // 花材報廢排行 [v2.13]
+    if (!byProduct[name]) byProduct[name] = { name, qty: 0, cost: 0 };
+    byProduct[name].qty  += qty;
+    byProduct[name].cost += cost;
   });
+
+  // 依廢棄量由多到少排序
+  const byProductArr = Object.values(byProduct).sort((a, b) => b.qty - a.qty);
 
   return {
     totalCost: wasteRows.reduce((s, r) => s + (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0), 0),
     byStore,
+    byProduct: byProductArr, // [v2.13] 花材報廢排行
   };
 }
 
