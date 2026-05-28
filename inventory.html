@@ -94,8 +94,13 @@
         .stock-btn { width: 26px; height: 26px; border: 1.5px solid #DDD0BC; background: #F5EFE6; border-radius: 7px; cursor: pointer; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: all 0.12s; color: #7A6550; font-weight: 700; padding: 0; }
         .stock-btn:hover { background: #EDE5D8; border-color: #C4A87A; }
         .stock-btn.minus:hover { background: rgba(196,146,138,0.15); border-color: #C4928A; color: #C4928A; }
-        .stock-val { font-size: 15px; font-weight: 800; color: #3D2E1E; min-width: 28px; text-align: center; }
-        .stock-val.low { color: #C4928A; }
+        /* ── 可直接輸入的庫存數字欄 ── */
+        .stock-input { width: 52px; text-align: center; font-size: 15px; font-weight: 800; color: #3D2E1E; border: 1.5px solid transparent; border-radius: 7px; background: transparent; padding: 4px 2px; outline: none; -moz-appearance: textfield; transition: all 0.15s; }
+        .stock-input::-webkit-inner-spin-button, .stock-input::-webkit-outer-spin-button { -webkit-appearance: none; }
+        .stock-input:hover { border-color: #DDD0BC; background: #F5EFE6; cursor: text; }
+        .stock-input:focus { border-color: #8e9775; background: #FAF7F2; }
+        .stock-input.low { color: #C4928A; }
+        .stock-input:disabled { opacity: 0.5; }
 
         /* ── 空狀態 ── */
         .empty-state { text-align: center; padding: 60px 20px; color: #A89278; }
@@ -448,6 +453,7 @@ function renderTable() {
         const total = kh + tn + es + mk;
         const pJson = escHtml(JSON.stringify(p));
 
+        const sid = escHtml(id);
         return `<tr>
             <td>
                 <div class="prod-name">${name}</div>
@@ -455,30 +461,38 @@ function renderTable() {
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${escHtml(id)}','KH',-1,'${name}',${kh})" title="減 1">−</button>
-                    <span class="stock-val ${kh <= 3 ? 'low' : ''}" id="kh_${escHtml(id)}">${kh}</span>
-                    <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','KH',+1,'${name}',${kh})" title="加 1">＋</button>
+                    <button class="stock-btn minus" onclick="quickAdj('${sid}','KH',-1,'${name}')" title="減 1">−</button>
+                    <input class="stock-input ${kh <= 3 ? 'low' : ''}" type="number" id="kh_${sid}"
+                        value="${kh}" min="0" data-base="${kh}" data-id="${sid}" data-store="KH" data-name="${name}"
+                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="stock-btn plus" onclick="quickAdj('${sid}','KH',+1,'${name}')" title="加 1">＋</button>
                 </div>
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${escHtml(id)}','TN',-1,'${name}',${tn})" title="減 1">−</button>
-                    <span class="stock-val ${tn <= 3 ? 'low' : ''}" id="tn_${escHtml(id)}">${tn}</span>
-                    <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','TN',+1,'${name}',${tn})" title="加 1">＋</button>
+                    <button class="stock-btn minus" onclick="quickAdj('${sid}','TN',-1,'${name}')" title="減 1">−</button>
+                    <input class="stock-input ${tn <= 3 ? 'low' : ''}" type="number" id="tn_${sid}"
+                        value="${tn}" min="0" data-base="${tn}" data-id="${sid}" data-store="TN" data-name="${name}"
+                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="stock-btn plus" onclick="quickAdj('${sid}','TN',+1,'${name}')" title="加 1">＋</button>
                 </div>
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${escHtml(id)}','ES',-1,'${name}',${es})" title="減 1">−</button>
-                    <span class="stock-val ${es <= 3 ? 'low' : ''}" id="es_${escHtml(id)}">${es}</span>
-                    <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','ES',+1,'${name}',${es})" title="加 1">＋</button>
+                    <button class="stock-btn minus" onclick="quickAdj('${sid}','ES',-1,'${name}')" title="減 1">−</button>
+                    <input class="stock-input ${es <= 3 ? 'low' : ''}" type="number" id="es_${sid}"
+                        value="${es}" min="0" data-base="${es}" data-id="${sid}" data-store="ES" data-name="${name}"
+                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="stock-btn plus" onclick="quickAdj('${sid}','ES',+1,'${name}')" title="加 1">＋</button>
                 </div>
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${escHtml(id)}','MK',-1,'${name}',${mk})" title="減 1">−</button>
-                    <span class="stock-val ${mk <= 3 ? 'low' : ''}" id="mk_${escHtml(id)}">${mk}</span>
-                    <button class="stock-btn plus" onclick="quickAdj('${escHtml(id)}','MK',+1,'${name}',${mk})" title="加 1">＋</button>
+                    <button class="stock-btn minus" onclick="quickAdj('${sid}','MK',-1,'${name}')" title="減 1">−</button>
+                    <input class="stock-input ${mk <= 3 ? 'low' : ''}" type="number" id="mk_${sid}"
+                        value="${mk}" min="0" data-base="${mk}" data-id="${sid}" data-store="MK" data-name="${name}"
+                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="stock-btn plus" onclick="quickAdj('${sid}','MK',+1,'${name}')" title="加 1">＋</button>
                 </div>
             </td>
             <td style="text-align:center;">
@@ -513,27 +527,28 @@ function renderTable() {
 }
 
 // ── 快速 +1 / -1 ──
-async function quickAdj(id, store, delta, name, currentVal) {
-    if (delta < 0 && currentVal <= 0) { showToast('庫存已為 0，無法再減'); return; }
+async function quickAdj(id, store, delta, name) {
     if (!API_URL) { showToast('請先設定 API 網址'); return; }
+    const el = document.getElementById(`${store.toLowerCase()}_${id}`);
+    const currentVal = el ? parseInt(el.dataset.base) || 0 : 0;
+    if (delta < 0 && currentVal <= 0) { showToast('庫存已為 0，無法再減'); return; }
 
+    if (el) el.disabled = true;
     setGas('loading');
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adjustStock', data: { id, store, delta } }) });
         const result = await res.json();
         if (result.success) {
             setGas('ok');
-            // 樂觀更新
             const p = allProducts.find(p => (p.id || p.productId) == id);
             if (p) {
                 const key = store === 'KH' ? 'stockKH' : store === 'TN' ? 'stockTN' : store === 'MK' ? 'stockMarket' : 'stockES';
-                const oldKey = store === 'KH' ? '庫存KH' : store === 'TN' ? '庫存TN' : store === 'MK' ? 'stockMarket' : '庫存ES';
-                const newVal = Math.max(0, Number(p[key] || p[oldKey] || 0) + delta);
+                const newVal = Math.max(0, currentVal + delta);
                 p[key] = newVal;
-                const el = document.getElementById(`${store.toLowerCase()}_${id}`);
                 if (el) {
-                    el.innerText = newVal;
-                    el.className = 'stock-val' + (newVal <= 3 ? ' low' : '');
+                    el.value = newVal;
+                    el.dataset.base = newVal;
+                    el.className = 'stock-input' + (newVal <= 3 ? ' low' : '');
                 }
             }
             renderAlerts();
@@ -545,6 +560,48 @@ async function quickAdj(id, store, delta, name, currentVal) {
         setGas('error');
         showToast('連線失敗');
     }
+    if (el) el.disabled = false;
+}
+
+// ── 直接輸入修改庫存 ──
+async function directSetStock(el) {
+    const id    = el.dataset.id;
+    const store = el.dataset.store;
+    const name  = el.dataset.name;
+    const oldVal = parseInt(el.dataset.base) || 0;
+    const nv    = parseInt(el.value);
+    if (isNaN(nv) || nv < 0) { el.value = oldVal; showToast('請輸入有效數字'); return; }
+    if (nv === oldVal) return;
+    const delta = nv - oldVal;
+    if (!API_URL) { el.value = oldVal; showToast('請先設定 API 網址'); return; }
+
+    el.disabled = true;
+    setGas('loading');
+    try {
+        const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'adjustStock', data:{ id, store, delta, note:'手動輸入修正' } }) });
+        const result = await res.json();
+        if (result.success) {
+            setGas('ok');
+            el.dataset.base = nv;
+            el.className = 'stock-input' + (nv <= 3 ? ' low' : '');
+            const p = allProducts.find(p => (p.id || p.productId) == id);
+            if (p) {
+                const key = store==='KH'?'stockKH':store==='TN'?'stockTN':store==='MK'?'stockMarket':'stockES';
+                p[key] = nv;
+            }
+            showToast(`✅ ${name}（${store}）→ ${nv}`);
+            renderAlerts();
+        } else {
+            setGas('error');
+            el.value = oldVal;
+            showToast('更新失敗：' + (result.error || ''));
+        }
+    } catch(e) {
+        setGas('error');
+        el.value = oldVal;
+        showToast('連線失敗');
+    }
+    el.disabled = false;
 }
 
 // ── 手動調整 Modal ──
