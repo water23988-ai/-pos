@@ -521,7 +521,7 @@ function emptyAlloc() {
 }
 
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, code:'', currentPrice:0, allocation: emptyAlloc() });
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, code:'', productId:'', currentPrice:0, allocation: emptyAlloc() });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
     // 自動捲到新品項並 focus
@@ -622,6 +622,7 @@ function _selectNameMatch(idx, i) {
 function _applyCodeProduct(idx, p) {
     procItems[idx].flowerName    = p.name;
     procItems[idx].code          = p.code || '';
+    procItems[idx].productId     = p.id   || '';
     // [v2.11] 帶入商品管理的現有售價，讓使用者評估是否要調整
     procItems[idx].currentPrice  = Number(p.price) || 0;
     if (p.category) procItems[idx].category = p.category;
@@ -873,6 +874,7 @@ async function submitProcurement() {
                 items : procItems.map(it => ({
                     flowerName   : it.flowerName,
                     category     : it.category,
+                    productId    : it.productId || '',
                     stemsPerBunch: Number(it.stemsPerBunch),
                     bunchesQty   : Number(it.bunchesQty),
                     pricePerBunch: Number(it.pricePerBunch),

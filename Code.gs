@@ -771,8 +771,8 @@ function getMonthlyReport(store, ym) {
     return { revenue: rev, cost: cst, profit: pft, margin: rev > 0 ? Math.round(pft/rev*100) : 0, customers: txs.length };
   };
 
-  const thisTxs = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= from  && d <= to; });
-  const lyTxs   = rows.filter(r => { const d = new Date(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= lyFrom && d <= lyTo; });
+  const thisTxs = rows.filter(r => { const d = parseTaipei_(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= from  && d <= to; });
+  const lyTxs   = rows.filter(r => { const d = parseTaipei_(r.date); return !isNaN(d) && filt(r) && notVoid(r) && d >= lyFrom && d <= lyTo; });
 
   return { ...compute(thisTxs), lastYear: compute(lyTxs) };
 }
@@ -1628,18 +1628,20 @@ function addProcurement(data) {
       date,
       allocJson, // allocation JSON
     ]);
-    // [v2.4] 商品不存在時自動建立
-    ensureProductExists(item.flowerName, item.category, costPerStem, suggestedPrice);
-    // [v2.6] 使用多據點版本更新成本與庫存
+    // [v2.4] 商品不存在時自動建立；[v2.13] 優先使用前端傳來的 productId（ID 比對更準確）
+    const resolvedId = Number(item.productId) > 0
+      ? Number(item.productId)
+      : ensureProductExists(item.flowerName, item.category, costPerStem, suggestedPrice);
+    // [v2.6] 使用多據點版本更新成本與庫存；[v2.13] 傳入 productId 優先做 ID 比對
     if (Object.keys(allocation).length > 0) {
-      updateProductCostWeightedWithAlloc({ flowerName: item.flowerName, stemsPerBunch, allocation, costPerStem });
+      updateProductCostWeightedWithAlloc({ flowerName: item.flowerName, productId: resolvedId, stemsPerBunch, allocation, costPerStem });
     } else {
       // 向下相容：若無 allocation 則用原本邏輯
-      updateProductCostWeighted({ flowerName: item.flowerName, store: data.store || '', newStems: totalStems, newCost: costPerStem });
+      updateProductCostWeighted({ flowerName: item.flowerName, productId: resolvedId, store: data.store || '', newStems: totalStems, newCost: costPerStem });
     }
-    // [v2.5] 若有手動設定收銀台售價，同步更新商品 price 欄位
+    // [v2.5] 若有手動設定收銷台售價，同步更新商品 price 欄位
     if (Number(item.salePrice) > 0) {
-      updateProductPrice(item.flowerName, Number(item.salePrice));
+      updateProductPrice(item.flowerName, Number(item.salePrice), resolvedId);
     }
     // [v2.3] 進貨時同步記錄價格歷史
     const phSh = getSheet(SH.PRICE_LOG);
@@ -1666,39 +1668,51 @@ function addProcurement(data) {
   return { success: true, batchId, totalItems: items.length, totalCost: Math.round(totalCost) };
 }
 
-// [v2.4] 進貨時若商品不存在，自動建立
+// [v2.4] 進貨時若商品不存在，自動建立；回傳該商品 ID（數字）
 function ensureProductExists(name, category, cost, price) {
-  if (!name) return;
+  if (!name) return null;
   const sh      = getSheet(SH.PRODUCTS);
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
+  const idCol   = headers.indexOf('id');
   const nameCol = headers.indexOf('name');
-  // 檢查是否已存在
+  // 檢查是否已存在（非 inactive）
+  const statusCol = headers.indexOf('status');
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][nameCol] || '').trim() === String(name).trim()) return;
+    if (String(vals[i][nameCol] || '').trim() === String(name).trim()) {
+      const st = statusCol >= 0 ? String(vals[i][statusCol] || '') : '';
+      if (st === 'inactive') continue; // 跳過已停用
+      return Number(vals[i][idCol]) || null;
+    }
   }
   // 不存在 → 自動建立
-  const maxId = vals.slice(1).reduce((m, r) => Math.max(m, Number(r[headers.indexOf('id')]) || 0), 0);
+  const maxId = vals.slice(1).reduce((m, r) => Math.max(m, Number(r[idCol]) || 0), 0);
+  const newId = maxId + 1;
   // [v2.8 Fix] 修正欄數：補上 stockMarket(0)、visible(true)、code('') 共 12 欄
-  sh.appendRow([maxId + 1, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 0, 'active', true, '']);
-  Logger.log(`✅ 自動建立商品：${name}`);
+  sh.appendRow([newId, name, category || '主花', price || 0, cost || 0, 0, 0, 0, 0, 'active', true, '']);
+  Logger.log(`✅ 自動建立商品：${name}（ID ${newId}）`);
+  return newId;
 }
 
 // [v2.5] 進貨時若手動填寫收銀台售價，同步更新 Products 工作表的 price 欄
-function updateProductPrice(name, price) {
+// [v2.13] 新增 productId 參數，ID 優先比對
+function updateProductPrice(name, price, productId) {
   if (!name || !price) return;
   const sh      = getSheet(SH.PRODUCTS);
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
+  const idCol    = headers.indexOf('id');
   const nameCol  = headers.indexOf('name');
   const priceCol = headers.indexOf('price');
   if (nameCol < 0 || priceCol < 0) return;
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][nameCol]).trim() === String(name).trim()) {
-      sh.getRange(i + 1, priceCol + 1).setValue(price);
-      Logger.log(`💰 售價更新：${name} → NT$ ${price}`);
-      return;
-    }
+    const rowId = Number(vals[i][idCol]) || null;
+    const nameMatch = String(vals[i][nameCol]).trim() === String(name).trim();
+    const matched = productId && rowId ? rowId === productId : nameMatch;
+    if (!matched) continue;
+    sh.getRange(i + 1, priceCol + 1).setValue(price);
+    Logger.log(`💰 售價更新：${name} → NT$ ${price}`);
+    return;
   }
 }
 
@@ -1736,10 +1750,11 @@ function addCodeColumn() {
   Logger.log(`✅ code 欄位已新增（第 ${newCol} 欄）`);
 }
 
-function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
+function updateProductCostWeighted({ flowerName, productId, store, newStems, newCost }) {
   const sh      = getSheet(SH.PRODUCTS);
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
+  const idCol      = headers.indexOf('id');
   const nameCol    = headers.indexOf('name');
   const costCol    = headers.indexOf('cost');
   const stockKHCol = headers.indexOf('stockKH');
@@ -1749,7 +1764,10 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
   const storeCol   = store === '台南FOCUS' ? stockTNCol : store === '誠品生活台南' ? stockESCol : store === '市集' ? stockMarketCol : stockKHCol;
 
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][nameCol] || '').trim() !== String(flowerName || '').trim()) continue;
+    // [v2.13] ID 優先比對，fallback 到名稱
+    const rowId = Number(vals[i][idCol]) || null;
+    const nameMatch = String(vals[i][nameCol] || '').trim() === String(flowerName || '').trim();
+    if (productId && rowId ? rowId !== productId : !nameMatch) continue;
     const row          = i + 1;
     const oldCost      = Number(vals[i][costCol])  || 0;
     const oldStock     = Number(vals[i][storeCol]) || 0;
@@ -1770,11 +1788,13 @@ function updateProductCostWeighted({ flowerName, store, newStems, newCost }) {
 
 // [v2.6] 多據點分配版：根據 allocation 物件按店分別加庫存，加權成本用總量計算
 // [v2.12] allocation 格式改為枝數：{ '高雄FOCUS 13': stemCount, '台南FOCUS': stemCount, ... }
-function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocation, costPerStem }) {
+// [v2.13] 新增 productId 參數，ID 優先比對，避免同名商品互相干擾
+function updateProductCostWeightedWithAlloc({ flowerName, productId, stemsPerBunch, allocation, costPerStem }) {
   if (!flowerName || !allocation) return;
   const sh      = getSheet(SH.PRODUCTS);
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
+  const idCol      = headers.indexOf('id');
   const nameCol    = headers.indexOf('name');
   const costCol    = headers.indexOf('cost');
   const stockKHCol = headers.indexOf('stockKH');
@@ -1791,7 +1811,10 @@ function updateProductCostWeightedWithAlloc({ flowerName, stemsPerBunch, allocat
   const totalNewStems = Object.values(allocation).reduce((s, b) => s + Number(b), 0);
 
   for (let i = 1; i < vals.length; i++) {
-    if (String(vals[i][nameCol] || '').trim() !== String(flowerName).trim()) continue;
+    // [v2.13] ID 優先比對，fallback 到名稱
+    const rowId = Number(vals[i][idCol]) || null;
+    const nameMatch = String(vals[i][nameCol] || '').trim() === String(flowerName).trim();
+    if (productId && rowId ? rowId !== productId : !nameMatch) continue;
     const row = i + 1;
     // ── 加權平均成本（用全館總庫存做分母）──
     const totalOldStock = [stockKHCol, stockTNCol, stockESCol, stockMarketCol2]
