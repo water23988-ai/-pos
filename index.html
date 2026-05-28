@@ -1461,11 +1461,13 @@ async function recallOrder(idx) {
 }
 
 function showRecallBanner(name) {
-    document.getElementById('recallBannerName').innerText = `叫回中：${name}`;
-    document.getElementById('recallBanner').classList.remove('hidden');
+    _recalledHangName = name; // 修正：補上設定，putBackHang 才能讀到正確名稱
+    document.getElementById('recallBannerName').innerText = name;
+    document.getElementById('recallBanner').style.display = 'flex';
 }
 function hideRecallBanner() {
-    document.getElementById('recallBanner').classList.add('hidden');
+    document.getElementById('recallBanner').style.display = 'none';
+    _recalledHangName = null;
 }
 async function putBackHang() {
     if (!cart.length) { showToast('購物車是空的'); return; }
