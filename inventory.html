@@ -9,7 +9,6 @@
         * { font-family: 'Noto Sans TC', -apple-system, sans-serif; box-sizing: border-box; }
         body { background: #F0E9DF; color: #3D2E1E; overflow-x: hidden; -webkit-font-smoothing: antialiased; margin: 0; }
 
-        /* ── 側邊欄 ── */
         .side-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; z-index: 200; box-shadow: 2px 0 12px rgba(0,0,0,0.06); }
         .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; }
         .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; }
@@ -24,17 +23,14 @@
         .nav-bottom { padding: 12px 8px 20px; border-top: 1px solid rgba(0,0,0,0.08); }
         .gas-status-bar { display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 10px; background: rgba(0,0,0,0.06); font-size: 11px; color: #a08060; }
         .gas-status-bar button { background: rgba(0,0,0,0.06); border: none; border-radius: 7px; width: 28px; height: 28px; cursor: pointer; font-size: 14px; margin-left: auto; }
-        /* ── 手機 API 按鈕 ── */
         .mobile-gas-btn { display: none; align-items: center; gap: 5px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; padding: 7px 11px; font-size: 12px; color: #7A6550; cursor: pointer; font-weight: 600; white-space: nowrap; }
         @media (max-width: 768px) { .mobile-gas-btn { display: flex; } }
 
-        /* ── 主內容 ── */
         .main-area { margin-left: 220px; min-height: 100vh; display: flex; flex-direction: column; }
         .main-header { background: #FAF7F2; border-bottom: 1px solid #DDD0BC; padding: 0 24px; height: 58px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
         .main-header-title { font-size: 16px; font-weight: 800; color: #3D2E1E; }
         .main-content { padding: 20px; }
 
-        /* ── 通用 ── */
         .f-input { border: 1.5px solid #DDD0BC; border-radius: 10px; padding: 10px 13px; font-size: 14px; outline: none; background: #F5EFE6; color: #3D2E1E; transition: all 0.15s; }
         .f-input:focus { border-color: #8e9775; background: #FAF7F2; }
         .btn-primary { background: #8e9775; color: white; border: none; border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity 0.15s; }
@@ -44,30 +40,25 @@
         .chip { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 20px; padding: 7px 14px; font-size: 12px; font-weight: 500; color: #7A6550; cursor: pointer; transition: all 0.15s; white-space: nowrap; }
         .chip.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; font-weight: 700; }
 
-        /* ── GAS dot ── */
         .gas-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #C8B89A; flex-shrink: 0; }
         .gas-dot.ok { background: #8E9775; }
         .gas-dot.loading { background: #C4A87A; animation: blink 0.8s infinite; }
         .gas-dot.error { background: #C4928A; }
         @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
 
-        /* ── Toast ── */
         #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px); background: #7A6550; color: white; padding: 10px 22px; border-radius: 24px; font-size: 13px; font-weight: 500; z-index: 9999; opacity: 0; transition: all 0.25s; pointer-events: none; white-space: nowrap; }
         #toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-        /* ── API Modal ── */
         .api-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
         .api-modal.show { display: flex; }
         .api-modal-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 360px; margin: 16px; border: 1px solid #DDD0BC; }
 
-        /* ── 篩選列 ── */
         .filter-bar { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; padding: 14px 18px; margin-bottom: 20px; box-shadow: 0 1px 4px rgba(122,101,80,0.06); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
         .filter-chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
         .search-wrap { position: relative; min-width: 200px; }
         .search-wrap input { padding-left: 34px; }
         .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); font-size: 14px; pointer-events: none; color: #A89278; }
 
-        /* ── 低庫存警示列 ── */
         .alert-banner { background: rgba(196,146,138,0.12); border: 1px solid rgba(196,146,138,0.3); border-radius: 12px; padding: 12px 16px; margin-bottom: 16px; display: none; }
         .alert-banner-header { display: flex; align-items: center; justify-content: space-between; cursor: pointer; user-select: none; }
         .alert-banner-title { font-size: 12px; font-weight: 700; color: #C4928A; }
@@ -77,7 +68,6 @@
         .alert-chips.collapsed { display: none; }
         .alert-chip { font-size: 11px; font-weight: 600; background: rgba(196,146,138,0.15); color: #C4928A; border-radius: 8px; padding: 4px 10px; }
 
-        /* ── 點位 Tabs ── */
         .store-tabs { display: flex; gap: 0; background: #FAF7F2; border-bottom: 1.5px solid #DDD0BC; padding: 0 20px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; }
         .store-tabs::-webkit-scrollbar { display: none; }
         .store-tab { position: relative; display: flex; align-items: center; gap: 6px; padding: 13px 20px; font-size: 13px; font-weight: 600; color: #A89278; background: none; border: none; border-bottom: 2.5px solid transparent; cursor: pointer; white-space: nowrap; transition: all 0.15s; margin-bottom: -1.5px; -webkit-tap-highlight-color: transparent; }
@@ -85,7 +75,6 @@
         .store-tab.active { color: #4d3520; border-bottom-color: #8e9775; font-weight: 700; }
         .tab-badge { background: #C4928A; color: white; font-size: 10px; font-weight: 700; border-radius: 10px; padding: 1px 6px; min-width: 18px; text-align: center; }
 
-        /* ── 庫存表格 ── */
         .inv-table-wrap { background: #FAF7F2; border-radius: 16px; border: 1px solid #DDD0BC; overflow: hidden; box-shadow: 0 1px 4px rgba(122,101,80,0.06); }
         .inv-table { width: 100%; border-collapse: collapse; }
         .inv-table th { background: #F5EFE6; padding: 12px 16px; font-size: 10px; font-weight: 700; color: #A89278; letter-spacing: 0.08em; text-transform: uppercase; text-align: left; border-bottom: 1px solid #DDD0BC; }
@@ -96,13 +85,11 @@
         .prod-name { font-weight: 700; color: #3D2E1E; }
         .prod-cat { display: inline-block; font-size: 10px; font-weight: 700; color: #8e9775; background: #f0f3ec; border-radius: 5px; padding: 2px 7px; margin-top: 3px; }
 
-        /* ── 庫存格 ── */
         .stock-cell { text-align: center; }
         .stock-control { display: flex; align-items: center; justify-content: center; gap: 6px; }
         .stock-btn { width: 26px; height: 26px; border: 1.5px solid #DDD0BC; background: #F5EFE6; border-radius: 7px; cursor: pointer; font-size: 15px; line-height: 1; display: flex; align-items: center; justify-content: center; transition: all 0.12s; color: #7A6550; font-weight: 700; padding: 0; }
         .stock-btn:hover { background: #EDE5D8; border-color: #C4A87A; }
         .stock-btn.minus:hover { background: rgba(196,146,138,0.15); border-color: #C4928A; color: #C4928A; }
-        /* ── 可直接輸入的庫存數字欄 ── */
         .stock-input { width: 52px; text-align: center; font-size: 15px; font-weight: 800; color: #3D2E1E; border: 1.5px solid transparent; border-radius: 7px; background: transparent; padding: 4px 2px; outline: none; -moz-appearance: textfield; transition: all 0.15s; }
         .stock-input::-webkit-inner-spin-button, .stock-input::-webkit-outer-spin-button { -webkit-appearance: none; }
         .stock-input:hover { border-color: #DDD0BC; background: #F5EFE6; cursor: text; }
@@ -110,19 +97,16 @@
         .stock-input.low { color: #C4928A; }
         .stock-input:disabled { opacity: 0.5; }
 
-        /* ── 空狀態 ── */
         .empty-state { text-align: center; padding: 60px 20px; color: #A89278; }
         .empty-icon { font-size: 40px; margin-bottom: 12px; }
         .empty-text { font-size: 14px; }
         .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #DDD0BC; border-top-color: #8e9775; border-radius: 50%; animation: spin 0.7s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
 
-        /* ── 手動調整 Modal ── */
         .adj-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
         .adj-modal.show { display: flex; }
         .adj-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; margin: 16px; border: 1px solid #DDD0BC; }
 
-        /* ── 報廢 Modal ── */
         .waste-modal { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.45); backdrop-filter: blur(6px); z-index: 400; align-items: center; justify-content: center; }
         .waste-modal.show { display: flex; }
         .waste-box { background: #FAF7F2; border-radius: 20px; padding: 24px; width: 100%; max-width: 380px; margin: 16px; border: 1px solid rgba(196,146,138,0.5); }
@@ -134,23 +118,15 @@
         .waste-store-btn .store-stock { font-size: 18px; font-weight: 800; color: #3D2E1E; display: block; margin-bottom: 2px; }
         .waste-store-btn.active .store-stock { color: #C4928A; }
 
-
-        /* ── 手機側邊抽屜 ── */
         .hamburger-btn { display: none; align-items: center; justify-content: center; width: 38px; height: 38px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; cursor: pointer; font-size: 22px; color: #3D2E1E; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
         .nav-overlay { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.38); z-index: 299; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
         .nav-overlay.show { display: block; }
-        /* ════════════════════════════════
-           手機響應式設計 (≤768px)
-        ════════════════════════════════ */
         .mobile-bottom-nav { display: none; }
         @media (max-width: 768px) {
-
-            /* ── 手機側邊抽屜 ── */
             .side-nav { display: flex !important; transform: translateX(-100%); transition: transform 0.28s cubic-bezier(0.4,0,0.2,1); z-index: 300; }
             .side-nav.nav-open { transform: translateX(0); box-shadow: 4px 0 24px rgba(61,46,30,0.2); }
             .hamburger-btn { display: flex; }
             .mobile-bottom-nav { display: none !important; }
-            /* .side-nav hidden → now handled by drawer */
             .main-area { margin-left: 0 !important; }
             .main-header { padding: 0 16px; }
             .main-content { padding: 14px 14px 80px; }
@@ -186,14 +162,21 @@
 
 <!-- 手動調整 Modal -->
 <div class="adj-modal" id="adjModal">
-    <div class="adj-box">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
-            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;" id="adjTitle">調整庫存</h3>
+    <div class="adj-box" id="adjBox">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+            <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">手動調整庫存</h3>
             <button onclick="closeAdjModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
         </div>
-        <p style="font-size:12px;color:#A89278;margin-bottom:14px;" id="adjSub"></p>
+        <p id="adjSub" style="font-size:13px;font-weight:600;color:#6d7756;margin-bottom:16px;"></p>
+        <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">點位</label>
+        <select id="adjStore" class="f-input" style="width:100%;margin-bottom:12px;">
+            <option value="KH">高雄 (KH)</option>
+            <option value="TN">台南 (TN)</option>
+            <option value="ES">誠品 (ES)</option>
+            <option value="MK">市集 (MK)</option>
+        </select>
         <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">調整數量（正數加庫存，負數減庫存）</label>
-        <input type="number" id="adjDelta" class="f-input" style="width:100%;margin-bottom:14px;" placeholder="例：10 或 -5">
+        <input type="number" id="adjDelta" class="f-input" style="width:100%;margin-bottom:12px;" placeholder="例：10 或 -5">
         <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">備註（選填）</label>
         <input type="text" id="adjNote" class="f-input" style="width:100%;margin-bottom:18px;" placeholder="例：補貨、盤點修正">
         <div style="display:flex;gap:10px;">
@@ -205,16 +188,14 @@
 
 <!-- 報廢 Modal -->
 <div class="waste-modal" id="wasteModal">
-    <div class="waste-box" id="wasteBox">
+    <div class="waste-box">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
             <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">🗑 回報報廢</h3>
             <button onclick="closeWasteModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
         </div>
         <p id="wasteProductName" style="font-size:13px;font-weight:600;color:#6d7756;margin-bottom:16px;"></p>
-
         <div style="font-size:11px;font-weight:600;color:#A89278;margin-bottom:8px;letter-spacing:0.04em;text-transform:uppercase;">選擇點位</div>
         <div class="waste-store-grid" id="wasteStoreGrid"></div>
-
         <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;letter-spacing:0.04em;text-transform:uppercase;">報廢數量</label>
         <input type="number" id="wasteQty" class="f-input" style="width:100%;margin-bottom:12px;" min="1" placeholder="輸入要報廢的支數">
         <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;letter-spacing:0.04em;text-transform:uppercase;">備註（選填）</label>
@@ -228,8 +209,7 @@
 
 <!-- 側邊欄 -->
 <div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
-
-<nav class="side-nav">
+<nav class="side-nav" id="sideNav">
     <div class="nav-brand">
         <div class="nav-brand-icon">🌸</div>
         <div>
@@ -259,9 +239,8 @@
 
 <!-- 主區域 -->
 <div class="main-area">
-    <!-- Header -->
     <div class="main-header">
-        <button class="hamburger-btn" id="hamburgerBtn" onclick="toggleNav()" aria-label="選單">☰</button>
+        <button class="hamburger-btn" onclick="toggleNav()" aria-label="選單">☰</button>
         <div style="display:flex;align-items:center;gap:12px;">
             <div class="main-header-title">📦 庫存管理</div>
             <span id="productCount" style="background:#F5EFE6;color:#7A6550;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;">—</span>
@@ -274,7 +253,7 @@
     </div>
 
     <!-- 點位 Tabs -->
-    <div class="store-tabs" id="storeTabs">
+    <div class="store-tabs">
         <button class="store-tab active" id="tab_KH" onclick="setStore(this,'KH')">
             高雄 <span class="tab-badge" id="badge_KH" style="display:none;"></span>
         </button>
@@ -289,10 +268,7 @@
         </button>
     </div>
 
-    <!-- 主內容 -->
     <div class="main-content">
-
-        <!-- 低庫存警示 -->
         <div class="alert-banner" id="alertBanner">
             <div class="alert-banner-header" onclick="toggleAlertBanner()">
                 <div class="alert-banner-title" id="alertBannerTitle">⚠️ 低庫存警示（庫存 ≤ 3）</div>
@@ -301,7 +277,6 @@
             <div class="alert-chips" id="alertChips"></div>
         </div>
 
-        <!-- 篩選列 -->
         <div class="filter-bar">
             <div class="filter-chips" id="catChips">
                 <button class="chip active" onclick="setCat(this,'全部')">全部</button>
@@ -318,17 +293,14 @@
             </div>
         </div>
 
-        <!-- [v2.13] 參考庫存說明 -->
         <div style="display:flex;align-items:center;gap:8px;background:rgba(168,146,120,0.10);border:1px solid rgba(168,146,120,0.25);border-radius:10px;padding:9px 14px;margin-bottom:14px;">
             <span style="font-size:15px;">📋</span>
             <span style="font-size:12px;color:#7A6550;line-height:1.5;">此頁顯示的為<strong>參考庫存</strong>，以進貨分配枝數自動累計，未扣除實際出售損耗。如需校正，請使用「調整庫存」功能手動盤點更新。</span>
         </div>
 
-        <!-- 庫存表格 -->
         <div id="inventoryContainer">
             <div class="empty-state"><div class="spinner"></div></div>
         </div>
-
     </div>
 </div>
 
@@ -336,7 +308,7 @@
 let API_URL      = localStorage.getItem('moment_flor_api') || '';
 let allProducts  = [];
 let currentCat   = '全部';
-let currentStore = localStorage.getItem('inv_store') || 'KH'; // 記住上次選的點位
+let currentStore = localStorage.getItem('inv_store') || 'KH';
 let adjTarget    = null;
 
 // ── API Modal ──
@@ -345,7 +317,9 @@ function openApiModal() {
     document.getElementById('apiModal').classList.add('show');
 }
 function closeApiModal() { document.getElementById('apiModal').classList.remove('show'); }
-document.getElementById('apiModal').addEventListener('click', e => { if (e.target === document.getElementById('apiModal')) closeApiModal(); });
+document.getElementById('apiModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('apiModal')) closeApiModal();
+});
 function saveApi() {
     const v = document.getElementById('apiInput').value.trim();
     if (!v) return;
@@ -386,7 +360,9 @@ async function loadProducts() {
     try {
         const res  = await fetch(`${API_URL}?action=getProducts`);
         const data = await res.json();
-        allProducts = Array.isArray(data) ? data : (data.products || data.data || []);
+        const raw  = Array.isArray(data) ? data : (data.products || data.data || []);
+        // 只顯示 active 商品（排除 inactive / hidden 不在架的商品）
+        allProducts = raw.filter(p => !p.status || p.status === 'active');
         setGas('ok');
         renderTable();
         renderAlerts();
@@ -403,12 +379,10 @@ async function loadProducts() {
 
 // ── 低庫存警示 ──
 let _alertCollapsed = false;
-
 function renderAlerts() {
     const LOW = 3;
     const alerts = [];
     const badgeCount = { KH: 0, TN: 0, ES: 0, MK: 0 };
-
     allProducts.forEach(p => {
         const name = p.name || '未命名';
         const kh = Number(p.stockKH || 0);
@@ -420,15 +394,12 @@ function renderAlerts() {
         if (es <= LOW) { alerts.push(`${name}（誠品 ${es}）`); badgeCount.ES++; }
         if (mk <= LOW) { alerts.push(`${name}（市集 ${mk}）`); badgeCount.MK++; }
     });
-
-    // 更新 Tab badge
     ['KH','TN','ES','MK'].forEach(s => {
         const badge = document.getElementById(`badge_${s}`);
         if (!badge) return;
         if (badgeCount[s] > 0) { badge.textContent = badgeCount[s]; badge.style.display = ''; }
-        else { badge.style.display = 'none'; }
+        else badge.style.display = 'none';
     });
-
     const banner = document.getElementById('alertBanner');
     const chips  = document.getElementById('alertChips');
     const title  = document.getElementById('alertBannerTitle');
@@ -443,17 +414,13 @@ function renderAlerts() {
         banner.style.display = 'none';
     }
 }
-
 function toggleAlertBanner() {
     _alertCollapsed = !_alertCollapsed;
     const chips = document.getElementById('alertChips');
     const btn   = document.getElementById('alertToggleBtn');
-    const title = document.getElementById('alertBannerTitle');
     if (_alertCollapsed) {
         chips.classList.add('collapsed');
-        // count items from current chips
-        const count = chips.querySelectorAll('.alert-chip').length;
-        btn.textContent = `展開（${count}）▼`;
+        btn.textContent = `展開（${chips.querySelectorAll('.alert-chip').length}）▼`;
     } else {
         chips.classList.remove('collapsed');
         btn.textContent = '收合 ▲';
@@ -469,7 +436,9 @@ function setStore(btn, store) {
     renderTable();
 }
 
-// ── 渲染表格（單點位模式）──
+// ── 渲染表格 ──
+// [FIX] 報廢按鈕和 +/- 按鈕改用 data-pid 傳 ID，不再把整個 JSON 或商品名稱塞進 onclick 屬性
+// 避免商品名稱含特殊字元（單引號、雙引號等）導致 HTML 屬性截斷、按鈕失效
 function renderTable() {
     const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
     let list = allProducts;
@@ -490,17 +459,15 @@ function renderTable() {
         return;
     }
 
-    const storeKey = currentStore === 'KH' ? 'stockKH' : currentStore === 'TN' ? 'stockTN' : currentStore === 'MK' ? 'stockMarket' : 'stockES';
+    const storeKey   = currentStore === 'KH' ? 'stockKH' : currentStore === 'TN' ? 'stockTN' : currentStore === 'MK' ? 'stockMarket' : 'stockES';
     const storeLabel = currentStore === 'KH' ? '高雄 庫存' : currentStore === 'TN' ? '台南 庫存' : currentStore === 'MK' ? '市集 庫存' : '誠品 庫存';
 
     const rows = list.map(p => {
-        const id    = p.id || p.productId || '';
+        const id    = String(p.id || p.productId || '');
         const name  = escHtml(p.name || '未命名');
         const cat   = escHtml(p.category || '');
         const stock = Number(p[storeKey] || 0);
-        const sid   = escHtml(id);
-        const pJson = escHtml(JSON.stringify(p));
-
+        // [FIX] 只用 data-pid 傳 ID，商品名稱不進 onclick
         return `<tr>
             <td>
                 <div class="prod-name">${name}</div>
@@ -508,17 +475,30 @@ function renderTable() {
             </td>
             <td class="stock-cell">
                 <div class="stock-control">
-                    <button class="stock-btn minus" onclick="quickAdj('${sid}','${currentStore}',-1,'${name}')" title="減 1">−</button>
+                    <button class="stock-btn minus"
+                        data-pid="${escHtml(id)}"
+                        data-store="${currentStore}"
+                        onclick="quickAdj(this.dataset.pid, this.dataset.store, -1)"
+                        title="減 1">−</button>
                     <input class="stock-input ${stock <= 3 ? 'low' : ''}" type="number"
-                        id="${currentStore.toLowerCase()}_${sid}"
+                        id="si_${currentStore}_${escHtml(id)}"
                         value="${stock}" min="0"
-                        data-base="${stock}" data-id="${sid}" data-store="${currentStore}" data-name="${name}"
-                        onchange="directSetStock(this)" onkeydown="if(event.key==='Enter')this.blur()">
-                    <button class="stock-btn plus" onclick="quickAdj('${sid}','${currentStore}',+1,'${name}')" title="加 1">＋</button>
+                        data-base="${stock}"
+                        data-id="${escHtml(id)}"
+                        data-store="${currentStore}"
+                        onchange="directSetStock(this)"
+                        onkeydown="if(event.key==='Enter')this.blur()">
+                    <button class="stock-btn plus"
+                        data-pid="${escHtml(id)}"
+                        data-store="${currentStore}"
+                        onclick="quickAdj(this.dataset.pid, this.dataset.store, +1)"
+                        title="加 1">＋</button>
                 </div>
             </td>
             <td style="text-align:right;">
-                <button onclick='openWasteModal(${pJson})' class="btn-waste">🗑 報廢</button>
+                <button class="btn-waste"
+                    data-pid="${escHtml(id)}"
+                    onclick="openWasteModalById(this.dataset.pid)">🗑 報廢</button>
             </td>
         </tr>`;
     }).join('');
@@ -538,13 +518,16 @@ function renderTable() {
         </div>`;
 }
 
-// ── 快速 +1 / -1 ──
-async function quickAdj(id, store, delta, name) {
+// ── 快速 +1 / -1（改為只接收 id + store + delta，名稱從 allProducts 查）──
+async function quickAdj(id, store, delta) {
     if (!API_URL) { showToast('請先設定 API 網址'); return; }
-    const el = document.getElementById(`${store.toLowerCase()}_${id}`);
-    const currentVal = el ? parseInt(el.dataset.base) || 0 : 0;
+    const p = allProducts.find(p => String(p.id || p.productId) === String(id));
+    const name = p ? (p.name || id) : id;
+    const storeKey = store === 'KH' ? 'stockKH' : store === 'TN' ? 'stockTN' : store === 'MK' ? 'stockMarket' : 'stockES';
+    const currentVal = p ? Number(p[storeKey] || 0) : 0;
     if (delta < 0 && currentVal <= 0) { showToast('庫存已為 0，無法再減'); return; }
 
+    const el = document.getElementById(`si_${store}_${id}`);
     if (el) el.disabled = true;
     setGas('loading');
     try {
@@ -552,11 +535,9 @@ async function quickAdj(id, store, delta, name) {
         const result = await res.json();
         if (result.success) {
             setGas('ok');
-            const p = allProducts.find(p => (p.id || p.productId) == id);
             if (p) {
-                const key = store === 'KH' ? 'stockKH' : store === 'TN' ? 'stockTN' : store === 'MK' ? 'stockMarket' : 'stockES';
                 const newVal = Math.max(0, currentVal + delta);
-                p[key] = newVal;
+                p[storeKey] = newVal;
                 if (el) {
                     el.value = newVal;
                     el.dataset.base = newVal;
@@ -577,26 +558,27 @@ async function quickAdj(id, store, delta, name) {
 
 // ── 直接輸入修改庫存 ──
 async function directSetStock(el) {
-    const id    = el.dataset.id;
-    const store = el.dataset.store;
-    const name  = el.dataset.name;
+    const id     = el.dataset.id;
+    const store  = el.dataset.store;
     const oldVal = parseInt(el.dataset.base) || 0;
-    const nv    = parseInt(el.value);
+    const nv     = parseInt(el.value);
     if (isNaN(nv) || nv < 0) { el.value = oldVal; showToast('請輸入有效數字'); return; }
     if (nv === oldVal) return;
     const delta = nv - oldVal;
     if (!API_URL) { el.value = oldVal; showToast('請先設定 API 網址'); return; }
 
+    const p    = allProducts.find(p => String(p.id || p.productId) === String(id));
+    const name = p ? (p.name || id) : id;
+
     el.disabled = true;
     setGas('loading');
     try {
-        const res    = await fetch(API_URL, { method:'POST', body: JSON.stringify({ action:'adjustStock', data:{ id, store, delta, note:'手動輸入修正' } }) });
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adjustStock', data: { id, store, delta, note: '手動輸入修正' } }) });
         const result = await res.json();
         if (result.success) {
             setGas('ok');
             el.dataset.base = nv;
             el.className = 'stock-input' + (nv <= 3 ? ' low' : '');
-            const p = allProducts.find(p => (p.id || p.productId) == id);
             if (p) {
                 const key = store==='KH'?'stockKH':store==='TN'?'stockTN':store==='MK'?'stockMarket':'stockES';
                 p[key] = nv;
@@ -619,44 +601,24 @@ async function directSetStock(el) {
 // ── 手動調整 Modal ──
 function openAdjModal(p) {
     adjTarget = p;
-    const name = p.name || p.productName || p.商品名稱 || '未命名';
-    document.getElementById('adjTitle').innerText = '手動調整庫存';
+    const name = p.name || '未命名';
     document.getElementById('adjSub').innerText = name;
     document.getElementById('adjDelta').value = '';
-    document.getElementById('adjNote').value = '';
-
-    // 動態選點位
-    document.getElementById('adjModal').innerHTML = `
-        <div class="adj-box">
-            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-                <h3 style="font-weight:700;font-size:15px;color:#3D2E1E;">手動調整庫存</h3>
-                <button onclick="closeAdjModal()" style="background:none;border:none;font-size:18px;cursor:pointer;color:#A89278;">✕</button>
-            </div>
-            <p style="font-size:13px;font-weight:600;color:#6d7756;margin-bottom:16px;">${escHtml(name)}</p>
-            <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">點位</label>
-            <select id="adjStore" class="f-input" style="width:100%;margin-bottom:12px;">
-                <option value="KH">高雄 (KH)</option>
-                <option value="TN">台南 (TN)</option>
-                <option value="ES">誠品 (ES)</option>
-                <option value="MK">市集 (MK)</option>
-            </select>
-            <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">調整數量（正數加庫存，負數減庫存）</label>
-            <input type="number" id="adjDelta" class="f-input" style="width:100%;margin-bottom:12px;" placeholder="例：10 或 -5">
-            <label style="font-size:11px;font-weight:600;color:#A89278;display:block;margin-bottom:6px;">備註（選填）</label>
-            <input type="text" id="adjNote" class="f-input" style="width:100%;margin-bottom:18px;" placeholder="例：補貨、盤點修正">
-            <div style="display:flex;gap:10px;">
-                <button onclick="closeAdjModal()" class="btn-secondary" style="flex:1;">取消</button>
-                <button onclick="submitAdj()" class="btn-primary" style="flex:2;" id="adjBtn">確認調整</button>
-            </div>
-        </div>`;
+    document.getElementById('adjNote').value  = '';
+    document.getElementById('adjBtn').disabled  = false;
+    document.getElementById('adjBtn').innerText = '確認調整';
     document.getElementById('adjModal').classList.add('show');
 }
-function closeAdjModal() { document.getElementById('adjModal').classList.remove('show'); adjTarget = null; }
-document.getElementById('adjModal').addEventListener('click', e => { if (e.target === document.getElementById('adjModal')) closeAdjModal(); });
-
+function closeAdjModal() {
+    document.getElementById('adjModal').classList.remove('show');
+    adjTarget = null;
+}
+document.getElementById('adjModal').addEventListener('click', e => {
+    if (e.target === document.getElementById('adjModal')) closeAdjModal();
+});
 async function submitAdj() {
     if (!adjTarget) return;
-    const store = document.getElementById('adjStore') ? document.getElementById('adjStore').value : 'KH';
+    const store = document.getElementById('adjStore').value;
     const delta = parseInt(document.getElementById('adjDelta').value);
     const note  = document.getElementById('adjNote').value.trim();
     if (isNaN(delta) || delta === 0) { showToast('請輸入非零的調整數量'); return; }
@@ -665,8 +627,7 @@ async function submitAdj() {
     const btn = document.getElementById('adjBtn');
     btn.disabled = true; btn.innerText = '調整中...';
     setGas('loading');
-
-    const id = adjTarget.id || adjTarget.productId || adjTarget.商品ID;
+    const id = adjTarget.id || adjTarget.productId;
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'adjustStock', data: { id, store, delta, note } }) });
         const result = await res.json();
@@ -688,35 +649,44 @@ async function submitAdj() {
 }
 
 // ── 報廢 Modal ──
+// [FIX] 改為 openWasteModalById：從 allProducts 用 id 查商品物件，
+// 不再把整個 JSON 字串傳進 onclick 屬性，根除特殊字元導致的崩潰
 let wasteTarget = null;
 let wasteStore  = 'KH';
+
+function openWasteModalById(id) {
+    const p = allProducts.find(p => String(p.id || p.productId) === String(id));
+    if (!p) { showToast('找不到商品資料'); return; }
+    openWasteModal(p);
+}
 
 function openWasteModal(p) {
     wasteTarget = p;
     wasteStore  = 'KH';
-    const name = p.name || p.productName || '未命名';
-    const kh   = Number(p.stockKH || 0);
-    const tn   = Number(p.stockTN || 0);
-    const es   = Number(p.stockES || 0);
+    const name = p.name || '未命名';
+    const kh   = Number(p.stockKH     || 0);
+    const tn   = Number(p.stockTN     || 0);
+    const es   = Number(p.stockES     || 0);
     const mk   = Number(p.stockMarket || 0);
 
     document.getElementById('wasteProductName').innerText = name;
-    document.getElementById('wasteQty').value  = '';
-    document.getElementById('wasteNote').value = '';
-    document.getElementById('wasteBtn').disabled = false;
+    document.getElementById('wasteQty').value   = '';
+    document.getElementById('wasteNote').value  = '';
+    document.getElementById('wasteBtn').disabled  = false;
     document.getElementById('wasteBtn').innerText = '確認報廢';
 
-    // 四個點位選擇按鈕
     const stores = [
         { code:'KH', label:'高雄', stock: kh },
         { code:'TN', label:'台南', stock: tn },
         { code:'ES', label:'誠品', stock: es },
         { code:'MK', label:'市集', stock: mk },
     ];
+    // [FIX] 按鈕也用 data-code 傳代碼，不再把 stock 數字拼進字串
     document.getElementById('wasteStoreGrid').innerHTML = stores.map(s => `
         <button class="waste-store-btn ${s.code === 'KH' ? 'active' : ''}"
             id="wasteSBtn_${s.code}"
-            onclick="selectWasteStore('${s.code}',${s.stock})">
+            data-code="${s.code}"
+            onclick="selectWasteStore(this.dataset.code)">
             <span class="store-stock" id="wasteStk_${s.code}">${s.stock}</span>
             ${s.label}
         </button>`).join('');
@@ -725,12 +695,12 @@ function openWasteModal(p) {
     setTimeout(() => document.getElementById('wasteQty').focus(), 150);
 }
 
-function selectWasteStore(code, stock) {
+function selectWasteStore(code) {
     wasteStore = code;
     document.querySelectorAll('.waste-store-btn').forEach(b => b.classList.remove('active'));
-    document.getElementById('wasteSBtn_' + code).classList.add('active');
+    const btn = document.getElementById('wasteSBtn_' + code);
+    if (btn) btn.classList.add('active');
 }
-
 function closeWasteModal() {
     document.getElementById('wasteModal').classList.remove('show');
     wasteTarget = null;
@@ -747,10 +717,10 @@ async function submitWaste() {
     if (!API_URL) { showToast('請先設定 API 網址'); return; }
 
     const storeLabel = wasteStore === 'KH' ? '高雄FOCUS 13' : wasteStore === 'TN' ? '台南FOCUS' : wasteStore === 'MK' ? '市集' : '誠品生活台南';
-    const id   = wasteTarget.id || wasteTarget.productId;
-    const name = wasteTarget.name || wasteTarget.productName || '';
-    const stockKey = wasteStore === 'KH' ? 'stockKH' : wasteStore === 'TN' ? 'stockTN' : wasteStore === 'MK' ? 'stockMarket' : 'stockES';
-    const curStock = Number(wasteTarget[stockKey] || 0);
+    const id         = wasteTarget.id || wasteTarget.productId;
+    const name       = wasteTarget.name || '';
+    const stockKey   = wasteStore === 'KH' ? 'stockKH' : wasteStore === 'TN' ? 'stockTN' : wasteStore === 'MK' ? 'stockMarket' : 'stockES';
+    const curStock   = Number(wasteTarget[stockKey] || 0);
 
     if (qty > curStock) {
         showToast(`報廢數量（${qty}）超過 ${storeLabel} 現有庫存（${curStock}）`);
@@ -759,7 +729,6 @@ async function submitWaste() {
 
     const btn = document.getElementById('wasteBtn');
     btn.disabled = true; btn.innerText = '記錄中...';
-
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
             action: 'reportWaste',
@@ -768,17 +737,15 @@ async function submitWaste() {
         const result = await res.json();
         if (result.success) {
             showToast(`✅ ${name} ×${qty} 已記錄報廢（${storeLabel}）`);
-            // 樂觀更新庫存顯示
             const p = allProducts.find(p => (p.id || p.productId) == id);
             if (p) {
                 p[stockKey] = Math.max(0, curStock - qty);
-                const el = document.getElementById(`${wasteStore.toLowerCase()}_${id}`);
+                const el = document.getElementById(`si_${wasteStore}_${id}`);
                 if (el) {
-                    el.value           = p[stockKey];
-                    el.dataset.base    = p[stockKey];
-                    el.className       = 'stock-input' + (p[stockKey] <= 3 ? ' low' : '');
+                    el.value        = p[stockKey];
+                    el.dataset.base = p[stockKey];
+                    el.className    = 'stock-input' + (p[stockKey] <= 3 ? ' low' : '');
                 }
-                // 更新 modal 裡的庫存數字
                 const stkEl = document.getElementById('wasteStk_' + wasteStore);
                 if (stkEl) stkEl.innerText = p[stockKey];
                 wasteTarget[stockKey] = p[stockKey];
@@ -811,13 +778,12 @@ function showToast(msg, dur=2500) {
 
 // ── 初始化 ──
 window.onload = function() {
+    document.addEventListener('wheel', function() {
+        if (document.activeElement && document.activeElement.type === 'number') {
+            document.activeElement.blur();
+        }
+    }, { passive: true });
 
-// 鎖定數字輸入框：防止滑鼠滾輪意外改值
-document.addEventListener("wheel", function() {
-    if (document.activeElement && document.activeElement.type === "number") {
-        document.activeElement.blur();
-    }
-}, { passive: true });
     // 還原上次選的點位 Tab
     document.querySelectorAll('.store-tab').forEach(b => b.classList.remove('active'));
     const savedTab = document.getElementById(`tab_${currentStore}`);
@@ -827,23 +793,21 @@ document.addEventListener("wheel", function() {
     loadProducts();
 };
 
-// ══ 側邊抽屜 ══
+// ── 側邊抽屜 ──
 function toggleNav() {
-    const nav = document.querySelector('.side-nav');
-    if (nav.classList.contains('nav-open')) closeNav();
-    else openNav();
+    const nav = document.getElementById('sideNav');
+    nav.classList.contains('nav-open') ? closeNav() : openNav();
 }
 function openNav() {
-    document.querySelector('.side-nav').classList.add('nav-open');
+    document.getElementById('sideNav').classList.add('nav-open');
     document.getElementById('navOverlay').classList.add('show');
 }
 function closeNav() {
-    document.querySelector('.side-nav').classList.remove('nav-open');
+    document.getElementById('sideNav').classList.remove('nav-open');
     document.getElementById('navOverlay').classList.remove('show');
 }
 </script>
 
-<!-- 手機底部導航 -->
 <nav class="mobile-bottom-nav">
     <a href="index.html" class="mbn-item"><span class="mbn-icon">🛒</span><span>收銀台</span></a>
     <a href="sales.html" class="mbn-item"><span class="mbn-icon">🔍</span><span>銷售</span></a>
