@@ -804,7 +804,7 @@ function renderItemList() {
                 <input type="number" min="0" inputmode="numeric" placeholder="自動計算" class="f-input-sm sale-price-input"
                     id="salePrice-${idx}"
                     value="${item.salePrice || ''}"
-                    oninput="this.dataset.manualEdit='1';onFieldChange(${idx},'salePrice',this.value)">
+                    oninput="procItems[${idx}]._salePriceManual=true;onFieldChange(${idx},'salePrice',this.value)"
             </div>
         </div>
 
