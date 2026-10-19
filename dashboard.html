@@ -220,6 +220,9 @@
 </script>
 <div id="toast"></div>
 
+<!-- [v2.14] 手機抽屜遮罩（原本缺少，點外側可關閉選單） -->
+<div class="nav-overlay" id="navOverlay" onclick="closeNav()"></div>
+
 <!-- API Modal -->
 <div class="api-modal" id="apiModal">
     <div class="api-modal-box">
@@ -490,6 +493,16 @@ let API_URL = localStorage.getItem('moment_flor_api') || 'https://script.google.
 let currentFilter = '全部';
 let _rangeFrom = '', _rangeTo = '';
 
+// ══ [v2.14] HTML 跳脫（原本沒定義，報廢排行會整段失敗） ══
+function escHtml(s) {
+    return String(s == null ? '' : s)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+}
+
 // ══ API Modal ══
 function openApiModal() {
     document.getElementById('apiInput').value = API_URL;
@@ -564,70 +577,6 @@ function chip(now, prev) {
     return `<span class="compare-chip ${cls}">${sign}${pct}%</span>`;
 }
 
-// ══ 摘要卡片 ══
-async function loadSummary() {
-    if (!API_URL) return;
-    const today = getToday();
-    const ym    = today.slice(0, 7);
-    try {
-        const [todayRes, monthRes] = await Promise.all([
-            fetch(`${API_URL}?action=getDailyReport&date=${today}`),
-            fetch(`${API_URL}?action=getMonthlyReport&ym=${ym}`)
-        ]);
-        const td = await todayRes.json();
-        const mo = await monthRes.json();
-
-        // ── 今日卡片 ──
-        const rev    = td.revenue   || 0;
-        const profit = td.profit    || 0;
-        const margin = td.margin    || 0;
-        const count  = td.customers || 0;
-        const avg    = td.avg       || 0;
-
-        document.getElementById('statTodaySales').innerText  = 'NT$ ' + rev.toLocaleString();
-        document.getElementById('statTodaySalesSub').innerText = today + ' · 業績';
-        document.getElementById('statTodayProfit').innerText = 'NT$ ' + profit.toLocaleString();
-        document.getElementById('statTodayMargin').innerText = `毛利率 ${margin}%`;
-        document.getElementById('statTodayCount').innerText  = count + ' 筆';
-        document.getElementById('statAvgOrder').innerText    = `均單 NT$ ${avg.toLocaleString()}`;
-
-        // ── 本月卡片 ──
-        const mRev    = mo.revenue || 0;
-        const mProfit = mo.profit  || 0;
-        document.getElementById('statMonthSales').innerText  = 'NT$ ' + mRev.toLocaleString();
-        document.getElementById('statMonthProfit').innerText = `本月毛利 NT$ ${mProfit.toLocaleString()}`;
-
-        // ── 同期比較 ──
-        const lw = td.lastWeek  || {};
-        const lm = td.lastMonth || {};
-        const ly = td.lastYear  || {};
-
-        const nt = v => 'NT$ ' + (v||0).toLocaleString();
-
-        // 上週
-        document.getElementById('lwRevenue').innerText     = nt(lw.revenue);
-        document.getElementById('lwRevenueChip').innerHTML = chip(rev, lw.revenue||0);
-        document.getElementById('lwProfit').innerText      = nt(lw.profit);
-        document.getElementById('lwProfitChip').innerHTML  = chip(profit, lw.profit||0);
-
-        // 上月
-        document.getElementById('lmRevenue').innerText     = nt(lm.revenue);
-        document.getElementById('lmRevenueChip').innerHTML = chip(rev, lm.revenue||0);
-        document.getElementById('lmProfit').innerText      = nt(lm.profit);
-        document.getElementById('lmProfitChip').innerHTML  = chip(profit, lm.profit||0);
-
-        // 去年
-        document.getElementById('lyRevenue').innerText     = nt(ly.revenue);
-        document.getElementById('lyRevenueChip').innerHTML = chip(rev, ly.revenue||0);
-        document.getElementById('lyProfit').innerText      = nt(ly.profit);
-        document.getElementById('lyProfitChip').innerHTML  = chip(profit, ly.profit||0);
-
-    } catch(e) {
-        ['statTodaySales','statTodayProfit','statTodayCount','statMonthSales'].forEach(id =>
-            document.getElementById(id).innerText = '—');
-    }
-}
-
 // ══ 日期區間工具 ══
 function taipeiStr(d) {
     return new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(d);
@@ -672,7 +621,7 @@ async function queryRange() {
     setGas(anyFailed ? 'error' : 'ok');
 }
 
-// ══ 查詢日報（摘要卡片用）[v2.8 修復：原為空殼，現在真的呼叫 API] ══
+// ══ 查詢日報（摘要卡片 + 同期比較） ══
 async function queryReport() {
     if (!API_URL) return;
     const date = document.getElementById('queryDate').value;
@@ -744,6 +693,7 @@ async function queryReport() {
 
         setGas('ok');
     } catch(e) {
+        console.error('queryReport error:', e);
         setGas('error');
     }
 }
@@ -761,17 +711,18 @@ async function loadStoreGrid(from, to) {
             grid.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無業績資料</p>';
             return;
         }
-        const maxRev = Math.max(...data.map(s => s.revenue), 1);
+        const maxRev = Math.max(...data.map(s => s.revenue || 0), 1);
         grid.innerHTML = data.map(s => {
-            const pct = Math.round(s.revenue / maxRev * 100);
+            const pct = Math.round((s.revenue || 0) / maxRev * 100);
             return `<div class="store-perf-card">
-                <div class="store-perf-name">${s.store}</div>
+                <div class="store-perf-name">${escHtml(s.store)}</div>
                 <div class="store-perf-sales">NT$ ${(s.revenue||0).toLocaleString()}</div>
-                <div class="store-perf-count">${s.count} 筆 · 毛利 ${s.margin}%</div>
+                <div class="store-perf-count">${s.count || 0} 筆 · 毛利 ${s.margin || 0}%</div>
                 <div class="store-perf-bar"><div class="store-perf-bar-fill" style="width:${pct}%"></div></div>
             </div>`;
         }).join('');
     } catch(e) {
+        console.error('loadStoreGrid error:', e);
         grid.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
@@ -800,7 +751,7 @@ async function loadWaste(from, to) {
             const cost = v.cost || 0;
             const pct  = Math.round(cost / maxCost * 100);
             return `<div class="waste-card ${pct >= 70 ? 'highlight' : ''}">
-                <div class="waste-card-name">${store}</div>
+                <div class="waste-card-name">${escHtml(store)}</div>
                 <div class="waste-card-cost">NT$ ${cost.toLocaleString()}</div>
                 <div class="waste-card-sub">${v.count || 0} 件報廢</div>
                 <div class="waste-card-bar"><div class="waste-card-bar-fill" style="width:${pct}%;"></div></div>
@@ -813,15 +764,18 @@ async function loadWaste(from, to) {
             if (!byProduct.length) {
                 rankCont.innerHTML = '<p style="color:#A89278;font-size:13px;">此區間無報廢記錄</p>';
             } else {
-                const maxQty = Math.max(...byProduct.map(p => p.qty), 1);
+                const maxQty = Math.max(...byProduct.map(p => p.qty || 0), 1);
                 const rows = byProduct.slice(0, 20).map((p, i) => {
-                    const pct = Math.round(p.qty / maxQty * 100);
+                    const pct = Math.round((p.qty || 0) / maxQty * 100);
                     const rankColor = i === 0 ? '#C4928A' : i === 1 ? '#C4A87A' : '#A89278';
                     return `<tr>
                         <td style="text-align:center;"><span class="waste-rank-no" style="color:${rankColor};">${i + 1}</span></td>
-                        <td><div style="font-weight:700;color:#3D2E1E;">${escHtml(p.name)}</div></td>
-                        <td style="text-align:right;font-weight:800;color:#C4928A;">${p.qty} 枝</td>
-                        <td style="text-align:right;font-size:12px;color:#A89278;">NT$ ${Math.round(p.cost).toLocaleString()}</td>
+                        <td>
+                            <div style="font-weight:700;color:#3D2E1E;">${escHtml(p.name)}</div>
+                            <div class="waste-rank-bar"><div class="waste-rank-bar-fill" style="width:${pct}%;"></div></div>
+                        </td>
+                        <td style="text-align:right;font-weight:800;color:#C4928A;">${p.qty || 0} 枝</td>
+                        <td style="text-align:right;font-size:12px;color:#A89278;">NT$ ${Math.round(p.cost || 0).toLocaleString()}</td>
                     </tr>`;
                 }).join('');
                 rankCont.innerHTML = `
@@ -839,9 +793,8 @@ async function loadWaste(from, to) {
             }
         }
     } catch(e) {
-        } catch(e) {
-    console.error('loadWaste error:', e);
-    wasteGrid.innerHTML = `<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗：${e.message}</p>`;
+        console.error('loadWaste error:', e);
+        wasteGrid.innerHTML = `<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗：${escHtml(e.message)}</p>`;
         if (rankCont) rankCont.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
@@ -880,8 +833,8 @@ async function loadRanking() {
             const wTag      = wasteRate < 10 ? 'low' : (wasteRate < 30 ? 'mid' : 'high');
             return `<tr>
                 <td class="rank-no ${isTop?'top':''}">${isTop ? ['🥇','🥈','🥉'][i] : rank}</td>
-                <td style="font-weight:600;color:#3D2E1E;">${it.name || '—'}</td>
-                <td><button onclick="openStoreSplit(${JSON.stringify(it.name||'')})" style="background:none;border:none;cursor:pointer;color:#6d7756;font-weight:700;font-size:13px;padding:2px 4px;border-radius:6px;text-decoration:underline dotted;" title="點選查看各點位銷售明細">${it.qty || 0}</button></td>
+                <td style="font-weight:600;color:#3D2E1E;">${escHtml(it.name || '—')}</td>
+                <td><button data-name="${escHtml(it.name || '')}" onclick="openStoreSplit(this.dataset.name)" style="background:none;border:none;cursor:pointer;color:#6d7756;font-weight:700;font-size:13px;padding:2px 4px;border-radius:6px;text-decoration:underline dotted;" title="點選查看各點位銷售明細">${it.qty || 0}</button></td>
                 <td style="font-weight:700;color:#6d7756;">NT$ ${(it.revenue||0).toLocaleString()}</td>
                 <td>${it.margin || 0}%</td>
                 <td class="rank-bar-cell"><div style="display:flex;align-items:center;gap:5px;"><div class="rank-bar" style="flex:1"><div class="rank-bar-fill" style="width:${pct}%"></div></div><span style="font-size:11px;color:#6d7756;font-weight:700;min-width:30px;text-align:right;">${pct}%</span></div></td>
@@ -890,6 +843,7 @@ async function loadRanking() {
             </tr>`;
         }).join('');
     } catch(e) {
+        console.error('loadRanking error:', e);
         tbody.innerHTML = '<tr><td colspan="8" class="empty-table" style="color:#C4928A;">載入失敗</td></tr>';
     }
 }
@@ -934,7 +888,7 @@ async function loadPayBreakdown() {
             const pct = Math.round(amt / maxAmt * 100);
             const sharePct = total > 0 ? Math.round(amt / total * 100) : 0;
             return `<div class="store-perf-card">
-                <div class="store-perf-name">${pay}</div>
+                <div class="store-perf-name">${escHtml(pay)}</div>
                 <div class="store-perf-sales">NT$ ${amt.toLocaleString()}</div>
                 <div class="store-perf-count">佔比 ${sharePct}%</div>
                 <div class="store-perf-bar"><div class="store-perf-bar-fill" style="width:${pct}%"></div></div>
@@ -944,6 +898,7 @@ async function loadPayBreakdown() {
         document.getElementById('payTotal').innerText = 'NT$ ' + total.toLocaleString();
         totalRow.style.display = 'block';
     } catch(e) {
+        console.error('loadPayBreakdown error:', e);
         grid.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
@@ -967,12 +922,12 @@ async function openStoreSplit(name) {
             document.getElementById('splitTableBody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:#A89278;">無資料</td></tr>';
             return;
         }
-        const totalQty = data.reduce((s, r) => s + r.qty, 0);
-        const totalRev = data.reduce((s, r) => s + r.revenue, 0);
+        const totalQty = data.reduce((s, r) => s + (r.qty || 0), 0);
+        const totalRev = data.reduce((s, r) => s + (r.revenue || 0), 0);
         document.getElementById('splitTableBody').innerHTML =
             data.map(r => `<tr style="border-bottom:1px solid #EDE5D8;">
-                <td style="padding:10px 4px;font-weight:600;">${r.store}</td>
-                <td style="text-align:right;padding:10px 4px;font-weight:700;color:#6d7756;">${r.qty}</td>
+                <td style="padding:10px 4px;font-weight:600;">${escHtml(r.store)}</td>
+                <td style="text-align:right;padding:10px 4px;font-weight:700;color:#6d7756;">${r.qty || 0}</td>
                 <td style="text-align:right;padding:10px 4px;">NT$ ${(r.revenue||0).toLocaleString()}</td>
             </tr>`).join('') +
             `<tr style="border-top:2px solid #DDD0BC;background:#F5EFE6;">
@@ -981,6 +936,7 @@ async function openStoreSplit(name) {
                 <td style="text-align:right;padding:10px 4px;font-weight:700;">NT$ ${totalRev.toLocaleString()}</td>
             </tr>`;
     } catch(e) {
+        console.error('openStoreSplit error:', e);
         document.getElementById('splitTableBody').innerHTML = '<tr><td colspan="3" style="text-align:center;padding:16px;color:#C4928A;">載入失敗</td></tr>';
     }
 }
@@ -996,8 +952,12 @@ function showToast(msg, dur=2500) {
 }
 
 // ══ 初始化 ══
+// [v2.14] 重新整理改呼叫 queryReport，維持目前選的日期（原本會跳回今天、但標題還是舊日期）
 async function refreshAll() {
-    loadSummary();
+    if (!document.getElementById('queryDate').value) {
+        document.getElementById('queryDate').value = getToday();
+    }
+    queryReport();
     if (_rangeFrom && _rangeTo) queryRange();
 }
 
@@ -1037,11 +997,13 @@ function toggleNav() {
 }
 function openNav() {
     document.querySelector('.side-nav').classList.add('nav-open');
-    document.getElementById('navOverlay').classList.add('show');
+    const ov = document.getElementById('navOverlay');
+    if (ov) ov.classList.add('show');
 }
 function closeNav() {
     document.querySelector('.side-nav').classList.remove('nav-open');
-    document.getElementById('navOverlay').classList.remove('show');
+    const ov = document.getElementById('navOverlay');
+    if (ov) ov.classList.remove('show');
 }
 </script>
 
