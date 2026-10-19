@@ -662,12 +662,11 @@ async function queryRange() {
     _rangeTo   = to;
     setGas('loading');
     try {
-        await Promise.all([
-            loadStoreGrid(from, to),
-            loadWaste(from, to),
-            loadRanking(),
-        ]);
-        setGas('ok');
+        // 各自獨立執行，任一失敗不影響其他
+loadStoreGrid(from, to).catch(e => console.warn('storeGrid failed', e));
+loadWaste(from, to).catch(e => console.warn('waste failed', e));
+loadRanking().catch(e => console.warn('ranking failed', e));
+setGas('ok');
     } catch(e) {
         setGas('error');
     }
