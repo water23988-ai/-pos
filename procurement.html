@@ -521,7 +521,7 @@ function emptyAlloc() {
 }
 
 function addItemRow() {
-    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0, code:'', productId:'', currentPrice:0, allocation: emptyAlloc() });
+    procItems.push({ flowerName:'', category:'主花', stemsPerBunch:10, bunchesQty:0, pricePerBunch:0, salePrice:0,_salePriceManual:false, code:'', productId:'', currentPrice:0, allocation: emptyAlloc() });
     document.getElementById('emptyHint').style.display = 'none';
     renderItemList();
     // 自動捲到新品項並 focus
