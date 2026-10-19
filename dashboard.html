@@ -839,7 +839,9 @@ async function loadWaste(from, to) {
             }
         }
     } catch(e) {
-        wasteGrid.innerHTML = '<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗</p>';
+        } catch(e) {
+    console.error('loadWaste error:', e);
+    wasteGrid.innerHTML = `<p style="color:#C4928A;font-size:13px;grid-column:1/-1;">載入失敗：${e.message}</p>`;
         if (rankCont) rankCont.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗</p>';
     }
 }
