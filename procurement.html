@@ -628,8 +628,9 @@ function _applyCodeProduct(idx, p) {
     if (p.category) procItems[idx].category = p.category;
     // salePrice 若還沒手動輸入，預設帶入現有售價
     if (!procItems[idx].salePrice && procItems[idx].currentPrice > 0) {
-        procItems[idx].salePrice = procItems[idx].currentPrice;
-    }
+    procItems[idx].salePrice = procItems[idx].currentPrice;
+    procItems[idx]._salePriceManual = true;
+}
     renderItemList();
     const codeStr = p.code ? `${p.code} → ` : '';
     showToast(`✅ ${codeStr}${p.name}　現售 NT$${Number(p.price)||0}`);
