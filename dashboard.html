@@ -661,15 +661,15 @@ async function queryRange() {
     _rangeFrom = from;
     _rangeTo   = to;
     setGas('loading');
-    try {
-        // 各自獨立執行，任一失敗不影響其他
-loadStoreGrid(from, to).catch(e => console.warn('storeGrid failed', e));
-loadWaste(from, to).catch(e => console.warn('waste failed', e));
-loadRanking().catch(e => console.warn('ranking failed', e));
-setGas('ok');
-    } catch(e) {
-        setGas('error');
-    }
+
+    const results = await Promise.allSettled([
+        loadStoreGrid(from, to),
+        loadWaste(from, to),
+        loadRanking(),
+    ]);
+
+    const anyFailed = results.some(r => r.status === 'rejected');
+    setGas(anyFailed ? 'error' : 'ok');
 }
 
 // ══ 查詢日報（摘要卡片用）[v2.8 修復：原為空殼，現在真的呼叫 API] ══
