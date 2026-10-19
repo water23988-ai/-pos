@@ -592,7 +592,21 @@ function getDailyReport(store, date) {
 
   const prodMap = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => { prodMap[Number(r.id)] = Number(r.cost)||0; });
-  const wasteRows = sheetToObjects(getSheet(SH.INV_LOG)).filter(r => {
+  // [PERF] 日報只查單日廢棄，讀最近 500 筆已足夠，避免全表掃描超時
+  const invShD   = getSheet(SH.INV_LOG);
+  const lastRowD = invShD.getLastRow();
+  const readRowsD = Math.min(500, lastRowD - 1);
+  let allInvRowsD = [];
+  if (readRowsD > 0) {
+    const hdrsD = invShD.getRange(1, 1, 1, invShD.getLastColumn()).getValues()[0];
+    const rawD  = invShD.getRange(lastRowD - readRowsD + 1, 1, readRowsD, invShD.getLastColumn()).getValues();
+    allInvRowsD = rawD.map(row => {
+      const obj = {};
+      hdrsD.forEach((h, i) => { obj[h] = row[i] instanceof Date ? Utilities.formatDate(row[i], 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss") : row[i]; });
+      return obj;
+    });
+  }
+  const wasteRows = allInvRowsD.filter(r => {
     const d = parseTaipei_(r.time);
     return r.type === 'waste' && !isNaN(d) && d >= from && d <= to;
   });
@@ -733,7 +747,21 @@ function getItemRanking(store, date, fromDate, toDate) {
     });
   const nameToKey = {};
   Object.entries(itemMap).forEach(([k, v]) => { nameToKey[v.name] = k; });
-  sheetToObjects(getSheet(SH.INV_LOG)).filter(r => {
+  // [PERF] 只讀最近 3000 筆，避免全表掃描超時
+  const invShR   = getSheet(SH.INV_LOG);
+  const lastRowR = invShR.getLastRow();
+  const readRowsR = Math.min(3000, lastRowR - 1);
+  let allInvRowsR = [];
+  if (readRowsR > 0) {
+    const hdrsR = invShR.getRange(1, 1, 1, invShR.getLastColumn()).getValues()[0];
+    const rawR  = invShR.getRange(lastRowR - readRowsR + 1, 1, readRowsR, invShR.getLastColumn()).getValues();
+    allInvRowsR = rawR.map(row => {
+      const obj = {};
+      hdrsR.forEach((h, i) => { obj[h] = row[i] instanceof Date ? Utilities.formatDate(row[i], 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss") : row[i]; });
+      return obj;
+    });
+  }
+  allInvRowsR.filter(r => {
     const d = parseTaipei_(r.time);
     return r.type === 'waste' && !isNaN(d) && filt(r) && d >= from && d <= to;
   }).forEach(r => {
@@ -808,7 +836,28 @@ function getWasteReport(store, fromDate, toDate) {
   const filt = storeFilter_(store);
   const prodMap = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => { prodMap[Number(r.id)] = Number(r.cost) || 0; });
-  const wasteRows = sheetToObjects(getSheet(SH.INV_LOG)).filter(r => {
+
+  // [PERF] InventoryLog 超過萬筆時讀全表會 GAS 超時（302 redirect）
+  // 改為只讀最近 3000 筆（倒序，抓最新的），涵蓋約 3-6 個月的報廢記錄
+  const invSh   = getSheet(SH.INV_LOG);
+  const lastRow = invSh.getLastRow();
+  const readRows = Math.min(3000, lastRow - 1);
+  let allInvRows = [];
+  if (readRows > 0) {
+    const headers = invSh.getRange(1, 1, 1, invSh.getLastColumn()).getValues()[0];
+    const rawData = invSh.getRange(lastRow - readRows + 1, 1, readRows, invSh.getLastColumn()).getValues();
+    allInvRows = rawData.map(row => {
+      const obj = {};
+      headers.forEach((h, i) => {
+        obj[h] = row[i] instanceof Date
+          ? Utilities.formatDate(row[i], 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss")
+          : row[i];
+      });
+      return obj;
+    });
+  }
+
+  const wasteRows = allInvRows.filter(r => {
     const d = parseTaipei_(r.time);
     return r.type === 'waste' && !isNaN(d) && filt(r) && d >= from && d <= to;
   });
