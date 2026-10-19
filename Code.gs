@@ -819,7 +819,25 @@ function getWasteReport(store, fromDate, toDate) {
     byStore[s].count++;
     byStore[s].cost += (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0);
   });
-  return { totalCost: wasteRows.reduce((s, r) => s + (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0), 0), byStore };
+
+  // 花材報廢排行：依品名彙總廢棄量與成本，供前端 dashboard 顯示
+  const byProductMap = {};
+  wasteRows.forEach(r => {
+    const name = String(r.name || '未知');
+    if (!byProductMap[name]) byProductMap[name] = { name, qty: 0, cost: 0 };
+    const qty = Math.abs(Number(r.diff) || 0);
+    byProductMap[name].qty  += qty;
+    byProductMap[name].cost += (prodMap[Number(r.productId)] || 0) * qty;
+  });
+  const byProduct = Object.values(byProductMap)
+    .sort((a, b) => b.qty - a.qty)
+    .slice(0, 20);
+
+  return {
+    totalCost: wasteRows.reduce((s, r) => s + (prodMap[Number(r.productId)] || 0) * Math.abs(Number(r.diff) || 0), 0),
+    byStore,
+    byProduct,
+  };
 }
 
 function getMemberStats() {
@@ -1666,12 +1684,12 @@ function setupWeeklyWasteTrigger() {
     }
   });
 
-  // 建立新 trigger：每週一 00:00–01:00
+  // 建立新 trigger：每週日 00:00–01:00
   ScriptApp.newTrigger('weeklyAutoWaste')
     .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.MONDAY)
+    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
     .atHour(0)
     .create();
 
-  Logger.log('✅ 週自動報廢 Trigger 已設定：每週一 00:00 執行');
+  Logger.log('✅ 週自動報廢 Trigger 已設定：每週日 00:00 執行');
 }
