@@ -1666,12 +1666,12 @@ function setupWeeklyWasteTrigger() {
     }
   });
 
-  // 建立新 trigger：每週日 00:00–01:00
+  // 建立新 trigger：每週一 00:00–01:00
   ScriptApp.newTrigger('weeklyAutoWaste')
     .timeBased()
-    .onWeekDay(ScriptApp.WeekDay.SUNDAY)
+    .onWeekDay(ScriptApp.WeekDay.MONDAY)
     .atHour(0)
     .create();
 
-  Logger.log('✅ 週自動報廢 Trigger 已設定：每週日 00:00 執行');
+  Logger.log('✅ 週自動報廢 Trigger 已設定：每週一 00:00 執行');
 }
