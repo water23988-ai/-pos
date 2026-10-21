@@ -139,9 +139,9 @@ canvas#success-canvas{position:absolute;inset:0;width:100%;height:100%;pointer-e
         <circle cx="40" cy="20" r="2.5" fill="#FAF6F0" opacity="0.4"/>
       </svg>
     </div>
-    <p class="brand-tag">拾逅花事 × FOCUS 13</p>
-    <h1 class="main-title">你送過的花<br>有沒有一個<em>故事</em>？</h1>
-    <p class="subtitle">每一束花背後，都藏著一個說不出口的理由。<br>把你的送花故事放進這裡——</p>
+    <p class="brand-tag">拾逅花事 · Moment Flor</p>
+    <h1 class="main-title">每束花<br>都代表著一大串<strong>說不完的心意</strong></h1>
+    <p class="subtitle">花送出去的那一刻，你心裡在想什麼？<br>把那束花的故事放進這裡——</p>
     <div class="reward-card">
       <span class="reward-icon">🎁</span>
       <div class="reward-text">
@@ -337,6 +337,15 @@ function submitForm() {
   allEntries=loadEntries();
   allEntries.unshift(entry);
   saveEntries(allEntries);
+
+  // POST to Google Sheets
+  fetch('https://script.google.com/macros/s/AKfycbzyrpVdz_wv78YmG3VDEIgTOqy_QEBz-5c9Lx3hZatTjHB64jotiSS_XLp0c-Uc9jAj/exec', {
+    method: 'POST',
+    mode: 'no-cors',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(entry)
+  }).catch(()=>{});
+
   document.getElementById('sc-timestamp').textContent='投遞時間：'+timeStr;
   showView('success');
   launchSuccessScene();
@@ -442,7 +451,7 @@ function renderAdmin(entries) {
 function copyIG(id) {
   const e=allEntries.find(x=>x.id===id);if(!e)return;
   const to=e.recipient?`送給${e.recipient}的那束花——`:'有人說——';
-  navigator.clipboard.writeText(`🌸 ${to}\n\n「${e.content}」\n\n${e.keyword?'#'+e.keyword+' ':''}#拾逅花事 #送花故事 #FOCUS13 #momentflor\n\n你有過這樣的故事嗎？`).then(()=>showToast('IG 發文已複製 ✓'));
+  navigator.clipboard.writeText(`🌸 ${to}\n\n「${e.content}」\n\n${e.keyword?'#'+e.keyword+' ':''}#拾逅花事 #送花故事 ##momentflor\n\n你有過這樣的故事嗎？`).then(()=>showToast('IG 發文已複製 ✓'));
 }
 function copyThreads(id) {
   const e=allEntries.find(x=>x.id===id);if(!e)return;
