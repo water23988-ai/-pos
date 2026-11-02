@@ -269,7 +269,15 @@
 </div>
 
 <script>
-let API_URL = localStorage.getItem('moment_flor_api') || 'https://script.google.com/macros/s/AKfycbwrY7PYJUMpCxoIcFz-RzGjjlbGVC5tcljp6rGdccsegP6oRUbCP6aY1ysOeJj7ZvWXEg/exec';
+// [v2.5] GAS 網址鎖定：裝置上存過的舊網址一律換成最新版
+const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwKKpuiZvTc3iGF4k8DHsdo_As-grOrLX2iqFnjgne_f88tnxoRZI8b-ISV8KIQYKc/exec';
+(function lockApiUrl() {
+    try {
+        const saved = localStorage.getItem('moment_flor_api');
+        if (saved !== DEFAULT_API_URL) localStorage.setItem('moment_flor_api', DEFAULT_API_URL);
+    } catch (e) {}
+})();
+let API_URL = DEFAULT_API_URL;
 let allRecords   = [];
 let currentStore = '全部';
 let currentTx    = null;
