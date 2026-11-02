@@ -556,10 +556,11 @@
         <div class="p-4 border-b border-gray-100 flex justify-between items-center">
             <div>
                 <h3 class="font-bold text-base">🎟 百貨兌換券</h3>
-                <div style="font-size:10px;color:#9ca3af;margin-top:2px;">點花材加入兌換，結帳金額 $0，每張向百貨請款 NT$40</div>
+                <div id="voucherSubtitle" style="font-size:10px;color:#9ca3af;margin-top:2px;">點花材加入兌換，結帳金額 $0</div>
             </div>
             <button onclick="closeVoucherModal()" class="text-gray-300 text-xl">✕</button>
         </div>
+        <div id="voucherCampaignBar" style="display:none;padding:10px 16px 0;"></div>
         <div id="voucherCatChips" class="no-scrollbar" style="display:flex;gap:6px;overflow-x:auto;padding:10px 16px;border-bottom:1px solid #f3f4f6;"></div>
         <div id="voucherGrid" class="grid grid-cols-2 gap-2 p-4 overflow-y-auto no-scrollbar" style="flex:1;"></div>
         <div style="padding:12px 16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;gap:10px;">
@@ -1230,21 +1231,97 @@ function applyDiscountAmt() {
 function clearDiscount() { discountRate = 0; discountFixed = 0; closeDiscountModal(); updateCheckoutBar(); }
 function closeDiscountModal() { document.getElementById('discountModal').classList.remove('show'); }
 
-// ══ [v2.5] 百貨兌換券 ══
-const VOUCHER_VALUE = 40;
-let _voucherCat = '全部';
+// ══ [v2.5 → v2.7] 百貨兌換券（多活動） ══
+const VOUCHER_DEFAULT_VALUE = 40;      // 舊掛單／找不到活動時的預設
+let _voucherCat       = '全部';
+let _voucherCampaigns = [];            // 目前點位今天可用的活動
+let _voucherCampaign  = null;          // 目前選中的活動
+let _voucherCampCache = { key: '', at: 0, list: [] };
 
-function openVoucherModal() {
+function voucherValueOf(item) { return Number(item.voucherValue) || VOUCHER_DEFAULT_VALUE; }
+function cartVoucherStats() {
+    let v = 0, amt = 0;
+    cart.forEach(c => { if (c.voucher) { v += (c.vouchers || 0); amt += (c.vouchers || 0) * voucherValueOf(c); } });
+    return { v, amt };
+}
+
+async function fetchVoucherCampaigns() {
+    const today = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
+    const key   = storeForGAS() + '|' + today;
+    if (_voucherCampCache.key === key && Date.now() - _voucherCampCache.at < 5 * 60 * 1000) return _voucherCampCache.list;
+    const res  = await fetch(`${API_URL}?action=getVoucherCampaigns&store=${encodeURIComponent(storeForGAS())}&date=${today}`);
+    const data = await res.json();
+    if (!Array.isArray(data)) throw new Error(data && data.error ? data.error : '活動資料格式錯誤');
+    _voucherCampCache = { key, at: Date.now(), list: data };
+    return data;
+}
+
+async function openVoucherModal() {
     if (!currentStore) return alert('請先選擇營運據點');
     if (!rawProducts.length) return alert('商品尚未載入，請稍候再試');
     _voucherCat = '全部';
-    renderVoucherModal();
+    document.getElementById('voucherCampaignBar').innerHTML = '';
+    document.getElementById('voucherCatChips').innerHTML = '';
+    document.getElementById('voucherGrid').innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#d1d5db;font-size:12px;padding:24px 0;">讀取兌換活動中...</p>';
     document.getElementById('voucherModal').classList.add('show');
+    try {
+        _voucherCampaigns = await fetchVoucherCampaigns();
+    } catch (e) {
+        document.getElementById('voucherGrid').innerHTML = `<p style="grid-column:1/-1;text-align:center;color:#f87171;font-size:12px;padding:24px 0;">讀不到兌換活動，請確認後端已更新到 v2.7<br><span style="color:#d1d5db;">${String(e.message || e)}</span></p>`;
+        return;
+    }
+    if (!_voucherCampaigns.length) {
+        _voucherCampaign = null;
+        document.getElementById('voucherGrid').innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#9ca3af;font-size:12px;padding:24px 0;line-height:1.8;">這個點位今天沒有進行中的兌換活動<br>請到試算表「VoucherCampaigns」確認點位、日期與啟用狀態</p>';
+        renderVoucherSummary();
+        return;
+    }
+    // 延用購物車裡已選的活動；只有一檔就自動選
+    const inCart = cart.find(c => c.voucher && c.campaignId);
+    _voucherCampaign = (inCart && _voucherCampaigns.find(c => c.campaignId === inCart.campaignId))
+        || (_voucherCampaigns.length === 1 ? _voucherCampaigns[0] : null);
+    renderVoucherModal();
 }
 function closeVoucherModal() { document.getElementById('voucherModal').classList.remove('show'); }
 
+function selectVoucherCampaign(id) {
+    _voucherCampaign = _voucherCampaigns.find(c => c.campaignId === id) || null;
+    _voucherCat = '全部';
+    renderVoucherModal();
+}
+
+function renderVoucherSummary() {
+    const { v, amt } = cartVoucherStats();
+    document.getElementById('voucherSummary').innerHTML = v > 0
+        ? `本單兌換 <b style="color:#9b6b62;">${v} 張</b> · 應收 NT$ ${amt.toLocaleString()}`
+        : '本單尚未兌換';
+}
+
 function renderVoucherModal() {
-    const inStock = rawProducts.filter(p => getStoreStock(p) > 0);
+    const bar = document.getElementById('voucherCampaignBar');
+    const sub = document.getElementById('voucherSubtitle');
+    // 活動選擇列
+    if (_voucherCampaigns.length > 1) {
+        bar.innerHTML = `<div style="font-size:10px;color:#9ca3af;margin-bottom:6px;">今天有 ${_voucherCampaigns.length} 檔活動，請先選客人持有的券</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap;">${_voucherCampaigns.map(c =>
+                `<button class="v-chip ${_voucherCampaign && _voucherCampaign.campaignId === c.campaignId ? 'active' : ''}" onclick="selectVoucherCampaign('${String(c.campaignId).replace(/'/g, "\\'")}')">${c.name} · $${c.value}</button>`).join('')}</div>`;
+        bar.style.display = 'block';
+    } else {
+        bar.innerHTML = '';
+        bar.style.display = 'none';
+    }
+    if (!_voucherCampaign) {
+        sub.innerText = '請先選擇兌換活動';
+        document.getElementById('voucherCatChips').innerHTML = '';
+        document.getElementById('voucherGrid').innerHTML = '<p style="grid-column:1/-1;text-align:center;color:#d1d5db;font-size:12px;padding:24px 0;">↑ 先點選活動，再選花材</p>';
+        renderVoucherSummary();
+        return;
+    }
+    const C = _voucherCampaign;
+    sub.innerText = `${C.name}${C.mall ? '（' + C.mall + '）' : ''} · 每張請款 NT$${C.value}${C.categories && C.categories.length ? ' · 限 ' + C.categories.join('、') : ''}`;
+
+    const allowCat = p => !C.categories || !C.categories.length || C.categories.includes(p.category || '其他加購');
+    const inStock  = rawProducts.filter(p => getStoreStock(p) > 0 && allowCat(p));
     const cats = ['全部', ...[...new Set(inStock.map(p => p.category || '其他加購'))].sort((a, b) => {
         const ai = CAT_ORDER.indexOf(a), bi = CAT_ORDER.indexOf(b);
         return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
@@ -1253,7 +1330,7 @@ function renderVoucherModal() {
         `<button class="v-chip ${c === _voucherCat ? 'active' : ''}" onclick="_voucherCat='${c}';renderVoucherModal();">${c}</button>`).join('');
     const list = _voucherCat === '全部' ? inStock : inStock.filter(p => (p.category || '其他加購') === _voucherCat);
     document.getElementById('voucherGrid').innerHTML = list.length ? list.map(p => {
-        const inCart = cart.find(c => c.voucher && String(c.id) === String(p.id));
+        const inCart = cart.find(c => c.voucher && String(c.id) === String(p.id) && c.campaignId === C.campaignId);
         const stock  = getStoreStock(p);
         return `<button class="v-card ${inCart ? 'picked' : ''}" onclick="addVoucherItem('${p.id}')">
             <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:4px;">
@@ -1263,23 +1340,22 @@ function renderVoucherModal() {
             <div style="margin-top:6px;font-size:11px;color:#d1d5db;text-decoration:line-through;">$${p.price||0}</div>
             <div style="font-size:12px;font-weight:bold;color:${inCart ? '#9b6b62' : '#8e9775'};">${inCart ? `✓ 已選 ${inCart.qty} 支` : '＋ 兌換 $0'}</div>
         </button>`;
-    }).join('') : '<p style="grid-column:1/-1;text-align:center;color:#d1d5db;font-size:12px;padding:24px 0;">這個分類目前沒有庫存</p>';
-    const v = cart.reduce((a, c) => a + (c.voucher ? (c.vouchers||0) : 0), 0);
-    document.getElementById('voucherSummary').innerHTML = v > 0
-        ? `本單兌換 <b style="color:#9b6b62;">${v} 張</b> · 應收 NT$ ${(v*VOUCHER_VALUE).toLocaleString()}`
-        : '本單尚未兌換';
+    }).join('') : '<p style="grid-column:1/-1;text-align:center;color:#d1d5db;font-size:12px;padding:24px 0;">這個分類目前沒有可兌換的庫存</p>';
+    renderVoucherSummary();
 }
 
 function addVoucherItem(id) {
     const p = rawProducts.find(x => String(x.id) === String(id));
-    if (!p) return;
-    const existing = cart.find(c => c.voucher && String(c.id) === String(id));
+    const C = _voucherCampaign;
+    if (!p || !C) return;
+    const existing = cart.find(c => c.voucher && String(c.id) === String(id) && c.campaignId === C.campaignId);
     if (existing) {
         existing.qty++;
         if (existing.vouchersLinked) existing.vouchers = existing.qty;
     } else {
         cart.push({ id: p.id, name: p.name, qty: 1, price: 0, priceTN: 0, priceKH: 0,
             originalPrice: p.price || 0, voucher: true, vouchers: 1, vouchersLinked: true,
+            campaignId: C.campaignId, campaignName: C.name, voucherValue: C.value,
             stockTN: p.stockTN||0, stockKH: p.stockKH||0, stockES: p.stockES||0, stockMarket: p.stockMarket||0, cost: p.cost || 0 });
     }
     showToast(`🎟 兌換 ${p.name} ✓`);
@@ -1288,8 +1364,9 @@ function addVoucherItem(id) {
 }
 
 function renderVoucherCartRow(item, idx) {
+    const camp = item.campaignName ? `<div style="font-size:10px;color:#c4a882;margin-top:1px;">${item.campaignName} · $${voucherValueOf(item)}/張</div>` : '';
     return `<div class="cart-item" style="background:#fdf8f6;">
-        <span class="cart-item-name">${item.name}<span class="v-tag" onclick="editVoucherCount(${idx})" style="cursor:pointer;">🎟 ${item.vouchers} 張</span></span>
+        <span class="cart-item-name">${item.name}<span class="v-tag" onclick="editVoucherCount(${idx})" style="cursor:pointer;">🎟 ${item.vouchers} 張</span>${camp}</span>
         <div style="display:flex;align-items:center;gap:7px;">
             <button class="qty-btn" onclick="updateVoucherQty(${idx},-1)">−</button>
             <span class="qty-val" onclick="editVoucherQty(${idx})">${item.qty}</span>
@@ -1329,11 +1406,12 @@ function editVoucherCount(idx) {
 function removeCartIdx(idx) { cart.splice(idx, 1); renderCart(); }
 
 function voucherCheckoutNote() {
-    const v = cart.reduce((a, c) => a + (c.voucher ? (c.vouchers||0) : 0), 0);
+    const { v, amt } = cartVoucherStats();
     if (!v) return '';
-    const allV = cart.every(i => i.voucher);
+    const allV  = cart.every(i => i.voucher);
+    const names = [...new Set(cart.filter(c => c.voucher).map(c => c.campaignName || '未分類'))].join('、');
     return `<div style="margin-top:8px;background:#fbf3f0;border:1px solid #f0dcd4;border-radius:10px;padding:8px 12px;font-size:12px;color:#9b6b62;">
-        🎟 本單使用兌換券 <b>${v} 張</b>，應向百貨請款 NT$ ${(v*VOUCHER_VALUE).toLocaleString()}${allV ? '<br><span style="color:#9ca3af;font-size:11px;">純兌換單，付款方式會自動記為「百貨兌換券」</span>' : ''}
+        🎟 本單使用兌換券 <b>${v} 張</b>（${names}），應向百貨請款 NT$ ${amt.toLocaleString()}${allV ? '<br><span style="color:#9ca3af;font-size:11px;">純兌換單，付款方式會自動記為「百貨兌換券」</span>' : ''}
     </div>`;
 }
 
@@ -1398,7 +1476,8 @@ async function confirmCheckout() {
             source: selectedSource,
             pointsRedeemed,
             items: cart.map(i => ({ id: i.id, name: i.name, qty: i.qty, unitPrice: getItemPrice(i), unitCost: i.cost||0,
-                ...(i.voucher ? { voucher: true, vouchers: i.vouchers, price: 0, originalPrice: i.originalPrice } : {}) }))
+                ...(i.voucher ? { voucher: true, vouchers: i.vouchers, price: 0, originalPrice: i.originalPrice,
+                    campaignId: i.campaignId || '', campaignName: i.campaignName || '', voucherValue: voucherValueOf(i) } : {}) }))
         }
     };
 

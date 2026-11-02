@@ -466,6 +466,9 @@
                     <option value="市集">市集</option>
                     <option value="Studio">Studio</option>
                 </select>
+                <select id="vCampaign" class="f-input" style="width:180px;padding:9px 12px;font-size:13px;">
+                    <option value="">全部活動</option>
+                </select>
                 <button onclick="loadVoucherAnalytics()" class="btn-primary" style="padding:10px 20px;font-size:13px;">查詢</button>
                 <button onclick="vRange('this')" class="btn-secondary" style="padding:9px 14px;font-size:12px;">本月</button>
                 <button onclick="vRange('last')" class="btn-secondary" style="padding:9px 14px;font-size:12px;">上月</button>
@@ -973,18 +976,21 @@ async function loadVoucherAnalytics() {
     const from  = document.getElementById('vFrom').value;
     const to    = document.getElementById('vTo').value;
     const store = document.getElementById('vStore').value;
+    const campaign = document.getElementById('vCampaign').value;
     if (!from || !to) return alert('請選擇開始與結束日期');
     const body = document.getElementById('vBody');
-    document.getElementById('vRangeLabel').innerText = (store || '全部點位') + '　' + from + ' ~ ' + to;
+    const campLabel = campaign ? document.getElementById('vCampaign').selectedOptions[0].text : '全部活動';
+    document.getElementById('vRangeLabel').innerText = (store || '全部點位') + '　' + campLabel + '　' + from + ' ~ ' + to;
     body.innerHTML = '<p style="color:#A89278;font-size:13px;"><span class="spinner"></span> 分析中...</p>';
     try {
-        const url = `${API_URL}?action=getVoucherAnalytics&from=${from}&to=${to}` + (store ? `&store=${encodeURIComponent(store)}` : '');
+        const url = `${API_URL}?action=getVoucherAnalytics&from=${from}&to=${to}` + (store ? `&store=${encodeURIComponent(store)}` : '') + (campaign ? `&campaign=${encodeURIComponent(campaign)}` : '');
         const d = await (await fetch(url)).json();
         if (d.error) {
-            body.innerHTML = `<p style="color:#C4928A;font-size:13px;">${d.error.includes('Unknown') ? '後端尚未更新：請把 Code.gs 換成 v2.6 並「編輯原本部署 → 新版本」' : escHtml(d.error)}</p>`;
+            body.innerHTML = `<p style="color:#C4928A;font-size:13px;">${d.error.includes('Unknown') ? '後端尚未更新：請把 Code.gs 換成 v2.7 並「編輯原本部署 → 新版本」' : escHtml(d.error)}</p>`;
             return;
         }
-        _vLast = { from, to, store, d };
+        _vLast = { from, to, store, campaign, d };
+        fillCampaignSelect(d.campaigns || [], campaign);
         renderVoucherAnalytics(d);
     } catch (e) {
         console.error('loadVoucherAnalytics error:', e);
@@ -992,11 +998,67 @@ async function loadVoucherAnalytics() {
     }
 }
 
+function fillCampaignSelect(list, selected) {
+    const sel = document.getElementById('vCampaign');
+    sel.innerHTML = '<option value="">全部活動</option>' + list.map(c =>
+        `<option value="${escHtml(c.key)}" ${c.key === selected ? 'selected' : ''}>${escHtml(c.name)}${c.key !== 'UNCAT' ? ' · $' + c.value : ''}</option>`).join('');
+}
+
+const V_STATUS_STYLE = {
+    '進行中': 'background:rgba(142,151,117,0.15);color:#4d6145;',
+    '未開始': 'background:rgba(196,168,122,0.2);color:#7A5C20;',
+    '已結束': 'background:#F0E9DF;color:#A89278;',
+    '停用'  : 'background:rgba(196,146,138,0.15);color:#9d4a42;',
+    '—'     : 'background:#F0E9DF;color:#A89278;',
+};
+function renderCampaignBlocks(d) {
+    const camps = d.campaigns || [];
+    const comp  = d.byCampaign || [];
+    const statusTable = `
+    <div class="card" style="padding:0;overflow:hidden;margin-top:14px;">
+        <div class="card-title" style="padding:16px 18px 0;">🏷 活動設定一覽 <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#A89278;">（到試算表 VoucherCampaigns 分頁新增或修改）</span></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>狀態</th><th>活動</th><th>百貨</th><th>每張金額</th><th>點位</th><th>期間</th><th>限定分類</th></tr></thead>
+            <tbody>${camps.length ? camps.map(c => `<tr>
+                <td><span class="waste-rate-tag" style="${V_STATUS_STYLE[c.status] || ''}">${c.status}</span></td>
+                <td style="font-weight:700;">${escHtml(c.name)}</td>
+                <td>${escHtml(c.mall || '—')}</td>
+                <td>${c.key === 'UNCAT' ? '$40（預設）' : '$' + c.value}</td>
+                <td style="font-size:12px;">${c.stores && c.stores.length ? escHtml(c.stores.join('、')) : '全部'}</td>
+                <td style="font-size:12px;white-space:nowrap;">${c.startDate || '不限'} ~ ${c.endDate || '不限'}</td>
+                <td style="font-size:12px;">${c.categories && c.categories.length ? escHtml(c.categories.join('、')) : '全部'}</td>
+            </tr>`).join('') : '<tr><td colspan="7" class="empty-table">還沒有活動設定</td></tr>'}</tbody>
+        </table></div>
+    </div>`;
+    if (!comp.length) return statusTable;
+    const best = comp.length > 1 ? comp.reduce((a, b) => (b.profitPerVoucher > a.profitPerVoucher ? b : a)) : null;
+    return `
+    <div class="card" style="padding:0;overflow:hidden;margin-top:14px;">
+        <div class="card-title" style="padding:16px 18px 0;">⚖️ 各檔活動比較 <span style="font-weight:500;text-transform:none;letter-spacing:0;color:#A89278;">（同期間、同點位條件）</span></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>活動</th><th>每張金額</th><th>兌換張數</th><th>單張兌換毛利</th><th>加購率</th><th>加購營收</th><th>會員留存</th><th>活動毛利</th><th>每張帶來毛利</th><th>未請款</th></tr></thead>
+            <tbody>${comp.map(x => `<tr>
+                <td style="font-weight:700;">${escHtml(x.name)}${best && best.key === x.key ? ' <span class="waste-rate-tag low">最佳</span>' : ''}</td>
+                <td>${x.values.map(v => '$' + v).join(' / ')}</td>
+                <td>${x.vouchers}</td>
+                <td style="font-weight:700;color:${x.perVoucherMargin >= 0 ? '#4d6145' : '#9d4a42'};">${vMoney(x.perVoucherMargin)}</td>
+                <td>${x.addOnRate}%</td>
+                <td class="td-amount">${vMoney(x.addOnRevenue)}</td>
+                <td>${x.memberRate}%</td>
+                <td style="font-weight:700;color:#7A5C20;">${vMoney(x.profit)}</td>
+                <td style="font-weight:700;">${vMoney(x.profitPerVoucher)}</td>
+                <td style="color:#9b6b62;font-weight:700;">${vMoney(x.unbilledAmount)}</td>
+            </tr>`).join('')}</tbody>
+        </table></div>
+        <div style="padding:10px 18px 14px;font-size:11px;color:#A89278;">「每張帶來毛利」= 活動毛利 ÷ 兌換張數，含加購，是跟百貨談下一檔面額時最有用的數字。</div>
+    </div>` + statusTable;
+}
+
 function renderVoucherAnalytics(d) {
-    const s = d.summary, b = d.billing, V = d.voucherValue || 40;
+    const s = d.summary, b = d.billing, V = s.avgVoucherValue || d.voucherValue || 40;
     const body = document.getElementById('vBody');
     if (!s.voucherTx) {
-        body.innerHTML = `<div class="v-insight">這段期間還沒有兌換紀錄。百貨未請款餘額：<b>${vMoney(b.unbilledAmount)}</b></div>`;
+        body.innerHTML = `<div class="v-insight">這段期間還沒有兌換紀錄。百貨未請款餘額：<b>${vMoney(b.unbilledAmount)}</b></div>` + renderCampaignBlocks(d);
         return;
     }
     const perVoucherMargin = V - s.redeemCostPerVoucher;
@@ -1004,7 +1066,7 @@ function renderVoucherAnalytics(d) {
 
     // 自動判讀
     const insights = [];
-    insights.push(`每張券平均用掉 <b>${vMoney(s.redeemCostPerVoucher)}</b> 的花材，向百貨請款 ${vMoney(V)}，單張毛利 <b style="color:${perVoucherMargin >= 0 ? '#4d6145' : '#9d4a42'};">${vMoney(perVoucherMargin)}</b>${perVoucherMargin < 0 ? '，兌換花材成本偏高，建議把兌換範圍限縮在成本 $40 以下的花材' : ''}。`);
+    insights.push(`每張券平均用掉 <b>${vMoney(s.redeemCostPerVoucher)}</b> 的花材，平均向百貨請款 ${vMoney(V)}，單張毛利 <b style="color:${perVoucherMargin >= 0 ? '#4d6145' : '#9d4a42'};">${vMoney(perVoucherMargin)}</b>${perVoucherMargin < 0 ? '，兌換花材成本偏高，建議在活動設定裡用「限定分類」把兌換範圍縮到成本較低的花材' : ''}。`);
     insights.push(`${s.voucherTx} 位兌換客中有 <b>${s.addOnTx} 位加購</b>（加購率 ${s.addOnRate}%），平均每位兌換客多帶來 ${vMoney(s.avgAddOnPerVoucherTx)} 營收。`);
     if (s.addOnTx && s.normalTx) insights.push(`有加購的兌換客平均花 <b>${vMoney(s.avgAddOnPerAddOnTx)}</b>，一般客均單 ${vMoney(s.normalAvg)}，${avgDiff >= 0 ? `高出 ${vMoney(avgDiff)}` : `少了 ${vMoney(-avgDiff)}`}。`);
     insights.push(`兌換客留下會員資料的比例 <b>${s.memberRate}%</b>${s.memberRate < 30 ? '，還有很大空間，兌換當下是邀請加入 LINE 社群的好時機' : ''}。`);
@@ -1046,7 +1108,7 @@ function renderVoucherAnalytics(d) {
             </div>
         </div>
         <div class="summary-card">
-            <div class="summary-card-label">單張券成本 / 收入</div>
+            <div class="summary-card-label">單張券成本 / 平均收入</div>
             <div class="summary-card-value">${vMoney(s.redeemCostPerVoucher)} <span style="font-size:14px;color:#A89278;">/ $${V}</span></div>
             <div class="summary-card-sub">兌換花材總成本 ${vMoney(s.redeemCost)}</div>
         </div>
@@ -1058,7 +1120,7 @@ function renderVoucherAnalytics(d) {
         <div class="summary-card">
             <div class="summary-card-label">兌換收入（應計）</div>
             <div class="summary-card-value">${vMoney(s.voucherIncome)}</div>
-            <div class="summary-card-sub">${s.vouchers} 張 × $${V}</div>
+            <div class="summary-card-sub">${s.vouchers} 張 · 平均 $${V}/張</div>
         </div>
     </div>
 
@@ -1103,21 +1165,26 @@ function renderVoucherAnalytics(d) {
                 <tbody>${d.addOnItems.length ? d.addOnItems.map(x => `<tr><td>${escHtml(x.name)}</td><td>${x.qty}</td><td class="td-amount">${vMoney(x.sales)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty-table">還沒有加購紀錄</td></tr>'}</tbody>
             </table></div>
         </div>
-    </div>`;
+    </div>` + renderCampaignBlocks(d);
 }
 
 async function markVoucherBilledUI() {
     if (!_vLast) return;
-    const { from, to, store, d } = _vLast;
+    const { from, to, store, campaign, d } = _vLast;
     const b = d.billing;
     if (!b.unbilledAmount) return;
-    const ok = confirm(`確認以下兌換券已向百貨請款？\n\n點位：${store || '全部點位'}\n期間：${from} ~ ${to}\n張數：${b.unbilledVouchers} 張\n金額：NT$ ${b.unbilledAmount.toLocaleString()}\n\n標記後不會再列入未請款。`);
+    const unbilledCamps = (d.byCampaign || []).filter(x => x.unbilledAmount > 0);
+    if (!campaign && unbilledCamps.length > 1) {
+        if (!confirm(`目前選的是「全部活動」，會把 ${unbilledCamps.map(x => x.name).join('、')} 一起標記。\n\n不同百貨通常分開請款，建議先在上方選單選定一檔活動再按。\n\n仍要全部一起標記嗎？`)) return;
+    }
+    const campName = campaign ? ((d.campaigns || []).find(c => c.key === campaign) || {}).name || campaign : '全部活動';
+    const ok = confirm(`確認以下兌換券已向百貨請款？\n\n活動：${campName}\n點位：${store || '全部點位'}\n期間：${from} ~ ${to}\n張數：${b.unbilledVouchers} 張\n金額：NT$ ${b.unbilledAmount.toLocaleString()}\n\n標記後不會再列入未請款。`);
     if (!ok) return;
-    const billBatch = prompt('請款批次名稱（可留空，自動產生）', `${(store || '全部').replace(/\s/g, '')}-${to.slice(0, 7)}`);
+    const billBatch = prompt('請款批次名稱（可留空，自動產生）', `${campaign ? campName.replace(/\s/g, '') : (store || '全部').replace(/\s/g, '')}-${to.slice(0, 7)}`);
     if (billBatch === null) return;
     setGas('loading');
     try {
-        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markVoucherBilled', data: { store, from, to, billBatch: billBatch || '' } }) });
+        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markVoucherBilled', data: { store, from, to, campaign: campaign || '', billBatch: billBatch || '' } }) });
         const r = await res.json();
         if (r.success) {
             setGas('ok');
