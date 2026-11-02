@@ -1,7 +1,16 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
+//  版本：2.5  |  2026-11
+//  [v2.5] 新增百貨兌換券模組
+//         - 新分頁 VoucherLog（兌換明細 / 請款狀態）
+//         - addTransaction：兌換品項寫入 VoucherLog
+//         - voidTransaction：退款同步作廢兌換紀錄，已請款會回傳提醒
+//         - getItemRanking：修正 price=0 被當成原價的問題，新增 voucherQty
+//         - getDailyReport：新增 voucherCount / voucherStems / voucherReceivable
+//         - 新 API：GET getVoucherReport、POST markVoucherBilled
+//         - Transactions 工作表結構不變
+//  ────────────────────────────────────────────────────
 //  版本：2.4-fix  |  2026-05
-//  修正項目：
 //  [FIX-1] 加入 LockService，防止多人同時操作造成庫存/交易資料衝突
 //           影響函式：addTransaction / updateStock / receiveStock /
 //                     reportWaste / adjustStock
@@ -25,6 +34,7 @@ const SH = {
   INV_LOG     : 'InventoryLog',
   HANG_ORDERS : 'HangOrders',
   PRICE_LOG   : 'PriceHistory',
+  VOUCHER_LOG : 'VoucherLog',   // [v2.5]
 };
 
 // ══════════════════════════════════════════════════════
@@ -101,6 +111,7 @@ function doGet(e) {
       case 'getPayBreakdownRange':    return jsonOut(getPayBreakdownRange(e.parameter.store, e.parameter.from, e.parameter.to));
       case 'getProductByCode':        return jsonOut(getProductByCode(e.parameter.code));
       case 'getItemStoreSplit':       return jsonOut(getItemStoreSplit(e.parameter.name, e.parameter.from, e.parameter.to));
+      case 'getVoucherReport':        return jsonOut(getVoucherReport(e.parameter.store, e.parameter.from, e.parameter.to, e.parameter.status)); // [v2.5]
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -134,6 +145,7 @@ function doPost(e) {
       case 'deleteProcurementBatch':  return jsonOut(deleteProcurementBatch(data));
       case 'adjustStock':             return jsonOut(adjustStock(data));
       case 'mergeProducts':           return jsonOut(mergeProducts(data));
+      case 'markVoucherBilled':       return jsonOut(markVoucherBilled(data)); // [v2.5]
       default: return jsonOut({ error: 'Unknown POST action: ' + action });
     }
   } catch (err) {
@@ -469,6 +481,9 @@ function addTransaction(data) {
       });
     }
 
+    // [v2.5] 兌換品項寫入 VoucherLog（在 Lock 內，已過去重檢查）
+    logVoucherItems_(txId, txDate, data.store, data.items);
+
     // 累積會員點數
     if (data.memberId && Number(data.earnedPoints) > 0) {
       updateMemberPoints({ id: data.memberId, addPoints: data.earnedPoints, addSpend: data.total });
@@ -619,7 +634,12 @@ function getDailyReport(store, date) {
     wasteByStore[s].cost += (prodMap[Number(r.productId)]||0) * Math.abs(Number(r.diff)||0);
   });
 
-  return { ...compute(todayTxs), lastWeek: compute(lwTxs), lastMonth: compute(lmTxs), lastYear: compute(lyTxs), sourceBreakdown, newCount, memberCount, totalWasteCost, wasteByStore };
+  return {
+    ...compute(todayTxs),
+    lastWeek: compute(lwTxs), lastMonth: compute(lmTxs), lastYear: compute(lyTxs),
+    sourceBreakdown, newCount, memberCount, totalWasteCost, wasteByStore,
+    ...voucherSummaryFromTxs_(todayTxs), // [v2.5] voucherCount / voucherStems / voucherReceivable
+  };
 }
 
 // [FIX-2] getMonthlyReport 時區修正
@@ -736,13 +756,16 @@ function getItemRanking(store, date, fromDate, toDate) {
       items.forEach(item => {
         const key  = String(item.id || item.name);
         const prod = prodMap[Number(item.id)] || {};
-        if (!itemMap[key]) itemMap[key] = { name: item.name || prod.name || key, qty: 0, sales: 0, cost: 0, waste: 0 };
+        if (!itemMap[key]) itemMap[key] = { name: item.name || prod.name || key, qty: 0, sales: 0, cost: 0, waste: 0, voucherQty: 0 };
         const qty   = Number(item.qty)   || 0;
-        const price = Number(item.price) || prod.price || 0;
+        // [v2.5] 兌換品項 price=0，不可 fallback 到原價
+        const isVoucher = isVoucherItem_(item);
+        const price = isVoucher ? 0 : (Number(item.price) || prod.price || 0);
         const uc    = prod.cost || 0;
         itemMap[key].qty   += qty;
         itemMap[key].sales += price * qty;
         itemMap[key].cost  += uc * qty;
+        if (isVoucher) itemMap[key].voucherQty += qty;
       });
     });
   const nameToKey = {};
@@ -772,7 +795,7 @@ function getItemRanking(store, date, fromDate, toDate) {
     const profit    = it.sales - it.cost;
     const margin    = it.sales > 0 ? Math.round(profit / it.sales * 100) : 0;
     const wasteRate = (it.qty + it.waste) > 0 ? Math.round(it.waste / (it.qty + it.waste) * 100) : 0;
-    return { name: it.name, qty: it.qty, revenue: Math.round(it.sales), sales: Math.round(it.sales), cost: Math.round(it.cost), profit: Math.round(profit), margin, waste: it.waste, wasteRate };
+    return { name: it.name, qty: it.qty, revenue: Math.round(it.sales), sales: Math.round(it.sales), cost: Math.round(it.cost), profit: Math.round(profit), margin, waste: it.waste, wasteRate, voucherQty: it.voucherQty };
   }).sort((a,b) => b.revenue - a.revenue);
   const maxSales = sorted.length > 0 ? (sorted[0].revenue || 1) : 1;
   sorted.forEach(it => { it.pct = Math.round(it.revenue / maxSales * 100); });
@@ -1351,6 +1374,7 @@ function voidTransaction(data) {
     const alreadyVoided = vals[i][voidedCol];
     if (alreadyVoided === true || String(alreadyVoided).toLowerCase() === 'true') return { success: false, error: '此交易已退款過了' };
     sh.getRange(i + 1, voidedCol + 1).setValue(true);
+    const vRes = markVoucherVoided_(txId); // [v2.5] 同步作廢兌換紀錄
     const store = vals[i][headers.indexOf('store')];
     const items = safeJson(String(vals[i][headers.indexOf('items')] || ''), []);
     items.forEach(item => {
@@ -1360,7 +1384,11 @@ function voidTransaction(data) {
     const earnedPts = Number(vals[i][headers.indexOf('earnedPoints')]) || 0;
     const txTotal   = Number(vals[i][headers.indexOf('total')]) || 0;
     if (memberId && earnedPts > 0) updateMemberPoints({ id: memberId, addPoints: -earnedPts, addSpend: -txTotal });
-    return { success: true };
+    return {
+      success: true,
+      voucherVoided: vRes.voided,
+      warning: vRes.billedWarning > 0 ? '這張單的兌換券已經請款過，記得跟百貨沖銷' : '',
+    };
   }
   return { success: false, error: '找不到交易紀錄' };
 }
@@ -1741,4 +1769,174 @@ function setupWeeklyWasteTrigger() {
     .create();
 
   Logger.log('✅ 週自動報廢 Trigger 已設定：每週日 00:00 執行');
+}
+
+// ══════════════════════════════════════════════════════
+//  [v2.5] 百貨兌換券模組
+//
+//  前端購物車兌換品項格式（items 陣列中的一筆）：
+//  {
+//    id: 12, name: '粉玫瑰', qty: 1,
+//    price: 0,              // 結帳金額為 0
+//    originalPrice: 60,     // 原價，只做顯示用
+//    voucher: true,         // 兌換旗標
+//    vouchers: 1,           // 使用張數
+//    cost: 18               // 照常帶成本
+//  }
+//  整筆交易：total 只算現金品項；cost 包含兌換品項成本
+//  純兌換單建議 pay 帶 '百貨兌換券'
+// ══════════════════════════════════════════════════════
+
+const VOUCHER_VALUE   = 40; // 每張券向百貨請款金額
+const VOUCHER_HEADERS = ['time','txId','store','productId','name','qty','vouchers','receivable','status','billedAt','billBatch','voided'];
+
+// 手動執行一次（不執行也可以，第一次兌換時會自動建立）
+function setupVoucherSheet() {
+  getVoucherSheet_();
+  Logger.log('✅ VoucherLog 工作表初始化完成');
+}
+
+function getVoucherSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(SH.VOUCHER_LOG);
+  if (!sh) sh = ss.insertSheet(SH.VOUCHER_LOG);
+  if (sh.getLastRow() === 0) sh.appendRow(VOUCHER_HEADERS);
+  return sh;
+}
+
+function isVoucherItem_(it) {
+  return !!it && (it.voucher === true || String(it.voucher).toLowerCase() === 'true');
+}
+
+// 由 addTransaction 在 Lock 內呼叫
+function logVoucherItems_(txId, txDate, store, items) {
+  const vItems = (items || []).filter(it => isVoucherItem_(it) && Number(it.vouchers) > 0);
+  if (!vItems.length) return 0;
+  const sh   = getVoucherSheet_();
+  const rows = vItems.map(it => {
+    const v = Number(it.vouchers) || 0;
+    return [txDate, txId, store || '', Number(it.id) || '', it.name || '', Number(it.qty) || 0, v, v * VOUCHER_VALUE, '未請款', '', '', false];
+  });
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  return rows.length;
+}
+
+// 由 voidTransaction 呼叫：退款時同步作廢兌換紀錄
+function markVoucherVoided_(txId) {
+  const sh = getVoucherSheet_();
+  if (sh.getLastRow() < 2) return { voided: 0, billedWarning: 0 };
+  const vals  = sh.getDataRange().getValues();
+  const h     = vals[0];
+  const txCol = h.indexOf('txId'), stCol = h.indexOf('status'), vdCol = h.indexOf('voided');
+  let voided = 0, billedWarning = 0;
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][txCol]) !== String(txId)) continue;
+    sh.getRange(i + 1, vdCol + 1).setValue(true);
+    if (vals[i][stCol] === '已請款') billedWarning++;
+    voided++;
+  }
+  return { voided, billedWarning };
+}
+
+// 給日報用：從交易 items 算當日兌換張數與應收
+function voucherSummaryFromTxs_(txs) {
+  let voucherCount = 0, voucherStems = 0;
+  txs.forEach(r => {
+    safeJson(String(r.items || '[]'), []).forEach(it => {
+      if (!isVoucherItem_(it)) return;
+      voucherCount += Number(it.vouchers) || 0;
+      voucherStems += Number(it.qty)      || 0;
+    });
+  });
+  return { voucherCount, voucherStems, voucherReceivable: voucherCount * VOUCHER_VALUE };
+}
+
+// GET ?action=getVoucherReport&store=&from=yyyy-MM-dd&to=yyyy-MM-dd&status=未請款
+function getVoucherReport(store, from, to, status) {
+  const rows     = sheetToObjects(getVoucherSheet_());
+  const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
+  const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const filtered = rows.filter(r => {
+    const d = parseTaipei_(r.time);
+    if (isNaN(d) || d < fromDate || d > toDate) return false;
+    if (store && r.store !== store) return false;
+    if (status && r.status !== status) return false;
+    return notVoid(r);
+  });
+
+  let totalVouchers = 0, totalReceivable = 0, unbilledVouchers = 0, unbilledAmount = 0;
+  const byStore = {}, byProductMap = {};
+  filtered.forEach(r => {
+    const v   = Number(r.vouchers)   || 0;
+    const amt = Number(r.receivable) || 0;
+    const unbilled = r.status !== '已請款';
+    totalVouchers   += v;
+    totalReceivable += amt;
+    if (unbilled) { unbilledVouchers += v; unbilledAmount += amt; }
+
+    const s = r.store || '未知';
+    if (!byStore[s]) byStore[s] = { vouchers: 0, receivable: 0, unbilledVouchers: 0, unbilledAmount: 0 };
+    byStore[s].vouchers   += v;
+    byStore[s].receivable += amt;
+    if (unbilled) { byStore[s].unbilledVouchers += v; byStore[s].unbilledAmount += amt; }
+
+    const n = String(r.name || '未知');
+    if (!byProductMap[n]) byProductMap[n] = { name: n, qty: 0, vouchers: 0 };
+    byProductMap[n].qty      += Number(r.qty) || 0;
+    byProductMap[n].vouchers += v;
+  });
+
+  return {
+    voucherValue: VOUCHER_VALUE,
+    totalVouchers, totalReceivable,
+    unbilledVouchers, unbilledAmount,
+    billedAmount: totalReceivable - unbilledAmount,
+    byStore,
+    byProduct: Object.values(byProductMap).sort((a, b) => b.vouchers - a.vouchers),
+    rows: filtered.slice(-200).reverse(),
+  };
+}
+
+// POST { action:'markVoucherBilled', data:{ store, from, to, billBatch } }
+// 把區間內「未請款、未作廢」的兌換紀錄標成已請款。單人操作，不加 Lock
+function markVoucherBilled(data) {
+  const sh = getVoucherSheet_();
+  if (sh.getLastRow() < 2) return { success: true, count: 0, vouchers: 0, amount: 0 };
+
+  const fromDate = data.from ? new Date(data.from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = data.to   ? new Date(data.to   + 'T23:59:59+08:00') : new Date();
+  const batch    = data.billBatch || ('VB' + Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyyMMdd'));
+  const now      = taipeiNow();
+
+  const vals = sh.getDataRange().getValues();
+  const h    = vals[0];
+  const c    = name => h.indexOf(name);
+  const tCol = c('time'), sCol = c('store'), stCol = c('status'), vdCol = c('voided');
+  const baCol = c('billedAt'), bbCol = c('billBatch'), vCol = c('vouchers'), rcCol = c('receivable');
+
+  let count = 0, vouchers = 0, amount = 0;
+  for (let i = 1; i < vals.length; i++) {
+    const row = vals[i];
+    const d   = row[tCol] instanceof Date ? row[tCol] : parseTaipei_(row[tCol]);
+    if (isNaN(d) || d < fromDate || d > toDate) continue;
+    if (data.store && row[sCol] !== data.store) continue;
+    if (row[stCol] === '已請款') continue;
+    if (row[vdCol] === true || String(row[vdCol]).toLowerCase() === 'true') continue;
+    row[stCol] = '已請款';
+    row[baCol] = now;
+    row[bbCol] = batch;
+    count++;
+    vouchers += Number(row[vCol])  || 0;
+    amount   += Number(row[rcCol]) || 0;
+  }
+
+  if (count > 0) {
+    const n = vals.length - 1;
+    sh.getRange(2, stCol + 1, n, 1).setValues(vals.slice(1).map(r => [r[stCol]]));
+    sh.getRange(2, baCol + 1, n, 1).setValues(vals.slice(1).map(r => [r[baCol]]));
+    sh.getRange(2, bbCol + 1, n, 1).setValues(vals.slice(1).map(r => [r[bbCol]]));
+  }
+  return { success: true, billBatch: batch, count, vouchers, amount };
 }
