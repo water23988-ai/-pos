@@ -164,6 +164,23 @@
         .waste-rate-tag.high { background: rgba(196,146,138,0.2);  color: #9d4a42; }
 
 
+        /* [v2.6] 兌換券分析 */
+        .v-section { margin-top: 28px; }
+        .v-kpi-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 14px; }
+        .v-card-rose { border-color: #e6cfc7 !important; background: #fbf3f0 !important; }
+        .v-card-rose .summary-card-value { color: #9b6b62; }
+        .v-insight { background: #FAF7F2; border: 1px solid #DDD0BC; border-left: 4px solid #C4A87A; border-radius: 12px; padding: 14px 18px; margin-bottom: 14px; font-size: 13px; line-height: 1.9; color: #5a4632; }
+        .v-two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 14px; }
+        .v-bar-row { display: grid; grid-template-columns: 110px 1fr 56px; align-items: center; gap: 10px; padding: 6px 0; font-size: 12px; color: #7A6550; }
+        .v-bar { height: 8px; background: #EDE5D8; border-radius: 4px; overflow: hidden; }
+        .v-bar-fill { height: 100%; background: #C4A87A; border-radius: 4px; transition: width .5s ease; }
+        .v-bar-fill.rose { background: #c99a8f; }
+        .v-bill-btn { background: #9b6b62; color: white; border: none; border-radius: 10px; padding: 8px 14px; font-size: 12px; font-weight: 700; cursor: pointer; }
+        .v-bill-btn:disabled { background: #d9c3bc; cursor: not-allowed; }
+        @media (max-width: 768px) {
+            .v-kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .v-two-col { grid-template-columns: 1fr; }
+        }
         /* ── 手機側邊抽屜 ── */
         .hamburger-btn { display: none; align-items: center; justify-content: center; width: 38px; height: 38px; background: rgba(0,0,0,0.06); border: none; border-radius: 10px; cursor: pointer; font-size: 22px; color: #3D2E1E; flex-shrink: 0; -webkit-tap-highlight-color: transparent; }
         .nav-overlay { display: none; position: fixed; inset: 0; background: rgba(61,46,30,0.38); z-index: 299; -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); }
@@ -427,6 +444,33 @@
                     </table>
                 </div>
             </div>
+        </div>
+
+        <!-- [v2.6] 百貨兌換券分析 -->
+        <div class="v-section" id="voucherSection">
+            <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:12px;">
+                <div>
+                    <div class="card-title" style="margin-bottom:2px;">🎟 百貨兌換券分析</div>
+                    <span style="font-size:11px;color:#A89278;" id="vRangeLabel">請選擇日期區間後查詢</span>
+                </div>
+            </div>
+            <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:14px;">
+                <input type="date" id="vFrom" class="query-date-input">
+                <span style="font-size:13px;color:#A89278;">至</span>
+                <input type="date" id="vTo" class="query-date-input">
+                <select id="vStore" class="f-input" style="width:140px;padding:9px 12px;font-size:13px;">
+                    <option value="">全部點位</option>
+                    <option value="高雄FOCUS 13">高雄FOCUS 13</option>
+                    <option value="台南FOCUS">台南FOCUS</option>
+                    <option value="誠品生活台南">誠品生活台南</option>
+                    <option value="市集">市集</option>
+                    <option value="Studio">Studio</option>
+                </select>
+                <button onclick="loadVoucherAnalytics()" class="btn-primary" style="padding:10px 20px;font-size:13px;">查詢</button>
+                <button onclick="vRange('this')" class="btn-secondary" style="padding:9px 14px;font-size:12px;">本月</button>
+                <button onclick="vRange('last')" class="btn-secondary" style="padding:9px 14px;font-size:12px;">上月</button>
+            </div>
+            <div id="vBody"><p style="color:#A89278;font-size:13px;">請選擇日期區間後查詢</p></div>
         </div>
 
         <!-- [v2.8] 付款方式區間查詢 -->
@@ -911,6 +955,178 @@ async function loadPayBreakdown() {
     }
 }
 
+// ══ [v2.6] 百貨兌換券分析 ══
+let _vLast = null;
+function vRange(which) {
+    const d = new Date();
+    let first, last;
+    if (which === 'last') { first = new Date(d.getFullYear(), d.getMonth() - 1, 1); last = new Date(d.getFullYear(), d.getMonth(), 0); }
+    else { first = new Date(d.getFullYear(), d.getMonth(), 1); last = d; }
+    document.getElementById('vFrom').value = taipeiStr(first);
+    document.getElementById('vTo').value   = taipeiStr(last);
+    loadVoucherAnalytics();
+}
+function vMoney(n) { return 'NT$ ' + Math.round(n || 0).toLocaleString(); }
+
+async function loadVoucherAnalytics() {
+    if (!API_URL) return;
+    const from  = document.getElementById('vFrom').value;
+    const to    = document.getElementById('vTo').value;
+    const store = document.getElementById('vStore').value;
+    if (!from || !to) return alert('請選擇開始與結束日期');
+    const body = document.getElementById('vBody');
+    document.getElementById('vRangeLabel').innerText = (store || '全部點位') + '　' + from + ' ~ ' + to;
+    body.innerHTML = '<p style="color:#A89278;font-size:13px;"><span class="spinner"></span> 分析中...</p>';
+    try {
+        const url = `${API_URL}?action=getVoucherAnalytics&from=${from}&to=${to}` + (store ? `&store=${encodeURIComponent(store)}` : '');
+        const d = await (await fetch(url)).json();
+        if (d.error) {
+            body.innerHTML = `<p style="color:#C4928A;font-size:13px;">${d.error.includes('Unknown') ? '後端尚未更新：請把 Code.gs 換成 v2.6 並「編輯原本部署 → 新版本」' : escHtml(d.error)}</p>`;
+            return;
+        }
+        _vLast = { from, to, store, d };
+        renderVoucherAnalytics(d);
+    } catch (e) {
+        console.error('loadVoucherAnalytics error:', e);
+        body.innerHTML = '<p style="color:#C4928A;font-size:13px;">載入失敗，請確認連線</p>';
+    }
+}
+
+function renderVoucherAnalytics(d) {
+    const s = d.summary, b = d.billing, V = d.voucherValue || 40;
+    const body = document.getElementById('vBody');
+    if (!s.voucherTx) {
+        body.innerHTML = `<div class="v-insight">這段期間還沒有兌換紀錄。百貨未請款餘額：<b>${vMoney(b.unbilledAmount)}</b></div>`;
+        return;
+    }
+    const perVoucherMargin = V - s.redeemCostPerVoucher;
+    const avgDiff = s.avgAddOnPerAddOnTx - s.normalAvg;
+
+    // 自動判讀
+    const insights = [];
+    insights.push(`每張券平均用掉 <b>${vMoney(s.redeemCostPerVoucher)}</b> 的花材，向百貨請款 ${vMoney(V)}，單張毛利 <b style="color:${perVoucherMargin >= 0 ? '#4d6145' : '#9d4a42'};">${vMoney(perVoucherMargin)}</b>${perVoucherMargin < 0 ? '，兌換花材成本偏高，建議把兌換範圍限縮在成本 $40 以下的花材' : ''}。`);
+    insights.push(`${s.voucherTx} 位兌換客中有 <b>${s.addOnTx} 位加購</b>（加購率 ${s.addOnRate}%），平均每位兌換客多帶來 ${vMoney(s.avgAddOnPerVoucherTx)} 營收。`);
+    if (s.addOnTx && s.normalTx) insights.push(`有加購的兌換客平均花 <b>${vMoney(s.avgAddOnPerAddOnTx)}</b>，一般客均單 ${vMoney(s.normalAvg)}，${avgDiff >= 0 ? `高出 ${vMoney(avgDiff)}` : `少了 ${vMoney(-avgDiff)}`}。`);
+    insights.push(`兌換客留下會員資料的比例 <b>${s.memberRate}%</b>${s.memberRate < 30 ? '，還有很大空間，兌換當下是邀請加入 LINE 社群的好時機' : ''}。`);
+    insights.push(`整體來看，這波兌換活動替你帶來 <b>${vMoney(s.totalProfit)}</b> 毛利（兌換 ${vMoney(s.redeemProfit)} + 加購 ${vMoney(s.addOnProfit)}）。`);
+
+    const maxBucket = Math.max(...d.buckets.map(x => x.count), 1);
+    const maxDay    = Math.max(...d.byDate.map(x => x.vouchers), 1);
+
+    body.innerHTML = `
+    <div class="v-kpi-grid">
+        <div class="summary-card v-card-rose">
+            <div class="summary-card-label">兌換張數</div>
+            <div class="summary-card-value">${s.vouchers} 張</div>
+            <div class="summary-card-sub">${s.voucherTx} 單 · ${s.stems} 支 · 佔來客 ${s.voucherShareOfTx}%</div>
+        </div>
+        <div class="summary-card accent">
+            <div class="summary-card-label">加購率</div>
+            <div class="summary-card-value">${s.addOnRate}%</div>
+            <div class="summary-card-sub">${s.addOnTx} / ${s.voucherTx} 單有另外消費</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">帶動加購營收</div>
+            <div class="summary-card-value">${vMoney(s.addOnRevenue)}</div>
+            <div class="summary-card-sub">加購單均 ${vMoney(s.avgAddOnPerAddOnTx)} · 一般均單 ${vMoney(s.normalAvg)}</div>
+        </div>
+        <div class="summary-card profit-card">
+            <div class="summary-card-label">活動總毛利</div>
+            <div class="summary-card-value">${vMoney(s.totalProfit)}</div>
+            <div class="summary-card-sub">兌換 ${vMoney(s.redeemProfit)} + 加購 ${vMoney(s.addOnProfit)}</div>
+        </div>
+    </div>
+    <div class="v-kpi-grid">
+        <div class="summary-card">
+            <div class="summary-card-label">應收百貨（未請款）</div>
+            <div class="summary-card-value" style="color:#9b6b62;">${vMoney(b.unbilledAmount)}</div>
+            <div class="summary-card-sub" style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+                <span>${b.unbilledVouchers} 張 · 已請款 ${vMoney(b.billedAmount)}</span>
+                <button class="v-bill-btn" onclick="markVoucherBilledUI()" ${b.unbilledAmount > 0 ? '' : 'disabled'}>標記已請款</button>
+            </div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">單張券成本 / 收入</div>
+            <div class="summary-card-value">${vMoney(s.redeemCostPerVoucher)} <span style="font-size:14px;color:#A89278;">/ $${V}</span></div>
+            <div class="summary-card-sub">兌換花材總成本 ${vMoney(s.redeemCost)}</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">會員留存</div>
+            <div class="summary-card-value">${s.memberRate}%</div>
+            <div class="summary-card-sub">${s.memberTx} 單兌換客有會員資料</div>
+        </div>
+        <div class="summary-card">
+            <div class="summary-card-label">兌換收入（應計）</div>
+            <div class="summary-card-value">${vMoney(s.voucherIncome)}</div>
+            <div class="summary-card-sub">${s.vouchers} 張 × $${V}</div>
+        </div>
+    </div>
+
+    <div class="v-insight">${insights.map(t => '・' + t).join('<br>')}</div>
+
+    <div class="v-two-col">
+        <div class="card">
+            <div class="card-title">💰 兌換客加購分布</div>
+            ${d.buckets.map(x => `<div class="v-bar-row"><span>${x.label}</span><div class="v-bar"><div class="v-bar-fill" style="width:${Math.round(x.count / maxBucket * 100)}%"></div></div><span style="text-align:right;font-weight:700;color:#3D2E1E;">${x.count} 單</span></div>`).join('')}
+        </div>
+        <div class="card">
+            <div class="card-title">📅 每日兌換張數</div>
+            <div style="max-height:200px;overflow-y:auto;">
+            ${d.byDate.map(x => `<div class="v-bar-row"><span>${x.date.slice(5)}</span><div class="v-bar"><div class="v-bar-fill rose" style="width:${Math.round(x.vouchers / maxDay * 100)}%"></div></div><span style="text-align:right;font-weight:700;color:#3D2E1E;">${x.vouchers} 張</span></div>`).join('')}
+            </div>
+        </div>
+    </div>
+
+    <div class="card" style="padding:0;overflow:hidden;margin-top:14px;">
+        <div class="card-title" style="padding:16px 18px 0;">🏪 各點位兌換效益</div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>點位</th><th>兌換張數</th><th>兌換單</th><th>加購率</th><th>加購營收</th><th>活動毛利</th><th>未請款</th></tr></thead>
+            <tbody>${d.byStore.map(x => {
+                const ub = (b.byStore && b.byStore[x.store]) ? b.byStore[x.store].unbilledAmount : 0;
+                return `<tr><td><span class="td-store">${escHtml(x.store)}</span></td><td>${x.vouchers}</td><td>${x.voucherTx}</td><td>${x.addOnRate}%</td><td class="td-amount">${vMoney(x.addOnRevenue)}</td><td style="font-weight:700;color:#7A5C20;">${vMoney(x.profit)}</td><td style="color:#9b6b62;font-weight:700;">${vMoney(ub)}</td></tr>`;
+            }).join('')}</tbody>
+        </table></div>
+    </div>
+
+    <div class="v-two-col">
+        <div class="card" style="padding:0;overflow:hidden;">
+            <div class="card-title" style="padding:16px 18px 0;">🌷 最常被兌換的花材</div>
+            <div class="table-wrap"><table>
+                <thead><tr><th>花材</th><th>支數</th><th>成本</th><th>兌換毛利</th></tr></thead>
+                <tbody>${d.redeemItems.map(x => `<tr><td>${escHtml(x.name)}</td><td>${x.qty}</td><td>${vMoney(x.cost)}</td><td style="font-weight:700;color:${x.margin >= 0 ? '#4d6145' : '#9d4a42'};">${vMoney(x.margin)}</td></tr>`).join('')}</tbody>
+            </table></div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden;">
+            <div class="card-title" style="padding:16px 18px 0;">🛍 兌換客順手加購</div>
+            <div class="table-wrap"><table>
+                <thead><tr><th>品項</th><th>數量</th><th>銷售額</th></tr></thead>
+                <tbody>${d.addOnItems.length ? d.addOnItems.map(x => `<tr><td>${escHtml(x.name)}</td><td>${x.qty}</td><td class="td-amount">${vMoney(x.sales)}</td></tr>`).join('') : '<tr><td colspan="3" class="empty-table">還沒有加購紀錄</td></tr>'}</tbody>
+            </table></div>
+        </div>
+    </div>`;
+}
+
+async function markVoucherBilledUI() {
+    if (!_vLast) return;
+    const { from, to, store, d } = _vLast;
+    const b = d.billing;
+    if (!b.unbilledAmount) return;
+    const ok = confirm(`確認以下兌換券已向百貨請款？\n\n點位：${store || '全部點位'}\n期間：${from} ~ ${to}\n張數：${b.unbilledVouchers} 張\n金額：NT$ ${b.unbilledAmount.toLocaleString()}\n\n標記後不會再列入未請款。`);
+    if (!ok) return;
+    const billBatch = prompt('請款批次名稱（可留空，自動產生）', `${(store || '全部').replace(/\s/g, '')}-${to.slice(0, 7)}`);
+    if (billBatch === null) return;
+    setGas('loading');
+    try {
+        const res = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'markVoucherBilled', data: { store, from, to, billBatch: billBatch || '' } }) });
+        const r = await res.json();
+        if (r.success) {
+            setGas('ok');
+            showToast(`✅ 已標記 ${r.vouchers} 張 · NT$ ${(r.amount || 0).toLocaleString()}`);
+            loadVoucherAnalytics();
+        } else { setGas('error'); alert('標記失敗：' + (r.error || '')); }
+    } catch (e) { setGas('error'); alert('連線失敗'); }
+}
+
 // ══ [v2.9] 各點位銷售明細 Modal ══
 function closeStoreSplit() {
     document.getElementById('storeSplitModal').style.display = 'none';
@@ -986,6 +1202,8 @@ function init() {
     // 預設本月區間
     rangeThisMonth();
     queryRange();
+    // [v2.6] 兌換券分析預設本月
+    vRange('this');
 }
 
 window.onload = init;

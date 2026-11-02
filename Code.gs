@@ -1,5 +1,9 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
+//  版本：2.6  |  2026-11
+//  [v2.6] 新增 GET getVoucherAnalytics：兌換券效益分析
+//         （加購率、加購金額、兌換毛利、會員留存、各點位、加購品項、每日趨勢）
+//  ────────────────────────────────────────────────────
 //  版本：2.5  |  2026-11
 //  [v2.5] 新增百貨兌換券模組
 //         - 新分頁 VoucherLog（兌換明細 / 請款狀態）
@@ -112,6 +116,7 @@ function doGet(e) {
       case 'getProductByCode':        return jsonOut(getProductByCode(e.parameter.code));
       case 'getItemStoreSplit':       return jsonOut(getItemStoreSplit(e.parameter.name, e.parameter.from, e.parameter.to));
       case 'getVoucherReport':        return jsonOut(getVoucherReport(e.parameter.store, e.parameter.from, e.parameter.to, e.parameter.status)); // [v2.5]
+      case 'getVoucherAnalytics':     return jsonOut(getVoucherAnalytics(e.parameter.store, e.parameter.from, e.parameter.to));                   // [v2.6]
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -1939,4 +1944,134 @@ function markVoucherBilled(data) {
     sh.getRange(2, bbCol + 1, n, 1).setValues(vals.slice(1).map(r => [r[bbCol]]));
   }
   return { success: true, billBatch: batch, count, vouchers, amount };
+}
+
+
+// ══════════════════════════════════════════════════════
+//  [v2.6] 兌換券效益分析
+//  GET ?action=getVoucherAnalytics&store=&from=yyyy-MM-dd&to=yyyy-MM-dd
+//
+//  口徑說明：
+//  - 兌換單：items 內至少一筆 voucher=true 的交易
+//  - 加購：兌換單中 total > 0（客人另外付錢買的部分，已扣折扣）
+//  - 兌換收入：券數 × 40（應收百貨，應計基礎）
+//  - 兌換毛利 = 兌換收入 − 兌換花材成本
+//  - 加購毛利 = 加購營收 − 加購品項成本
+//  - 一般單：同期間、同點位、沒有兌換的交易，作為均單對照組
+// ══════════════════════════════════════════════════════
+function getVoucherAnalytics(store, from, to) {
+  const rows     = sheetToObjects(getSheet(SH.TRANSACTIONS));
+  const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
+  const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
+  const filt     = storeFilter_(store);
+  const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+
+  const prodCost = {};
+  sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => { prodCost[Number(r.id)] = Number(r.cost) || 0; });
+  const unitCostOf = it => Number(it.unitCost) || prodCost[Number(it.id)] || 0;
+
+  const T = {
+    voucherTx: 0, vouchers: 0, stems: 0, redeemCost: 0,
+    addOnTx: 0, addOnRevenue: 0, addOnCost: 0, memberTx: 0,
+    normalTx: 0, normalRevenue: 0,
+  };
+  const buckets   = { '只兌換': 0, '加購 $1–99': 0, '加購 $100–299': 0, '加購 $300+': 0 };
+  const byStore   = {};
+  const byDate    = {};
+  const redeemMap = {};
+  const addOnMap  = {};
+
+  rows.forEach(r => {
+    const d = parseTaipei_(r.date);
+    if (isNaN(d) || d < fromDate || d > toDate || !filt(r) || !notVoid(r)) return;
+    const items  = safeJson(String(r.items || '[]'), []);
+    const vItems = items.filter(isVoucherItem_);
+    const total  = Number(r.total) || 0;
+
+    if (!vItems.length) { T.normalTx++; T.normalRevenue += total; return; }
+
+    const pItems  = items.filter(it => !isVoucherItem_(it));
+    const v       = vItems.reduce((a, it) => a + (Number(it.vouchers) || 0), 0);
+    const stems   = vItems.reduce((a, it) => a + (Number(it.qty) || 0), 0);
+    const rCost   = vItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
+    const aCost   = pItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
+    const hasAdd  = total > 0;
+
+    T.voucherTx++; T.vouchers += v; T.stems += stems; T.redeemCost += rCost;
+    if (hasAdd) { T.addOnTx++; T.addOnRevenue += total; T.addOnCost += aCost; }
+    if (r.memberId) T.memberTx++;
+
+    if (!hasAdd)          buckets['只兌換']++;
+    else if (total < 100) buckets['加購 $1–99']++;
+    else if (total < 300) buckets['加購 $100–299']++;
+    else                  buckets['加購 $300+']++;
+
+    const s = r.store || '未知';
+    if (!byStore[s]) byStore[s] = { store: s, voucherTx: 0, vouchers: 0, addOnTx: 0, addOnRevenue: 0, redeemCost: 0, addOnCost: 0 };
+    byStore[s].voucherTx++; byStore[s].vouchers += v; byStore[s].redeemCost += rCost;
+    if (hasAdd) { byStore[s].addOnTx++; byStore[s].addOnRevenue += total; byStore[s].addOnCost += aCost; }
+
+    const day = Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
+    if (!byDate[day]) byDate[day] = { date: day, vouchers: 0, voucherTx: 0, addOnRevenue: 0 };
+    byDate[day].vouchers += v; byDate[day].voucherTx++; byDate[day].addOnRevenue += total;
+
+    vItems.forEach(it => {
+      const n = String(it.name || '未知');
+      if (!redeemMap[n]) redeemMap[n] = { name: n, qty: 0, vouchers: 0, cost: 0 };
+      redeemMap[n].qty      += Number(it.qty) || 0;
+      redeemMap[n].vouchers += Number(it.vouchers) || 0;
+      redeemMap[n].cost     += unitCostOf(it) * (Number(it.qty) || 0);
+    });
+    pItems.forEach(it => {
+      const n = String(it.name || '未知');
+      if (!addOnMap[n]) addOnMap[n] = { name: n, qty: 0, sales: 0 };
+      addOnMap[n].qty   += Number(it.qty) || 0;
+      addOnMap[n].sales += (Number(it.unitPrice) || 0) * (Number(it.qty) || 0);
+    });
+  });
+
+  const r0 = n => Math.round(n);
+  const voucherIncome   = T.vouchers * VOUCHER_VALUE;
+  const redeemProfit    = voucherIncome - T.redeemCost;
+  const addOnProfit     = T.addOnRevenue - T.addOnCost;
+  const billing         = getVoucherReport(store, from, to, '');
+
+  return {
+    period: { from: from || '', to: to || '', store: store || '' },
+    voucherValue: VOUCHER_VALUE,
+    summary: {
+      voucherTx: T.voucherTx, vouchers: T.vouchers, stems: T.stems,
+      voucherIncome,
+      redeemCost: r0(T.redeemCost),
+      redeemProfit: r0(redeemProfit),
+      redeemCostPerVoucher: T.vouchers ? r0(T.redeemCost / T.vouchers) : 0,
+      addOnTx: T.addOnTx,
+      addOnRate: T.voucherTx ? Math.round(T.addOnTx / T.voucherTx * 100) : 0,
+      addOnRevenue: r0(T.addOnRevenue),
+      addOnCost: r0(T.addOnCost),
+      addOnProfit: r0(addOnProfit),
+      avgAddOnPerVoucherTx: T.voucherTx ? r0(T.addOnRevenue / T.voucherTx) : 0,
+      avgAddOnPerAddOnTx:   T.addOnTx   ? r0(T.addOnRevenue / T.addOnTx)   : 0,
+      totalProfit: r0(redeemProfit + addOnProfit),
+      memberTx: T.memberTx,
+      memberRate: T.voucherTx ? Math.round(T.memberTx / T.voucherTx * 100) : 0,
+      normalTx: T.normalTx,
+      normalAvg: T.normalTx ? r0(T.normalRevenue / T.normalTx) : 0,
+      voucherShareOfTx: (T.voucherTx + T.normalTx) ? Math.round(T.voucherTx / (T.voucherTx + T.normalTx) * 100) : 0,
+    },
+    billing: {
+      unbilledVouchers: billing.unbilledVouchers, unbilledAmount: billing.unbilledAmount,
+      billedAmount: billing.billedAmount, byStore: billing.byStore,
+    },
+    buckets: Object.entries(buckets).map(([label, count]) => ({ label, count })),
+    byStore: Object.values(byStore).map(x => ({
+      store: x.store, voucherTx: x.voucherTx, vouchers: x.vouchers,
+      addOnTx: x.addOnTx, addOnRate: x.voucherTx ? Math.round(x.addOnTx / x.voucherTx * 100) : 0,
+      addOnRevenue: r0(x.addOnRevenue),
+      profit: r0(x.vouchers * VOUCHER_VALUE - x.redeemCost + x.addOnRevenue - x.addOnCost),
+    })).sort((a, b) => b.vouchers - a.vouchers),
+    byDate: Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1),
+    redeemItems: Object.values(redeemMap).map(x => ({ ...x, cost: r0(x.cost), margin: r0(x.vouchers * VOUCHER_VALUE - x.cost) })).sort((a, b) => b.qty - a.qty).slice(0, 15),
+    addOnItems: Object.values(addOnMap).map(x => ({ ...x, sales: r0(x.sales) })).sort((a, b) => b.sales - a.sales).slice(0, 15),
+  };
 }
