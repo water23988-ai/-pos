@@ -692,7 +692,6 @@
                 <button onclick="setHistoryStore('all')"     id="hs-all" class="source-chip source-hist active" style="font-size:11px;">全部</button>
                 <button onclick="setHistoryStore('高雄FOCUS 13')" id="hs-kh"  class="source-chip source-hist" style="font-size:11px;">高雄</button>
                 <button onclick="setHistoryStore('台南FOCUS')"    id="hs-tn"  class="source-chip source-hist" style="font-size:11px;">台南</button>
-                <button onclick="setHistoryStore('誠品生活台南')" id="hs-es"  class="source-chip source-hist" style="font-size:11px;">誠品</button>
                 <button onclick="setHistoryStore('市集')"      id="hs-mk"  class="source-chip source-hist" style="font-size:11px;">市集</button>
                 <button onclick="setHistoryStore('Studio')"   id="hs-st"  class="source-chip source-hist" style="font-size:11px;">Studio</button>
             </div>
@@ -751,13 +750,6 @@
                 <div>
                     <div class="store-card-name">台南 FOCUS</div>
                     <div class="store-card-sub">台南旗艦店</div>
-                </div>
-            </button>
-            <button onclick="pickStore('誠品生活台南')" class="store-card">
-                <div class="store-card-icon">📚</div>
-                <div>
-                    <div class="store-card-name">誠品生活台南</div>
-                    <div class="store-card-sub">誠品合作店面</div>
                 </div>
             </button>
             <button onclick="pickStore('市集')" class="store-card">
@@ -836,7 +828,6 @@ const CAT_ORDER      = ['主花','配花','葉材','花束','花瓶','其他加�
 function isKH()           { return currentStore === '高雄FOCUS 13'; }  // [v2.2] Studio 已獨立
 function getStoreStock(p) {
     if (currentStore === '台南FOCUS')   return Number(p.stockTN)     || 0;
-    if (currentStore === '誠品生活台南') return Number(p.stockES)    || 0;
     if (currentStore === '市集')        return Number(p.stockMarket) || 0;
     return Number(p.stockKH) || 0;
 }
@@ -995,8 +986,9 @@ async function fetchProducts() {
     try {
         const res   = await fetch(`${API_URL}?action=getProducts`);
         const all   = await res.json();
-        // 收銀台只顯示 status==='active' 的商品（v2.12 起 visible 已由 status 統一管理）
-        rawProducts = all.filter(p => p.status === 'active');
+        // [v2.9] 收銀台顯示條件：沒有停售（status==='active'）且本週有上架（visible 不是 false）
+        //        週六進貨時，後端會把這週沒進的花材 visible 設為 FALSE
+        rawProducts = all.filter(p => p.status === 'active' && p.visible !== false);
         document.getElementById('statusInfo').innerText = '✅ 連線正常';
         setGasStatus('ok');
         renderModalCategories();
@@ -1534,7 +1526,7 @@ async function reportWaste(id) {
     const p = rawProducts.find(x => String(x.id) === String(id));
     if (!p) return;
     const store = currentStore;
-    const stock = store === '台南FOCUS' ? p.stockTN : store === '誠品生活台南' ? p.stockES : p.stockKH;
+    const stock = getStoreStock(p);  // [v2.8] 統一用 getStoreStock，修正市集報廢時讀到高雄庫存
     const qty   = prompt(`報廢「${p.name}」幾枝？（庫存 ${stock} 枝）`);
     if (!qty || isNaN(qty) || Number(qty) <= 0) return;
     if (Number(qty) > stock) return alert('報廢數量超過庫存');
@@ -1849,7 +1841,7 @@ let _selectedHistoryStore = 'all';
 function setHistoryStore(store) {
     _selectedHistoryStore = store;
     document.querySelectorAll('.source-hist').forEach(b => b.classList.remove('active'));
-    const idMap = { 'all':'hs-all', '高雄FOCUS 13':'hs-kh', '台南FOCUS':'hs-tn', '誠品生活台南':'hs-es', 'Studio':'hs-st' };
+    const idMap = { 'all':'hs-all', '高雄FOCUS 13':'hs-kh', '台南FOCUS':'hs-tn', '市集':'hs-mk', 'Studio':'hs-st' };  // [v2.8] 移除誠品、補上市集
     const el = document.getElementById(idMap[store]);
     if (el) el.classList.add('active');
     if (document.getElementById('historyDateInput').value) loadHistory();

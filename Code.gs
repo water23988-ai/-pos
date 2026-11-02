@@ -1,5 +1,31 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
+//  版本：2.9  |  2026-11
+//  [v2.9] 週換花「下架」改用 visible 欄位，status 只代表停售
+//         - visible=FALSE：本週沒進貨、暫時不在收銀台（進貨後自動打開）
+//         - status=inactive：停售，進貨不會自動解除，要在商品頁手動恢復
+//         - getProducts 新增回傳 visible（空白視為 TRUE）
+//         - 新 API：GET getRotateStatus（進貨頁判斷「本週換花」預設要不要勾）
+//         - 第一次使用前，請在編輯器執行 resetAllVisible() 一次，清掉 visible 舊值
+//  ────────────────────────────────────────────────────
+//  版本：2.8  |  2026-11
+//  [v2.8] 週六進貨自動換花
+//         - addProcurement：週六當天第一筆進貨送出時，先把上週主花/配花/葉材
+//           各點位剩餘庫存報廢歸零（寫入 InventoryLog type='waste'），
+//           再把「這次沒進的花材」下架（status=inactive），收銀台只顯示本週花材
+//         - 每一筆進貨（含平日補貨、週六第二筆）都會把該批品項自動上架
+//         - 前端可傳 data.weeklyReset = true / false 強制開關，不傳則依上面規則自動判斷
+//         - 停用週日 00:00 自動報廢：請在編輯器執行 removeWeeklyWasteTrigger() 一次
+//         - 誠品生活台南已收點：後端保留欄位與對照（歷史報表、對帳用），不再於收銀台顯示
+//  ────────────────────────────────────────────────────
+//  版本：2.7  |  2026-11
+//  [v2.7] 兌換券多活動：新分頁 VoucherCampaigns（活動名稱、每張金額、點位、期間、限定分類）
+//         - 結帳時後端依活動表鎖定活動名稱與金額，寫入 items 與 VoucherLog
+//         - VoucherLog 新增 campaignId / campaignName / voucherValue（自動補欄位）
+//         - 新 API：GET getVoucherCampaigns
+//         - getVoucherReport / getVoucherAnalytics / markVoucherBilled 支援活動篩選
+//         - 舊紀錄沒有活動代碼 → 歸為「未分類」，金額沿用 40
+//  ────────────────────────────────────────────────────
 //  版本：2.6  |  2026-11
 //  [v2.6] 新增 GET getVoucherAnalytics：兌換券效益分析
 //         （加購率、加購金額、兌換毛利、會員留存、各點位、加購品項、每日趨勢）
@@ -39,6 +65,7 @@ const SH = {
   HANG_ORDERS : 'HangOrders',
   PRICE_LOG   : 'PriceHistory',
   VOUCHER_LOG : 'VoucherLog',   // [v2.5]
+  VOUCHER_CAMPAIGNS: 'VoucherCampaigns', // [v2.7]
 };
 
 // ══════════════════════════════════════════════════════
@@ -115,8 +142,10 @@ function doGet(e) {
       case 'getPayBreakdownRange':    return jsonOut(getPayBreakdownRange(e.parameter.store, e.parameter.from, e.parameter.to));
       case 'getProductByCode':        return jsonOut(getProductByCode(e.parameter.code));
       case 'getItemStoreSplit':       return jsonOut(getItemStoreSplit(e.parameter.name, e.parameter.from, e.parameter.to));
-      case 'getVoucherReport':        return jsonOut(getVoucherReport(e.parameter.store, e.parameter.from, e.parameter.to, e.parameter.status)); // [v2.5]
-      case 'getVoucherAnalytics':     return jsonOut(getVoucherAnalytics(e.parameter.store, e.parameter.from, e.parameter.to));                   // [v2.6]
+      case 'getVoucherReport':        return jsonOut(getVoucherReport(e.parameter.store, e.parameter.from, e.parameter.to, e.parameter.status, e.parameter.campaign)); // [v2.7]
+      case 'getVoucherAnalytics':     return jsonOut(getVoucherAnalytics(e.parameter.store, e.parameter.from, e.parameter.to, e.parameter.campaign)); // [v2.7]
+      case 'getVoucherCampaigns':     return jsonOut(getVoucherCampaigns(e.parameter.store, e.parameter.date, e.parameter.all));                   // [v2.7]
+      case 'getRotateStatus':         return jsonOut(getRotateStatus());                                                                              // [v2.9]
       default:                        return jsonOut({ error: 'Unknown GET action: ' + action });
     }
   } catch (err) {
@@ -241,8 +270,15 @@ function getProducts() {
     stockES     : Number(r.stockES)     || 0,
     stockMarket : Number(r.stockMarket) || 0,
     status      : r.status || 'active',
+    visible     : isVisible_(r.visible),   // [v2.9]
     code        : String(r.code || ''),
   }));
+}
+
+// [v2.9] visible 判斷：只有明確 FALSE 才算隱藏，空白 / 舊資料一律當 TRUE
+function isVisible_(v) {
+  if (v === false) return false;
+  return String(v).trim().toUpperCase() !== 'FALSE';
 }
 
 function addProduct(data) {
@@ -466,6 +502,9 @@ function addTransaction(data) {
       if (d.length === 10) return d + 'T' + Utilities.formatDate(new Date(), 'Asia/Taipei', 'HH:mm:ss');
       return taipeiNow();
     })();
+
+    // [v2.7] 兌換品項依活動表鎖定活動名稱與金額（寫入前處理，items JSON 也會帶到）
+    resolveVoucherItems_(data.items);
 
     sh.appendRow([
       txId, txDate, data.store || '', data.memberId || '',
@@ -1210,6 +1249,16 @@ function addProcurement(data) {
   let   totalCost = 0;
   const itemRows  = [];
 
+  // [v2.8] 週六換花：必須在入庫「之前」執行，
+  //        舊庫存先歸零，本週加權成本才會是乾淨的新進價
+  const itemNames    = items.map(it => String(it.flowerName || '').trim()).filter(Boolean);
+  const doRotate     = shouldWeeklyRotate_(data, date);
+  let   rotateResult = null;
+  if (doRotate) {
+    rotateResult = weeklyRotateFlowers_(itemNames);
+    PropertiesService.getScriptProperties().setProperty('last_weekly_rotate', date);
+  }
+
   items.forEach((item, idx) => {
     const stemsPerBunch  = Number(item.stemsPerBunch)  || 0;
     const bunchesQty     = Number(item.bunchesQty)     || 0;
@@ -1233,7 +1282,147 @@ function addProcurement(data) {
 
   batchSh.appendRow([batchId, date, data.source || '', '', data.note || '', items.length, Math.round(totalCost)]);
   if (itemRows.length > 0) itemSh.getRange(itemSh.getLastRow() + 1, 1, itemRows.length, itemRows[0].length).setValues(itemRows);
-  return { success: true, batchId, totalItems: items.length, totalCost: Math.round(totalCost) };
+
+  // [v2.9] 這批有進的品項 visible 打開（不動 status，停售的花不會被自動解除）
+  const activated = showProductsByName_(itemNames);
+
+  return {
+    success: true, batchId, totalItems: items.length, totalCost: Math.round(totalCost),
+    weeklyRotate: doRotate,                                   // [v2.8] 這次有沒有執行換花
+    wastedCount : rotateResult ? rotateResult.wasted : 0,     // [v2.8] 報廢筆數（點位 × 品項）
+    hiddenCount : rotateResult ? rotateResult.hidden : 0,     // [v2.8] 下架品項數
+    activatedCount: activated,                                // [v2.9] 重新顯示品項數（visible FALSE → TRUE）
+  };
+}
+
+// ══════════════════════════════════════════════════════
+//  [v2.8] 週六進貨換花
+// ══════════════════════════════════════════════════════
+
+// 判斷這次進貨要不要執行換花
+//  - data.weeklyReset === true / false → 以前端指定為準
+//  - 沒指定 → 進貨日期 = 今天、今天是週六、且今天還沒換過花
+//    （週六同一天第二筆進貨不會再報廢一次，只會把品項上架）
+function shouldWeeklyRotate_(data, date) {
+  if (data.weeklyReset === true)  return true;
+  if (data.weeklyReset === false) return false;
+  const now   = new Date();
+  const today = Utilities.formatDate(now, 'Asia/Taipei', 'yyyy-MM-dd');
+  const isSat = Utilities.formatDate(now, 'Asia/Taipei', 'u') === '6';
+  if (!isSat) return false;
+  if (String(date).slice(0, 10) !== today) return false;   // 補登過去的進貨單不觸發
+  const last = PropertiesService.getScriptProperties().getProperty('last_weekly_rotate');
+  return last !== today;
+}
+
+// 報廢上週花材 + 下架這次沒進的花材（[v2.9] 下架 = visible 設 FALSE，不動 status）
+// 只動 主花/配花/葉材（AUTO_WASTE_CATS），花瓶、包裝、加購品不受影響
+// 只寫有變動的格子，不整欄覆寫，避免蓋掉同時間收銀台的扣庫存
+function weeklyRotateFlowers_(keepNames) {
+  const keep    = new Set((keepNames || []).map(n => String(n).trim()));
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const idCol     = headers.indexOf('id');
+  const nameCol   = headers.indexOf('name');
+  const catCol    = headers.indexOf('category');
+  const statusCol = headers.indexOf('status');
+  const visCol    = ensureVisibleCol_(sh, headers);   // [v2.9]
+
+  const stockCols = Object.entries(STORE_COL_MAP)
+    .map(([store, key]) => ({ store, idx: headers.indexOf(key) }))
+    .filter(c => c.idx >= 0);
+
+  const now        = taipeiNow();
+  const zeroCells  = [];
+  const hideCells  = [];
+  const logRows    = [];
+
+  for (let i = 1; i < vals.length; i++) {
+    const row    = vals[i];
+    const cat    = String(row[catCol] || '');
+    const status = String(row[statusCol] || '').toLowerCase();
+    if (!AUTO_WASTE_CATS.includes(cat)) continue;
+    if (status === 'inactive') continue;   // 已停售的不動（跟原本週日報廢規則一致）
+
+    const name = String(row[nameCol] || '').trim();
+
+    // 1) 各點位剩餘庫存報廢歸零（含已收點的誠品舊庫存，順便清掉）
+    stockCols.forEach(c => {
+      const qty = Number(row[c.idx]) || 0;
+      if (qty <= 0) return;
+      zeroCells.push(sh.getRange(i + 1, c.idx + 1).getA1Notation());
+      logRows.push([now, row[idCol], row[nameCol], c.store, qty, 0, -qty, '週換花報廢（週六進貨）', 'waste']);
+    });
+
+    // 2) 這次沒進貨、目前還顯示中的花材 → visible 設 FALSE
+    if (!keep.has(name) && isVisible_(row[visCol])) hideCells.push(sh.getRange(i + 1, visCol + 1).getA1Notation());
+  }
+
+  if (zeroCells.length) sh.getRangeList(zeroCells).setValue(0);
+  if (hideCells.length) sh.getRangeList(hideCells).setValue(false);
+  if (logRows.length) {
+    const logSh = getSheet(SH.INV_LOG);
+    logSh.getRange(logSh.getLastRow() + 1, 1, logRows.length, logRows[0].length).setValues(logRows);
+  }
+
+  Logger.log(`✅ 週六換花：報廢 ${logRows.length} 筆、下架 ${hideCells.length} 項`);
+  return { wasted: logRows.length, hidden: hideCells.length };
+}
+
+// [v2.9] 把指定品名的商品 visible 設 TRUE（同名只處理第一筆，跟加權成本的比對方式一致）
+//        不動 status：停售的花就算進貨也不會自己回到收銀台
+function showProductsByName_(names) {
+  const want = new Set((names || []).map(n => String(n).trim()).filter(Boolean));
+  if (!want.size) return 0;
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const nameCol = headers.indexOf('name');
+  const visCol  = ensureVisibleCol_(sh, headers);
+
+  const seen  = new Set();
+  const cells = [];
+  for (let i = 1; i < vals.length; i++) {
+    const name = String(vals[i][nameCol] || '').trim();
+    if (!want.has(name) || seen.has(name)) continue;
+    seen.add(name);
+    if (!isVisible_(vals[i][visCol])) cells.push(sh.getRange(i + 1, visCol + 1).getA1Notation());
+  }
+  if (cells.length) sh.getRangeList(cells).setValue(true);
+  return cells.length;
+}
+
+// [v2.9] 確保 Products 有 visible 欄，沒有就補在最後，回傳欄位 index（0-based）
+function ensureVisibleCol_(sh, headers) {
+  let col = headers.indexOf('visible');
+  if (col >= 0) return col;
+  col = headers.length;
+  sh.getRange(1, col + 1).setValue('visible');
+  headers.push('visible');
+  return col;
+}
+
+// [v2.9] 一次性：把所有商品 visible 統一設 TRUE，清掉 v2.12 以前留下的舊值
+//        改版後在編輯器手動執行一次就好（之後不用再跑）
+function resetAllVisible() {
+  const sh      = getSheet(SH.PRODUCTS);
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
+  const visCol  = ensureVisibleCol_(sh, headers);
+  const n       = sh.getLastRow() - 1;
+  if (n <= 0) return Logger.log('ℹ️ 沒有商品資料');
+  sh.getRange(2, visCol + 1, n, 1).setValues(Array.from({ length: n }, () => [true]));
+  Logger.log(`✅ 已將 ${n} 筆商品 visible 設為 TRUE`);
+}
+
+// [v2.9] 給進貨頁判斷「本週換花」預設勾選
+function getRotateStatus() {
+  const now = new Date();
+  return {
+    today     : Utilities.formatDate(now, 'Asia/Taipei', 'yyyy-MM-dd'),
+    isSaturday: Utilities.formatDate(now, 'Asia/Taipei', 'u') === '6',
+    lastRotate: PropertiesService.getScriptProperties().getProperty('last_weekly_rotate') || '',
+  };
 }
 
 function ensureProductExists(name, category, cost, price) {
@@ -1684,7 +1873,11 @@ function addAllocationColumn() {
 }
 
 // ══════════════════════════════════════════════════════
-//  每週日 00:00 自動報廢主花/配花/葉材剩餘庫存
+//  [v2.8 停用] 已改為週六進貨時自動換花（見 weeklyRotateFlowers_）
+//  請執行 removeWeeklyWasteTrigger() 一次，移除週日排程。
+//  weeklyAutoWaste 保留給「臨時要手動全部報廢」時在編輯器執行。
+//  ────────────────────────────────────────────────────
+//  （舊說明）每週日 00:00 自動報廢主花/配花/葉材剩餘庫存
 //  [Auto Waste] 執行後會把所有 active 商品中
 //  category 為 主花/配花/葉材 的各點位庫存歸零
 //  並在 InventoryLog 寫入 type='waste' 記錄
@@ -1758,6 +1951,16 @@ function weeklyAutoWaste() {
 //  執行後會建立「每週日 00:00–01:00」的排程
 //  重複執行會自動移除舊的再建新的，不會重複
 // ══════════════════════════════════════════════════════
+// [v2.8] 移除週日自動報廢排程（在編輯器手動執行一次）
+function removeWeeklyWasteTrigger() {
+  let removed = 0;
+  ScriptApp.getProjectTriggers().forEach(t => {
+    if (t.getHandlerFunction() === 'weeklyAutoWaste') { ScriptApp.deleteTrigger(t); removed++; }
+  });
+  Logger.log(removed ? `✅ 已移除 ${removed} 個週日自動報廢排程` : 'ℹ️ 沒有找到週日自動報廢排程');
+}
+
+// [v2.8] 已停用：週日報廢會把週六剛進的新花歸零，請勿再執行
 function setupWeeklyWasteTrigger() {
   // 移除舊的同名 trigger，避免重複
   ScriptApp.getProjectTriggers().forEach(t => {
@@ -1777,52 +1980,169 @@ function setupWeeklyWasteTrigger() {
 }
 
 // ══════════════════════════════════════════════════════
-//  [v2.5] 百貨兌換券模組
+//  [v2.5 → v2.7] 百貨兌換券模組（多活動版）
 //
-//  前端購物車兌換品項格式（items 陣列中的一筆）：
-//  {
-//    id: 12, name: '粉玫瑰', qty: 1,
-//    price: 0,              // 結帳金額為 0
-//    originalPrice: 60,     // 原價，只做顯示用
-//    voucher: true,         // 兌換旗標
-//    vouchers: 1,           // 使用張數
-//    cost: 18               // 照常帶成本
-//  }
-//  整筆交易：total 只算現金品項；cost 包含兌換品項成本
-//  純兌換單建議 pay 帶 '百貨兌換券'
+//  ▍活動設定：試算表「VoucherCampaigns」分頁，一列一檔活動
+//    campaignId  活動代碼（唯一，例：C001、FOCUS-2611）
+//    name        活動名稱（收銀台與報表顯示用）
+//    mall        百貨名稱（選填）
+//    value       每張券向百貨請款金額
+//    stores      適用點位，逗號分隔；空白或「全部」= 所有點位
+//                可寫完整名稱或關鍵字：高雄、台南FOCUS、誠品、市集、Studio
+//    startDate   開始日（空白 = 不限）
+//    endDate     結束日（空白 = 不限）
+//    categories  限定可兌換分類，逗號分隔；空白 = 全部分類
+//    active      TRUE / 是 = 啟用
+//    note        備註
+//
+//  ▍鎖定原則：結帳當下由後端查活動表，把「活動名稱 + 當下金額」
+//    寫進交易 items 與 VoucherLog。之後修改活動金額不會改寫歷史。
+//
+//  ▍前端購物車兌換品項格式：
+//  { id, name, qty, price: 0, originalPrice, voucher: true, vouchers: 1,
+//    campaignId: 'C001', campaignName, voucherValue, cost }
 // ══════════════════════════════════════════════════════
 
-const VOUCHER_VALUE   = 40; // 每張券向百貨請款金額
-const VOUCHER_HEADERS = ['time','txId','store','productId','name','qty','vouchers','receivable','status','billedAt','billBatch','voided'];
+const VOUCHER_DEFAULT_VALUE = 40;                     // 找不到活動時的預設金額（舊資料相容）
+const VOUCHER_VALUE         = VOUCHER_DEFAULT_VALUE;  // v2.5 相容
+const VOUCHER_UNCAT         = 'UNCAT';                // 沒有活動代碼的舊紀錄
+const VOUCHER_HEADERS  = ['time','txId','store','productId','name','qty','vouchers','receivable','status','billedAt','billBatch','voided','campaignId','campaignName','voucherValue'];
+const CAMPAIGN_HEADERS = ['campaignId','name','mall','value','stores','startDate','endDate','categories','active','note'];
 
-// 手動執行一次（不執行也可以，第一次兌換時會自動建立）
+// 手動執行一次：建立 / 補齊 VoucherLog 與 VoucherCampaigns
 function setupVoucherSheet() {
   getVoucherSheet_();
-  Logger.log('✅ VoucherLog 工作表初始化完成');
+  getCampaignSheet_();
+  Logger.log('✅ VoucherLog / VoucherCampaigns 初始化完成');
 }
 
 function getVoucherSheet_() {
   const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
   let sh = ss.getSheetByName(SH.VOUCHER_LOG);
   if (!sh) sh = ss.insertSheet(SH.VOUCHER_LOG);
-  if (sh.getLastRow() === 0) sh.appendRow(VOUCHER_HEADERS);
+  if (sh.getLastRow() === 0) { sh.appendRow(VOUCHER_HEADERS); return sh; }
+  // v2.5 → v2.7：補上活動欄位（加在最後面，不動既有欄位）
+  const lastCol = sh.getLastColumn();
+  const headers = sh.getRange(1, 1, 1, lastCol).getValues()[0];
+  const missing = VOUCHER_HEADERS.filter(h => headers.indexOf(h) === -1);
+  if (missing.length) sh.getRange(1, lastCol + 1, 1, missing.length).setValues([missing]);
   return sh;
 }
 
+function getCampaignSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(SH.VOUCHER_CAMPAIGNS);
+  if (!sh) {
+    sh = ss.insertSheet(SH.VOUCHER_CAMPAIGNS);
+    sh.appendRow(CAMPAIGN_HEADERS);
+    sh.appendRow(['C001', '百貨兌換券（預設）', '', VOUCHER_DEFAULT_VALUE, '全部', '', '', '', true, '系統自動建立，可直接修改或新增活動']);
+    sh.setFrozenRows(1);
+  } else if (sh.getLastRow() === 0) {
+    sh.appendRow(CAMPAIGN_HEADERS);
+  }
+  return sh;
+}
+
+// ── 小工具 ──
 function isVoucherItem_(it) {
   return !!it && (it.voucher === true || String(it.voucher).toLowerCase() === 'true');
+}
+function voucherValueOf_(it) { return Number(it && it.voucherValue) || VOUCHER_DEFAULT_VALUE; }
+function campaignKeyOf_(it)  { return String((it && it.campaignId) || '').trim() || VOUCHER_UNCAT; }
+function splitList_(v) {
+  return String(v || '').split(/[,，、;；\n]/).map(s => s.trim()).filter(s => s && s !== '全部');
+}
+function dateOnly_(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  const m = s.match(/(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})/);
+  if (!m) return '';
+  return `${m[1]}-${m[2].padStart(2, '0')}-${m[3].padStart(2, '0')}`;
+}
+function isTruthy_(v) {
+  if (v === true) return true;
+  return ['true', '是', 'y', 'yes', '1', '啟用', 'v', '✓', 'o'].includes(String(v || '').trim().toLowerCase());
+}
+
+// ── 活動讀取 ──
+function readCampaigns_() {
+  const rows = sheetToObjects(getCampaignSheet_());
+  return rows
+    .map((r, i) => ({ r, i }))
+    .filter(({ r }) => String(r.campaignId || '').trim() || String(r.name || '').trim())
+    .map(({ r, i }) => ({
+      campaignId: String(r.campaignId || '').trim() || ('ROW' + (i + 2)),
+      name      : String(r.name || '').trim() || '未命名活動',
+      mall      : String(r.mall || '').trim(),
+      value     : Number(r.value) || VOUCHER_DEFAULT_VALUE,
+      stores    : splitList_(r.stores),
+      startDate : dateOnly_(r.startDate),
+      endDate   : dateOnly_(r.endDate),
+      categories: splitList_(r.categories),
+      active    : isTruthy_(r.active),
+      note      : String(r.note || ''),
+    }));
+}
+
+function campaignStatus_(c, today) {
+  if (!c.active) return '停用';
+  if (c.startDate && today < c.startDate) return '未開始';
+  if (c.endDate   && today > c.endDate)   return '已結束';
+  return '進行中';
+}
+
+function campaignMatchesStore_(c, store) {
+  if (!c.stores.length || !store) return true;
+  return c.stores.some(s => s === store || String(store).includes(s) || s.includes(store));
+}
+
+// GET ?action=getVoucherCampaigns&store=市集&date=yyyy-MM-dd   → 該點位今天可用的活動
+// GET ?action=getVoucherCampaigns&all=1                        → 全部活動（含狀態）
+function getVoucherCampaigns(store, date, all) {
+  const today = dateOnly_(date) || Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
+  const list  = readCampaigns_().map(c => Object.assign({}, c, { status: campaignStatus_(c, today) }));
+  if (String(all) === '1' || all === true) return list;
+  return list.filter(c => c.status === '進行中' && campaignMatchesStore_(c, store));
+}
+
+// 由 addTransaction 在寫入前呼叫：以活動表為準，鎖定活動名稱與金額
+function resolveVoucherItems_(items) {
+  const vItems = (items || []).filter(isVoucherItem_);
+  if (!vItems.length) return;
+  const map = {};
+  readCampaigns_().forEach(c => { map[c.campaignId] = c; });
+  vItems.forEach(it => {
+    const c = it.campaignId ? map[String(it.campaignId).trim()] : null;
+    if (c) {
+      it.campaignId   = c.campaignId;
+      it.campaignName = c.name;
+      it.voucherValue = c.value;
+    } else {
+      it.campaignId   = String(it.campaignId || '');
+      it.campaignName = it.campaignName || '未分類';
+      it.voucherValue = voucherValueOf_(it);
+    }
+  });
 }
 
 // 由 addTransaction 在 Lock 內呼叫
 function logVoucherItems_(txId, txDate, store, items) {
   const vItems = (items || []).filter(it => isVoucherItem_(it) && Number(it.vouchers) > 0);
   if (!vItems.length) return 0;
-  const sh   = getVoucherSheet_();
+  const sh      = getVoucherSheet_();
+  const headers = sh.getRange(1, 1, 1, sh.getLastColumn()).getValues()[0];
   const rows = vItems.map(it => {
-    const v = Number(it.vouchers) || 0;
-    return [txDate, txId, store || '', Number(it.id) || '', it.name || '', Number(it.qty) || 0, v, v * VOUCHER_VALUE, '未請款', '', '', false];
+    const v   = Number(it.vouchers) || 0;
+    const val = voucherValueOf_(it);
+    const o = {
+      time: txDate, txId, store: store || '', productId: Number(it.id) || '', name: it.name || '',
+      qty: Number(it.qty) || 0, vouchers: v, receivable: v * val, status: '未請款',
+      billedAt: '', billBatch: '', voided: false,
+      campaignId: it.campaignId || '', campaignName: it.campaignName || '未分類', voucherValue: val,
+    };
+    return headers.map(h => (o[h] !== undefined ? o[h] : ''));
   });
-  sh.getRange(sh.getLastRow() + 1, 1, rows.length, rows[0].length).setValues(rows);
+  sh.getRange(sh.getLastRow() + 1, 1, rows.length, headers.length).setValues(rows);
   return rows.length;
 }
 
@@ -1843,21 +2163,23 @@ function markVoucherVoided_(txId) {
   return { voided, billedWarning };
 }
 
-// 給日報用：從交易 items 算當日兌換張數與應收
+// 給日報用：從交易 items 算當日兌換張數與應收（各活動金額分開計）
 function voucherSummaryFromTxs_(txs) {
-  let voucherCount = 0, voucherStems = 0;
+  let voucherCount = 0, voucherStems = 0, voucherReceivable = 0;
   txs.forEach(r => {
     safeJson(String(r.items || '[]'), []).forEach(it => {
       if (!isVoucherItem_(it)) return;
-      voucherCount += Number(it.vouchers) || 0;
-      voucherStems += Number(it.qty)      || 0;
+      const v = Number(it.vouchers) || 0;
+      voucherCount      += v;
+      voucherStems      += Number(it.qty) || 0;
+      voucherReceivable += v * voucherValueOf_(it);
     });
   });
-  return { voucherCount, voucherStems, voucherReceivable: voucherCount * VOUCHER_VALUE };
+  return { voucherCount, voucherStems, voucherReceivable };
 }
 
-// GET ?action=getVoucherReport&store=&from=yyyy-MM-dd&to=yyyy-MM-dd&status=未請款
-function getVoucherReport(store, from, to, status) {
+// GET ?action=getVoucherReport&store=&from=&to=&status=未請款&campaign=C001
+function getVoucherReport(store, from, to, status, campaign) {
   const rows     = sheetToObjects(getVoucherSheet_());
   const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
   const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
@@ -1868,11 +2190,12 @@ function getVoucherReport(store, from, to, status) {
     if (isNaN(d) || d < fromDate || d > toDate) return false;
     if (store && r.store !== store) return false;
     if (status && r.status !== status) return false;
+    if (campaign && campaignKeyOf_(r) !== campaign) return false;
     return notVoid(r);
   });
 
   let totalVouchers = 0, totalReceivable = 0, unbilledVouchers = 0, unbilledAmount = 0;
-  const byStore = {}, byProductMap = {};
+  const byStore = {}, byProductMap = {}, byCampaign = {};
   filtered.forEach(r => {
     const v   = Number(r.vouchers)   || 0;
     const amt = Number(r.receivable) || 0;
@@ -1887,6 +2210,12 @@ function getVoucherReport(store, from, to, status) {
     byStore[s].receivable += amt;
     if (unbilled) { byStore[s].unbilledVouchers += v; byStore[s].unbilledAmount += amt; }
 
+    const k = campaignKeyOf_(r);
+    if (!byCampaign[k]) byCampaign[k] = { key: k, name: r.campaignName || '未分類', vouchers: 0, receivable: 0, unbilledVouchers: 0, unbilledAmount: 0 };
+    byCampaign[k].vouchers   += v;
+    byCampaign[k].receivable += amt;
+    if (unbilled) { byCampaign[k].unbilledVouchers += v; byCampaign[k].unbilledAmount += amt; }
+
     const n = String(r.name || '未知');
     if (!byProductMap[n]) byProductMap[n] = { name: n, qty: 0, vouchers: 0 };
     byProductMap[n].qty      += Number(r.qty) || 0;
@@ -1894,17 +2223,18 @@ function getVoucherReport(store, from, to, status) {
   });
 
   return {
-    voucherValue: VOUCHER_VALUE,
+    voucherValue: VOUCHER_DEFAULT_VALUE,
     totalVouchers, totalReceivable,
     unbilledVouchers, unbilledAmount,
     billedAmount: totalReceivable - unbilledAmount,
     byStore,
+    byCampaign: Object.values(byCampaign),
     byProduct: Object.values(byProductMap).sort((a, b) => b.vouchers - a.vouchers),
     rows: filtered.slice(-200).reverse(),
   };
 }
 
-// POST { action:'markVoucherBilled', data:{ store, from, to, billBatch } }
+// POST { action:'markVoucherBilled', data:{ store, from, to, campaign, billBatch } }
 // 把區間內「未請款、未作廢」的兌換紀錄標成已請款。單人操作，不加 Lock
 function markVoucherBilled(data) {
   const sh = getVoucherSheet_();
@@ -1918,7 +2248,7 @@ function markVoucherBilled(data) {
   const vals = sh.getDataRange().getValues();
   const h    = vals[0];
   const c    = name => h.indexOf(name);
-  const tCol = c('time'), sCol = c('store'), stCol = c('status'), vdCol = c('voided');
+  const tCol = c('time'), sCol = c('store'), stCol = c('status'), vdCol = c('voided'), cidCol = c('campaignId');
   const baCol = c('billedAt'), bbCol = c('billBatch'), vCol = c('vouchers'), rcCol = c('receivable');
 
   let count = 0, vouchers = 0, amount = 0;
@@ -1927,6 +2257,7 @@ function markVoucherBilled(data) {
     const d   = row[tCol] instanceof Date ? row[tCol] : parseTaipei_(row[tCol]);
     if (isNaN(d) || d < fromDate || d > toDate) continue;
     if (data.store && row[sCol] !== data.store) continue;
+    if (data.campaign && (String(cidCol >= 0 ? row[cidCol] : '').trim() || VOUCHER_UNCAT) !== data.campaign) continue;
     if (row[stCol] === '已請款') continue;
     if (row[vdCol] === true || String(row[vdCol]).toLowerCase() === 'true') continue;
     row[stCol] = '已請款';
@@ -1948,80 +2279,107 @@ function markVoucherBilled(data) {
 
 
 // ══════════════════════════════════════════════════════
-//  [v2.6] 兌換券效益分析
-//  GET ?action=getVoucherAnalytics&store=&from=yyyy-MM-dd&to=yyyy-MM-dd
+//  [v2.6 → v2.7] 兌換券效益分析（可依活動篩選、各活動比較）
+//  GET ?action=getVoucherAnalytics&store=&from=&to=&campaign=C001
 //
-//  口徑說明：
-//  - 兌換單：items 內至少一筆 voucher=true 的交易
-//  - 加購：兌換單中 total > 0（客人另外付錢買的部分，已扣折扣）
-//  - 兌換收入：券數 × 40（應收百貨，應計基礎）
-//  - 兌換毛利 = 兌換收入 − 兌換花材成本
-//  - 加購毛利 = 加購營收 − 加購品項成本
+//  口徑：
+//  - 兌換單：items 內至少一筆符合條件的 voucher=true 品項
+//  - 加購：兌換單中 total > 0（客人另外付錢的部分，已扣折扣）
+//  - 兌換收入：Σ 券數 × 該筆鎖定的活動金額（應計基礎）
+//  - 兌換毛利 = 兌換收入 − 兌換花材成本；加購毛利 = 加購營收 − 加購成本
 //  - 一般單：同期間、同點位、沒有兌換的交易，作為均單對照組
+//  - 一張單若混到兩檔活動，單層級數據（加購、會員）歸給第一筆兌換品項的活動
 // ══════════════════════════════════════════════════════
-function getVoucherAnalytics(store, from, to) {
+function getVoucherAnalytics(store, from, to, campaign) {
   const rows     = sheetToObjects(getSheet(SH.TRANSACTIONS));
   const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
   const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
   const filt     = storeFilter_(store);
   const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
+  const today    = Utilities.formatDate(new Date(), 'Asia/Taipei', 'yyyy-MM-dd');
 
   const prodCost = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => { prodCost[Number(r.id)] = Number(r.cost) || 0; });
   const unitCostOf = it => Number(it.unitCost) || prodCost[Number(it.id)] || 0;
+  const r0 = n => Math.round(n);
 
   const T = {
-    voucherTx: 0, vouchers: 0, stems: 0, redeemCost: 0,
+    voucherTx: 0, vouchers: 0, stems: 0, income: 0, redeemCost: 0,
     addOnTx: 0, addOnRevenue: 0, addOnCost: 0, memberTx: 0,
     normalTx: 0, normalRevenue: 0,
   };
   const buckets   = { '只兌換': 0, '加購 $1–99': 0, '加購 $100–299': 0, '加購 $300+': 0 };
-  const byStore   = {};
-  const byDate    = {};
-  const redeemMap = {};
-  const addOnMap  = {};
+  const byStore = {}, byDate = {}, redeemMap = {}, addOnMap = {}, byCamp = {};
 
   rows.forEach(r => {
     const d = parseTaipei_(r.date);
     if (isNaN(d) || d < fromDate || d > toDate || !filt(r) || !notVoid(r)) return;
-    const items  = safeJson(String(r.items || '[]'), []);
-    const vItems = items.filter(isVoucherItem_);
-    const total  = Number(r.total) || 0;
+    const items   = safeJson(String(r.items || '[]'), []);
+    const allV    = items.filter(isVoucherItem_);
+    const total   = Number(r.total) || 0;
 
-    if (!vItems.length) { T.normalTx++; T.normalRevenue += total; return; }
+    if (!allV.length) { T.normalTx++; T.normalRevenue += total; return; }
 
-    const pItems  = items.filter(it => !isVoucherItem_(it));
-    const v       = vItems.reduce((a, it) => a + (Number(it.vouchers) || 0), 0);
-    const stems   = vItems.reduce((a, it) => a + (Number(it.qty) || 0), 0);
-    const rCost   = vItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
-    const aCost   = pItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
-    const hasAdd  = total > 0;
+    const pItems = items.filter(it => !isVoucherItem_(it));
+    const aCost  = pItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
+    const hasAdd = total > 0;
+    const txKey  = campaignKeyOf_(allV[0]);
 
-    T.voucherTx++; T.vouchers += v; T.stems += stems; T.redeemCost += rCost;
+    // ── 各活動比較（不受活動篩選影響）──
+    allV.forEach(it => {
+      const k = campaignKeyOf_(it);
+      if (!byCamp[k]) byCamp[k] = { key: k, name: it.campaignName || '未分類', values: {}, voucherTx: 0, vouchers: 0, income: 0, redeemCost: 0, addOnTx: 0, addOnRevenue: 0, addOnCost: 0, memberTx: 0 };
+      const v = Number(it.vouchers) || 0;
+      byCamp[k].vouchers   += v;
+      byCamp[k].income     += v * voucherValueOf_(it);
+      byCamp[k].redeemCost += unitCostOf(it) * (Number(it.qty) || 0);
+      byCamp[k].values[voucherValueOf_(it)] = true;
+    });
+    const bc = byCamp[txKey];
+    bc.voucherTx++;
+    if (hasAdd) { bc.addOnTx++; bc.addOnRevenue += total; bc.addOnCost += aCost; }
+    if (r.memberId) bc.memberTx++;
+
+    // ── 活動篩選 ──
+    const vItems = campaign ? allV.filter(it => campaignKeyOf_(it) === campaign) : allV;
+    if (!vItems.length) return;                          // 這張單是別檔活動
+    const txCounts = !campaign || txKey === campaign;    // 單層級數據歸屬
+
+    const v      = vItems.reduce((a, it) => a + (Number(it.vouchers) || 0), 0);
+    const stems  = vItems.reduce((a, it) => a + (Number(it.qty) || 0), 0);
+    const income = vItems.reduce((a, it) => a + (Number(it.vouchers) || 0) * voucherValueOf_(it), 0);
+    const rCost  = vItems.reduce((a, it) => a + unitCostOf(it) * (Number(it.qty) || 0), 0);
+
+    T.vouchers += v; T.stems += stems; T.income += income; T.redeemCost += rCost;
+
+    const s = r.store || '未知';
+    if (!byStore[s]) byStore[s] = { store: s, voucherTx: 0, vouchers: 0, income: 0, addOnTx: 0, addOnRevenue: 0, redeemCost: 0, addOnCost: 0 };
+    byStore[s].vouchers += v; byStore[s].income += income; byStore[s].redeemCost += rCost;
+
+    const day = Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
+    if (!byDate[day]) byDate[day] = { date: day, vouchers: 0, voucherTx: 0, addOnRevenue: 0 };
+    byDate[day].vouchers += v;
+
+    vItems.forEach(it => {
+      const n = String(it.name || '未知');
+      if (!redeemMap[n]) redeemMap[n] = { name: n, qty: 0, vouchers: 0, income: 0, cost: 0 };
+      redeemMap[n].qty      += Number(it.qty) || 0;
+      redeemMap[n].vouchers += Number(it.vouchers) || 0;
+      redeemMap[n].income   += (Number(it.vouchers) || 0) * voucherValueOf_(it);
+      redeemMap[n].cost     += unitCostOf(it) * (Number(it.qty) || 0);
+    });
+
+    if (!txCounts) return;
+    T.voucherTx++;
     if (hasAdd) { T.addOnTx++; T.addOnRevenue += total; T.addOnCost += aCost; }
     if (r.memberId) T.memberTx++;
-
     if (!hasAdd)          buckets['只兌換']++;
     else if (total < 100) buckets['加購 $1–99']++;
     else if (total < 300) buckets['加購 $100–299']++;
     else                  buckets['加購 $300+']++;
-
-    const s = r.store || '未知';
-    if (!byStore[s]) byStore[s] = { store: s, voucherTx: 0, vouchers: 0, addOnTx: 0, addOnRevenue: 0, redeemCost: 0, addOnCost: 0 };
-    byStore[s].voucherTx++; byStore[s].vouchers += v; byStore[s].redeemCost += rCost;
+    byStore[s].voucherTx++;
     if (hasAdd) { byStore[s].addOnTx++; byStore[s].addOnRevenue += total; byStore[s].addOnCost += aCost; }
-
-    const day = Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
-    if (!byDate[day]) byDate[day] = { date: day, vouchers: 0, voucherTx: 0, addOnRevenue: 0 };
-    byDate[day].vouchers += v; byDate[day].voucherTx++; byDate[day].addOnRevenue += total;
-
-    vItems.forEach(it => {
-      const n = String(it.name || '未知');
-      if (!redeemMap[n]) redeemMap[n] = { name: n, qty: 0, vouchers: 0, cost: 0 };
-      redeemMap[n].qty      += Number(it.qty) || 0;
-      redeemMap[n].vouchers += Number(it.vouchers) || 0;
-      redeemMap[n].cost     += unitCostOf(it) * (Number(it.qty) || 0);
-    });
+    byDate[day].voucherTx++; byDate[day].addOnRevenue += total;
     pItems.forEach(it => {
       const n = String(it.name || '未知');
       if (!addOnMap[n]) addOnMap[n] = { name: n, qty: 0, sales: 0 };
@@ -2030,18 +2388,30 @@ function getVoucherAnalytics(store, from, to) {
     });
   });
 
-  const r0 = n => Math.round(n);
-  const voucherIncome   = T.vouchers * VOUCHER_VALUE;
-  const redeemProfit    = voucherIncome - T.redeemCost;
-  const addOnProfit     = T.addOnRevenue - T.addOnCost;
-  const billing         = getVoucherReport(store, from, to, '');
+  const redeemProfit = T.income - T.redeemCost;
+  const addOnProfit  = T.addOnRevenue - T.addOnCost;
+  const billing      = getVoucherReport(store, from, to, '', campaign);
+
+  // 活動清單（下拉選單 + 狀態），補上出現在資料裡的未分類
+  const campaigns = readCampaigns_().map(c => ({
+    key: c.campaignId, name: c.name, mall: c.mall, value: c.value,
+    stores: c.stores, startDate: c.startDate, endDate: c.endDate,
+    categories: c.categories, status: campaignStatus_(c, today),
+  }));
+  if (byCamp[VOUCHER_UNCAT] || (billing.byCampaign || []).some(x => x.key === VOUCHER_UNCAT)) {
+    campaigns.push({ key: VOUCHER_UNCAT, name: '未分類（舊紀錄）', mall: '', value: VOUCHER_DEFAULT_VALUE, stores: [], startDate: '', endDate: '', categories: [], status: '—' });
+  }
+  const billByCamp = {};
+  (getVoucherReport(store, from, to, '', '').byCampaign || []).forEach(x => { billByCamp[x.key] = x; });
 
   return {
-    period: { from: from || '', to: to || '', store: store || '' },
-    voucherValue: VOUCHER_VALUE,
+    period: { from: from || '', to: to || '', store: store || '', campaign: campaign || '' },
+    voucherValue: VOUCHER_DEFAULT_VALUE,
+    campaigns,
     summary: {
       voucherTx: T.voucherTx, vouchers: T.vouchers, stems: T.stems,
-      voucherIncome,
+      voucherIncome: r0(T.income),
+      avgVoucherValue: T.vouchers ? r0(T.income / T.vouchers) : 0,
       redeemCost: r0(T.redeemCost),
       redeemProfit: r0(redeemProfit),
       redeemCostPerVoucher: T.vouchers ? r0(T.redeemCost / T.vouchers) : 0,
@@ -2063,15 +2433,32 @@ function getVoucherAnalytics(store, from, to) {
       unbilledVouchers: billing.unbilledVouchers, unbilledAmount: billing.unbilledAmount,
       billedAmount: billing.billedAmount, byStore: billing.byStore,
     },
+    byCampaign: Object.values(byCamp).map(x => {
+      const profit = x.income - x.redeemCost + x.addOnRevenue - x.addOnCost;
+      const b = billByCamp[x.key] || {};
+      return {
+        key: x.key, name: x.name,
+        values: Object.keys(x.values).map(Number).sort((a, b) => a - b),
+        voucherTx: x.voucherTx, vouchers: x.vouchers,
+        income: r0(x.income), redeemCost: r0(x.redeemCost),
+        perVoucherMargin: x.vouchers ? r0((x.income - x.redeemCost) / x.vouchers) : 0,
+        addOnRate: x.voucherTx ? Math.round(x.addOnTx / x.voucherTx * 100) : 0,
+        addOnRevenue: r0(x.addOnRevenue),
+        memberRate: x.voucherTx ? Math.round(x.memberTx / x.voucherTx * 100) : 0,
+        profit: r0(profit),
+        profitPerVoucher: x.vouchers ? r0(profit / x.vouchers) : 0,
+        unbilledAmount: r0(b.unbilledAmount || 0),
+      };
+    }).sort((a, b) => b.vouchers - a.vouchers),
     buckets: Object.entries(buckets).map(([label, count]) => ({ label, count })),
     byStore: Object.values(byStore).map(x => ({
       store: x.store, voucherTx: x.voucherTx, vouchers: x.vouchers,
       addOnTx: x.addOnTx, addOnRate: x.voucherTx ? Math.round(x.addOnTx / x.voucherTx * 100) : 0,
       addOnRevenue: r0(x.addOnRevenue),
-      profit: r0(x.vouchers * VOUCHER_VALUE - x.redeemCost + x.addOnRevenue - x.addOnCost),
+      profit: r0(x.income - x.redeemCost + x.addOnRevenue - x.addOnCost),
     })).sort((a, b) => b.vouchers - a.vouchers),
     byDate: Object.values(byDate).sort((a, b) => a.date < b.date ? -1 : 1),
-    redeemItems: Object.values(redeemMap).map(x => ({ ...x, cost: r0(x.cost), margin: r0(x.vouchers * VOUCHER_VALUE - x.cost) })).sort((a, b) => b.qty - a.qty).slice(0, 15),
+    redeemItems: Object.values(redeemMap).map(x => ({ name: x.name, qty: x.qty, vouchers: x.vouchers, cost: r0(x.cost), margin: r0(x.income - x.cost) })).sort((a, b) => b.qty - a.qty).slice(0, 15),
     addOnItems: Object.values(addOnMap).map(x => ({ ...x, sales: r0(x.sales) })).sort((a, b) => b.sales - a.sales).slice(0, 15),
   };
 }

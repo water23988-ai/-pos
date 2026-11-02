@@ -315,7 +315,6 @@
         <span class="store-chip-label">一鍵全配</span>
         <button onclick="quickAllocAll('高雄FOCUS 13')" class="chip">➜ 高雄 FOCUS</button>
         <button onclick="quickAllocAll('台南FOCUS')"    class="chip">➜ 台南 FOCUS</button>
-        <button onclick="quickAllocAll('誠品生活台南')" class="chip">➜ 誠品台南</button>
         <span style="font-size:10px;color:#C4A87A;margin-left:4px;">點擊可把所有品項一次全分給同一據點</span>
     </div>
 
@@ -342,13 +341,24 @@
                     <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
                         <div>
                             <label class="f-label">進貨日期</label>
-                            <input id="procDate" type="date" class="f-input">
+                            <input id="procDate" type="date" class="f-input" onchange="applyRotateDefault()">
                         </div>
                         <div>
                             <label class="f-label">備註</label>
                             <input id="procNote" type="text" placeholder="選填" class="f-input">
                         </div>
                     </div>
+                </div>
+
+                <!-- [v2.13] 本週換花 -->
+                <div class="card" id="rotateCard">
+                    <label style="display:flex;align-items:flex-start;gap:12px;cursor:pointer;">
+                        <input type="checkbox" id="weeklyReset" onchange="renderRotateHint()" style="width:20px;height:20px;margin-top:2px;accent-color:#8e9775;flex-shrink:0;">
+                        <div>
+                            <div style="font-size:14px;font-weight:700;color:#4d6145;">本週換花</div>
+                            <div id="rotateHint" style="font-size:12px;color:#A89278;margin-top:4px;line-height:1.6;"></div>
+                        </div>
+                    </label>
                 </div>
 
                 <!-- ═══ 花材清單（新設計）═══ -->
@@ -525,7 +535,7 @@ function flowerSuggestions() {
 
 // ══ 花材清單 CRUD（新設計）══
 function emptyAlloc() {
-    return { '高雄FOCUS 13': 0, '台南FOCUS': 0, '誠品生活台南': 0, '市集': 0 };
+    return { '高雄FOCUS 13': 0, '台南FOCUS': 0, '市集': 0 };  // [v2.13] 誠品已收點
 }
 
 function addItemRow() {
@@ -826,7 +836,7 @@ function renderItemList() {
         <div class="alloc-section">
             <div class="alloc-section-label">📦 分配到各據點（枝）${(Number(item.stemsPerBunch)||0)*(Number(item.bunchesQty)||0) > 0 ? `<span style="color:#8e9775;font-weight:600;margin-left:6px;">共 ${(Number(item.stemsPerBunch)||0)*(Number(item.bunchesQty)||0)} 枝可分配</span>` : ''}</div>
             <div class="alloc-grid">
-                ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['誠品生活台南','誠品台南'],['市集','市集']].map(([key, label]) => `
+                ${[['高雄FOCUS 13','高雄FOCUS'],['台南FOCUS','台南FOCUS'],['市集','市集']].map(([key, label]) => `
                 <div class="alloc-cell">
                     <label>${label}</label>
                     <input type="number" min="0" inputmode="numeric"
@@ -848,6 +858,39 @@ function escHtml(str) {
 }
 
 // ══ 送出進貨 ══
+// ══ [v2.13] 本週換花 ══
+// 預設勾選條件：進貨日期 = 今天、今天是週六、今天還沒換過花
+// 週六第二筆進貨會自動不勾，避免把第一筆剛進的花報廢掉
+let rotateStatus = { today: '', isSaturday: false, lastRotate: '' };
+
+async function loadRotateStatus() {
+    try {
+        const res = await fetch(`${API_URL}?action=getRotateStatus`);
+        const r   = await res.json();
+        if (r && !r.error) rotateStatus = r;
+    } catch(e) {}
+    applyRotateDefault();
+}
+function applyRotateDefault() {
+    const d  = document.getElementById('procDate').value;
+    const cb = document.getElementById('weeklyReset');
+    cb.checked = !!(rotateStatus.isSaturday && d === rotateStatus.today && rotateStatus.lastRotate !== rotateStatus.today);
+    renderRotateHint();
+}
+function renderRotateHint() {
+    const on   = document.getElementById('weeklyReset').checked;
+    const hint = document.getElementById('rotateHint');
+    const card = document.getElementById('rotateCard');
+    const done = rotateStatus.lastRotate && rotateStatus.lastRotate === rotateStatus.today;
+    if (on) {
+        hint.innerHTML = '送出時會先把上週主花／配花／葉材的剩餘庫存<b style="color:#C4928A;">全部報廢歸零</b>，再把這次沒進的花材從收銀台收起來。花瓶、包裝、加購品不受影響。';
+        card.style.borderColor = '#8e9775';
+    } else {
+        hint.innerHTML = (done ? '今天已經換過花了。' : '') + '不勾：只入庫這批花材並讓它們出現在收銀台，不報廢、不下架其他品項（平日補貨用這個）。';
+        card.style.borderColor = '';
+    }
+}
+
 async function submitProcurement() {
     if (!API_URL) return alert('請先設定 API 網址');
     if (!selectedSource) return alert('請選擇供應商');
@@ -868,6 +911,10 @@ async function submitProcurement() {
         }
     }
 
+    // [v2.13] 換花再確認一次，報廢無法自動還原
+    const weeklyReset = document.getElementById('weeklyReset').checked;
+    if (weeklyReset && !confirm('本週換花：上週主花／配花／葉材的剩餘庫存會全部報廢歸零，這次沒進的花材會從收銀台收起來。\n\n報廢不能自動還原，確定送出嗎？')) return;
+
     const btn = document.getElementById('submitBtn');
     btn.disabled = true; btn.innerText = '送出中...';
     setGas('loading');
@@ -880,6 +927,7 @@ async function submitProcurement() {
                 store : currentStore,
                 date  : document.getElementById('procDate').value || '',
                 note  : document.getElementById('procNote').value.trim(),
+                weeklyReset,                                   // [v2.13] 明確告訴後端要不要換花
                 items : procItems.map(it => ({
                     flowerName   : it.flowerName,
                     category     : it.category,
@@ -897,7 +945,10 @@ async function submitProcurement() {
 
         if (result.success) {
             setGas('ok');
-            showToast(`✅ 進貨完成！${result.totalItems || procItems.length} 種 · NT$ ${(result.totalCost||0).toLocaleString()}`);
+            const rotateMsg = result.weeklyRotate ? `\n🌿 換花完成：報廢 ${result.wastedCount||0} 筆、下架 ${result.hiddenCount||0} 項` : '';
+            showToast(`✅ 進貨完成！${result.totalItems || procItems.length} 種 · NT$ ${(result.totalCost||0).toLocaleString()}${rotateMsg}`, rotateMsg ? 4500 : 2500);
+            if (result.weeklyRotate) rotateStatus.lastRotate = rotateStatus.today || rotateStatus.lastRotate;
+            applyRotateDefault();
             procItems = [];
             document.getElementById('itemList').innerHTML = '';
             document.getElementById('emptyHint').style.display = '';
@@ -996,7 +1047,8 @@ async function loadBatchItems(batchId) {
             const allocHtml = allocEntries.length
                 ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;">${
                     allocEntries.map(([store, b]) => {
-                        const label = store === '高雄FOCUS 13' ? '高雄' : store === '台南FOCUS' ? '台南' : '誠品';
+                        // [v2.13] 修正：市集原本會被標成「誠品」；舊批次的誠品紀錄照常顯示
+                        const label = { '高雄FOCUS 13':'高雄', '台南FOCUS':'台南', '誠品生活台南':'誠品', '市集':'市集' }[store] || store;
                         return `<span style="background:#f0f3ec;color:#6d7756;border-radius:6px;padding:2px 7px;font-size:10px;font-weight:600;">${label} ${b}把</span>`;
                     }).join('')
                   }</div>`
@@ -1200,6 +1252,7 @@ async function init() {
     await loadFlowerLibrary();
     setGas('ok');
     loadBatches();
+    loadRotateStatus();   // [v2.13]
 }
 
 window.onload = init;
