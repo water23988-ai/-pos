@@ -137,7 +137,8 @@
         /* ── 側邊導覽（原 bottom-nav 改版） ── */
         .bottom-nav { position: fixed; left: 0; top: 0; bottom: 0; width: 220px; z-index: 200; background: #E5D2B8; border-right: 1px solid rgba(0,0,0,0.06); display: flex; flex-direction: column; box-shadow: 2px 0 16px rgba(0,0,0,0.08); }
         .nav-brand { padding: 22px 18px 18px; border-bottom: 1px solid rgba(0,0,0,0.08); display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
-        .nav-brand-icon { width: 36px; height: 36px; background: linear-gradient(135deg, #8e9775, #6d7756); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
+        .nav-brand-icon { width: 46px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+        .nav-brand-icon img { width: 100%; height: auto; display: block; pointer-events: none; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; -webkit-user-drag: none; }
         .nav-brand-name { font-size: 14px; font-weight: 800; color: #3d2e1e; letter-spacing: -0.3px; }
         .nav-brand-sub { font-size: 10px; color: #a08060; margin-top: 2px; }
         .nav-section-label { font-size: 9px; font-weight: 700; color: #b8976a; letter-spacing: 0.12em; text-transform: uppercase; padding: 14px 18px 6px; }
@@ -233,7 +234,7 @@
 <!-- ══ 側邊導覽列 ══ -->
 <nav class="bottom-nav" id="bottomNav">
     <div class="nav-brand">
-        <div class="nav-brand-icon">🌸</div>
+        <div class="nav-brand-icon"><img src="logo.png" alt="拾逅花事" draggable="false" oncontextmenu="return false"></div>
         <div>
             <div class="nav-brand-name">拾逅花事</div>
             <div class="nav-brand-sub">Moment Flor · POS</div>
