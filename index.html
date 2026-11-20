@@ -401,6 +401,16 @@
             <div><label class="s-label">取件日期</label><input type="date" id="s-pickup-date" class="s-input"></div>
             <div><label class="s-label">取件時間</label><input type="time" id="s-pickup-time" class="s-input"></div>
         </div>
+        <!-- [v2.11] Studio 客源（原本寫死朋友介紹） -->
+        <label class="s-label" style="margin-top:12px;display:block;">客源</label>
+        <div class="flex flex-wrap gap-2" id="s-source-group">
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn" data-val="walk">路過</button>
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn" data-val="ig">IG/FB</button>
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn active" data-val="friend">朋友介紹</button>
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn" data-val="market">市集常客</button>
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn" data-val="staff">員工</button>
+            <button onclick="toggleStudioTag(this,'source')" class="s-tag-btn" data-val="google">Google</button>
+        </div>
     </div>
     <div class="s-card">
         <div class="text-xs font-bold text-[#a09080] tracking-widest uppercase mb-3">🌸 設計規格</div>
@@ -815,7 +825,7 @@ let productModalMode = 'pos';
 let _recalledHangGasId = null; // 叫回時立刻清除，結帳不再使用
 let _recalledHangName  = null; // 記錄叫回的掛單名稱，供「掛回同名」使用
 let studioItems     = [];
-let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
+let studioTags      = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花', source: 'friend' };  // [v2.11] 加 source
 let _pendingTx      = null;
 let _historyData    = [];  // 新增：暫存查詢結果
 let _currentVoidTxId = null; // 新增：待退款的交易ID // 樂觀更新暫存
@@ -1977,7 +1987,7 @@ async function confirmVoid() {
 
 // ══ Studio ══
 function toggleStudioTag(btn, group) {
-    const groupId = { type: 's-type-group', color: 's-color-group', pay: 's-pay-group', status: 's-status-group', material: 's-material-group' };
+    const groupId = { type: 's-type-group', color: 's-color-group', pay: 's-pay-group', status: 's-status-group', material: 's-material-group', source: 's-source-group' };
     document.querySelectorAll(`#${groupId[group]} .s-tag-btn`).forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
     studioTags[group] = btn.dataset.val;
@@ -2046,7 +2056,7 @@ async function submitStudioOrder() {
         studioTags.status   ? `付款：${studioTags.status}`       : '',
         note                ? `備註：${note}`                     : '',
     ].filter(Boolean).join('｜');
-    const payload = { action: 'addTransaction', data: { id: 'S' + Date.now().toString().slice(-8), date: taipeiNow(), store: '高雄FOCUS 13', memberId: '', memberName: name, subtotal: total, discount: 0, total, cost: Math.round(cost), pay: studioTags.pay||'現金', earnedPoints: 0, note: noteStr, customerType: '新客', source: 'friend', items: studioItems.map(i => ({ id: i.productId||0, name: i.name, qty: i.qty||1, unitPrice: i.price||0, unitCost: i.cost||0 })) } };
+    const payload = { action: 'addTransaction', data: { id: 'S' + Date.now().toString().slice(-8), date: taipeiNow(), store: 'Studio', memberId: '', memberName: name, subtotal: total, discount: 0, total, cost: Math.round(cost), pay: studioTags.pay||'現金', earnedPoints: 0, note: noteStr, customerType: '新客', source: studioTags.source||'friend', items: studioItems.map(i => ({ id: i.productId||0, name: i.name, qty: i.qty||1, unitPrice: i.price||0, unitCost: i.cost||0 })) } };
     const btn = document.getElementById('s-submitBtn');
     btn.disabled = true; btn.innerText = '送出中...';
     setGasStatus('loading');
@@ -2062,11 +2072,12 @@ function resetStudioForm() {
     ['s-name','s-phone','s-note','s-budget','s-total'].forEach(id => document.getElementById(id).value = '');
     document.getElementById('s-pickup-date').valueAsDate = new Date();
     document.getElementById('s-pickup-time').value = '';
-    studioItems = []; studioTags = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花' };
+    studioItems = []; studioTags = { type: '', color: '', pay: '現金', status: '已付', material: '鮮花', source: 'friend' };
     document.querySelectorAll('.s-tag-btn').forEach(b => b.classList.remove('active'));
     document.querySelector('[data-val="現金"]').classList.add('active');
     document.querySelector('[data-val="已付"]').classList.add('active');
     document.querySelector('[data-val="鮮花"]').classList.add('active');
+    document.querySelector('#s-source-group [data-val="friend"]').classList.add('active');  // [v2.11]
     renderStudioItems();
     document.getElementById('s-total-display').innerText = 'NT$ 0';
 }
@@ -2078,7 +2089,7 @@ async function openDailyModal() {
     document.getElementById('dailyCloseStatus').innerText = '';
     document.getElementById('dailyContent').innerHTML = '<p style="text-align:center;color:#d1d5db;font-size:12px;padding:32px 0;">載入中...</p>';
     const date  = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
-    const store = currentView === 'studio' ? '高雄FOCUS 13' : storeForGAS();
+    const store = currentView === 'studio' ? 'Studio' : storeForGAS();  // [v2.11] Studio 日結查 Studio
     setGasStatus('loading');
     try {
         const [repRes, payRes] = await Promise.all([
@@ -2128,7 +2139,7 @@ async function confirmDailyClose() {
     const btn = document.querySelector('#dailyConfirmArea button');
     btn.disabled = true; btn.innerText = '記錄中...';
     const date  = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Asia/Taipei' }).format(new Date());
-    const store = currentView === 'studio' ? '高雄FOCUS 13' : storeForGAS();
+    const store = currentView === 'studio' ? 'Studio' : storeForGAS();  // [v2.11] Studio 日結查 Studio
     setGasStatus('loading');
     try {
         const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'dailyClose', data: { date, store, closedAt: taipeiNow() } }) });
