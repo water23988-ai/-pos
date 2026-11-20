@@ -1,5 +1,28 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
+//  版本：2.14  |  2026-11
+//  [v2.14] 價格歷史修復
+//         - 原因：進貨時只在 PriceHistory 分頁「已存在」才寫入，分頁從沒建立過，所以一筆都沒記到
+//         - 進貨時分頁不存在就自動建立
+//         - 售價欄：進貨單有填就用填的，沒填就記當下收銀台售價（原本沒填記 0）
+//         - 商品頁手動改售價或成本也會記一筆（來源「手動調價」）
+//         - 新增一次性 rebuildPriceHistory()：用 ProcurementItems 補回 4 月起的每次進貨，
+//           售價取該批進貨後 7 天內收銀台最常成交的單價
+//  ────────────────────────────────────────────────────
+//  版本：2.13  |  2026-11
+//  [v2.13] 商品頁三種狀態：上架中 / 本週未進 / 停售
+//         - updateProduct 支援 visible；收到舊版前端送來的 status='hidden'
+//           自動轉成 status=active + visible=FALSE，不再寫入 hidden
+//  ────────────────────────────────────────────────────
+//  版本：2.12  |  2026-11
+//  [v2.12] 修正：進貨後部分品項沒回到收銀台
+//         - 原因：Products 的 status 除了 active / inactive，還有商品頁寫入的 'hidden'；
+//           進貨只打開 visible，status 仍是 hidden，收銀台只認 status=active 所以不顯示
+//         - showProductsByName_：進貨品項 status 是 hidden 時一併改回 active（inactive 停售維持不動）
+//         - 新增一次性 migrateHiddenStatus()：把 status=hidden 統一轉成 active + visible=FALSE，
+//           之後 status 只剩 active（販售中）/ inactive（停售）兩種意思
+//         - 新增 checkLastProcurement()：檢查最近一批進貨，每個品項為什麼有 / 沒有出現在收銀台
+//  ────────────────────────────────────────────────────
 //  版本：2.11  |  2026-11
 //  [v2.11] Studio 訂單獨立
 //         - Studio 花材另外進貨：Studio 單結帳不扣任何點位庫存，作廢也不還原庫存
@@ -391,6 +414,15 @@ function updateProduct(data) {
     if (Number(vals[i][idCol]) === Number(data.id)) {
       const row = i + 1;
       const set = (col, val) => sh.getRange(row, headers.indexOf(col) + 1).setValue(val);
+      // [v2.14] 手動改售價或成本 → 記一筆價格歷史
+      const oldPrice = Number(vals[i][headers.indexOf('price')]) || 0;
+      const oldCost  = Number(vals[i][headers.indexOf('cost')])  || 0;
+      const newPrice = data.price !== undefined ? Number(data.price) : oldPrice;
+      const newCost  = data.cost  !== undefined ? Number(data.cost)  : oldCost;
+      if (newPrice !== oldPrice || newCost !== oldCost) {
+        priceLogSheet_().appendRow([taipeiNow(), data.name || vals[i][headers.indexOf('name')], data.category || vals[i][headers.indexOf('category')],
+          0, 0, newCost, newPrice, `手動調價（售價 ${oldPrice}→${newPrice}、成本 ${oldCost}→${newCost}）`]);
+      }
       if (data.name        !== undefined) set('name',        data.name);
       if (data.category    !== undefined) set('category',    data.category);
       if (data.price       !== undefined) set('price',       Number(data.price));
@@ -399,10 +431,16 @@ function updateProduct(data) {
       if (data.stockTN     !== undefined) set('stockTN',     Number(data.stockTN));
       if (data.stockES     !== undefined) set('stockES',     Number(data.stockES));
       if (data.stockMarket !== undefined) set('stockMarket', Number(data.stockMarket));
+      // [v2.13] 舊版前端的「隱藏」= 本週未進：status 維持 active，改寫 visible
+      if (String(data.status || '').toLowerCase() === 'hidden') { data.status = 'active'; data.visible = false; }
       if (data.status !== undefined) {
         let statusCol = headers.indexOf('status');
         if (statusCol === -1) { statusCol = headers.length; sh.getRange(1, statusCol + 1).setValue('status'); }
         sh.getRange(row, statusCol + 1).setValue(data.status);
+      }
+      if (data.visible !== undefined) {   // [v2.13]
+        const visCol = ensureVisibleCol_(sh, headers);
+        sh.getRange(row, visCol + 1).setValue(data.visible !== false && String(data.visible).toUpperCase() !== 'FALSE');
       }
       if (data.code !== undefined) {
         let codeCol = headers.indexOf('code');
@@ -1275,12 +1313,74 @@ function logPriceHistory(data) {
   return { success: true };
 }
 
+// [v2.14] 取得 PriceHistory 分頁，不存在就建立
+function priceLogSheet_() {
+  const ss = SpreadsheetApp.openById(SPREADSHEET_ID);
+  let sh = ss.getSheetByName(SH.PRICE_LOG);
+  if (!sh) { sh = ss.insertSheet(SH.PRICE_LOG); sh.appendRow(['time','name','category','bundlePrice','stems','unitCost','salePrice','note']); }
+  return sh;
+}
+
+function currentPriceByName_(name) {
+  const n = String(name || '').trim();
+  const p = sheetToObjects(getSheet(SH.PRODUCTS)).find(r => String(r.name || '').trim() === n);
+  return p ? Number(p.price) || 0 : 0;
+}
+
+// [v2.14] 一次性：從 ProcurementItems 補回價格歷史
+//  - 只在 PriceHistory 沒有任何資料時執行，避免重複；要強制重建請執行 rebuildPriceHistory(true)
+//  - 售價：該批進貨日起 7 天內，收銀台這支花最常成交的單價（含封存檔交易）；沒賣出就留 0
+function rebuildPriceHistory(force) {
+  const sh = priceLogSheet_();
+  if (sh.getLastRow() > 1 && force !== true) {
+    return Logger.log(`ℹ️ PriceHistory 已有 ${sh.getLastRow() - 1} 筆，未執行。要清空重建請執行 rebuildPriceHistory(true)`);
+  }
+  const items = sheetToObjects(getSheet(SH_PROC.ITEMS));
+  if (!items.length) return Logger.log('沒有進貨資料');
+
+  const srcByBatch = {};
+  sheetToObjects(getSheet(SH_PROC.BATCHES)).forEach(b => { srcByBatch[b.batchId] = b.source || ''; });
+
+  // 成交單價：name → [{ymd, price}]
+  const sales = {};
+  getTxRows_(true).forEach(t => {
+    if (t.voided === true || String(t.voided).toLowerCase() === 'true') return;
+    const ymd = String(t.date).slice(0, 10);
+    safeJson(String(t.items || ''), []).forEach(it => {
+      const n = String(it.name || '').trim(), price = Number(it.unitPrice) || 0;
+      if (!n || price <= 0) return;
+      (sales[n] = sales[n] || []).push({ ymd, price });
+    });
+  });
+  const addDays = (ymd, d) => { const x = new Date(ymd + 'T00:00:00+08:00'); x.setDate(x.getDate() + d); return ymdOf_(x); };
+  const modePrice = (name, from) => {
+    const to = addDays(from, 6), cnt = {};
+    (sales[name] || []).forEach(s => { if (s.ymd >= from && s.ymd <= to) cnt[s.price] = (cnt[s.price] || 0) + 1; });
+    const best = Object.entries(cnt).sort((a, b) => b[1] - a[1] || b[0] - a[0])[0];
+    return best ? Number(best[0]) : 0;
+  };
+
+  const rows = items.map(it => {
+    const ymd  = String(it.date || '').slice(0, 10).replace(/\//g, '-');
+    const name = String(it.flowerName || '').trim();
+    return [ymd + 'T00:00:00', name, it.category || '', Number(it.pricePerBunch) || 0, Number(it.stemsPerBunch) || 0,
+            Number(it.costPerStem) || 0, modePrice(name, ymd), `進貨（${srcByBatch[it.batchId] || ''}）`];
+  }).filter(r => r[1]);
+
+  if (sh.getLastRow() > 1) sh.getRange(2, 1, sh.getLastRow() - 1, 8).clearContent();
+  sh.getRange(2, 1, rows.length, 8).setValues(rows);
+  const noPrice = rows.filter(r => !r[6]).length;
+  Logger.log(`✅ 已補回 ${rows.length} 筆進貨價格（${noPrice} 筆在進貨後 7 天內沒有成交，售價留空）`);
+}
+
 function getPriceHistory(name) {
   const sh = SpreadsheetApp.openById(SPREADSHEET_ID).getSheetByName(SH.PRICE_LOG);
   if (!sh || sh.getLastRow() < 2) return [];
   const rows     = sheetToObjects(sh);
   const filtered = name ? rows.filter(r => r.name === name) : rows;
-  return filtered.reverse().slice(0, 300).map(r => ({
+  // [v2.14] 依時間新到舊排序（補回的舊資料和新資料混在一起時也正確），上限放寬到 1000 筆
+  filtered.sort((a, b) => String(b.time).localeCompare(String(a.time)));
+  return filtered.slice(0, 1000).map(r => ({
     time: r.time, name: r.name, category: r.category,
     bundlePrice: Number(r.bundlePrice)||0, stems: Number(r.stems)||0,
     unitCost: Number(r.unitCost)||0, salePrice: Number(r.salePrice)||0, note: r.note,
@@ -1363,8 +1463,9 @@ function addProcurement(data) {
       updateProductCostWeighted({ flowerName: item.flowerName, store: data.store || '', newStems: totalStems, newCost: costPerStem });
     }
     if (Number(item.salePrice) > 0) updateProductPrice(item.flowerName, Number(item.salePrice));
-    const phSh = getSheet(SH.PRICE_LOG);
-    if (phSh) phSh.appendRow([taipeiNow(), item.flowerName || '', item.category || '', pricePerBunch, stemsPerBunch, costPerStem, Number(item.salePrice) || 0, `進貨（${data.source || ''}）`]);
+    // [v2.14] 分頁不存在就建立；沒填售價就記當下收銀台售價
+    const salePriceNow = Number(item.salePrice) > 0 ? Number(item.salePrice) : currentPriceByName_(item.flowerName);
+    priceLogSheet_().appendRow([taipeiNow(), item.flowerName || '', item.category || '', pricePerBunch, stemsPerBunch, costPerStem, salePriceNow, `進貨（${data.source || ''}）`]);
   });
 
   batchSh.appendRow([batchId, date, data.source || '', '', data.note || '', items.length, Math.round(totalCost)]);
@@ -1465,19 +1566,29 @@ function showProductsByName_(names) {
   const sh      = getSheet(SH.PRODUCTS);
   const vals    = sh.getDataRange().getValues();
   const headers = vals[0];
-  const nameCol = headers.indexOf('name');
-  const visCol  = ensureVisibleCol_(sh, headers);
+  const nameCol   = headers.indexOf('name');
+  const statusCol = headers.indexOf('status');
+  const visCol    = ensureVisibleCol_(sh, headers);
 
-  const seen  = new Set();
-  const cells = [];
+  const seen      = new Set();
+  const visCells  = [];
+  const statCells = [];
   for (let i = 1; i < vals.length; i++) {
     const name = String(vals[i][nameCol] || '').trim();
     if (!want.has(name) || seen.has(name)) continue;
     seen.add(name);
-    if (!isVisible_(vals[i][visCol])) cells.push(sh.getRange(i + 1, visCol + 1).getA1Notation());
+    let changed = false;
+    if (!isVisible_(vals[i][visCol])) { visCells.push(sh.getRange(i + 1, visCol + 1).getA1Notation()); changed = true; }
+    // [v2.12] 商品頁「隱藏」寫的是 status=hidden，屬於暫時下架，有進貨就恢復販售
+    //         inactive（停售）不動，維持 v2.9 的規則
+    if (statusCol >= 0 && String(vals[i][statusCol] || '').toLowerCase() === 'hidden') {
+      statCells.push(sh.getRange(i + 1, statusCol + 1).getA1Notation()); changed = true;
+    }
+    if (changed) vals[i]._changed = true;
   }
-  if (cells.length) sh.getRangeList(cells).setValue(true);
-  return cells.length;
+  if (visCells.length)  sh.getRangeList(visCells).setValue(true);
+  if (statCells.length) sh.getRangeList(statCells).setValue('active');
+  return vals.filter(r => r._changed).length;
 }
 
 // [v2.9] 確保 Products 有 visible 欄，沒有就補在最後，回傳欄位 index（0-based）
@@ -2612,4 +2723,74 @@ function fixStudioStore() {
     n += cells.length;
   });
   Logger.log(`✅ 已將 ${n} 筆 Studio 單的點位改為 Studio（主檔 ${main.rows.length}、封存檔 ${arch.rows.length}）`);
+}
+
+
+// ══════════════════════════════════════════════════════
+//  [v2.12] 一次性：status=hidden → active + visible=FALSE
+//  顯示結果不變（原本看不到的還是看不到），但下次進貨就能正常回到收銀台
+// ══════════════════════════════════════════════════════
+function migrateHiddenStatus() {
+  const sh      = getSheet(SH.PRODUCTS);
+  const vals    = sh.getDataRange().getValues();
+  const headers = vals[0];
+  const statusCol = headers.indexOf('status');
+  const visCol    = ensureVisibleCol_(sh, headers);
+  const nameCol   = headers.indexOf('name');
+  const statCells = [], visCells = [], names = [];
+  for (let i = 1; i < vals.length; i++) {
+    if (String(vals[i][statusCol] || '').toLowerCase() !== 'hidden') continue;
+    statCells.push(sh.getRange(i + 1, statusCol + 1).getA1Notation());
+    visCells.push(sh.getRange(i + 1, visCol + 1).getA1Notation());
+    names.push(vals[i][nameCol]);
+  }
+  if (!statCells.length) return Logger.log('ℹ️ 沒有 status=hidden 的商品');
+  sh.getRangeList(visCells).setValue(false);
+  sh.getRangeList(statCells).setValue('active');
+  Logger.log(`✅ 已轉換 ${statCells.length} 筆：${names.join('、')}`);
+}
+
+// ══════════════════════════════════════════════════════
+//  [v2.12] 檢查本週進貨：從最近一次換花那天起的所有批次
+//  每個品項在收銀台看不看得到、原因是什麼；並列出換花報廢被執行了幾次
+//  在編輯器執行，結果看「執行紀錄」
+// ══════════════════════════════════════════════════════
+function checkLastProcurement() {
+  const ss     = SpreadsheetApp.openById(SPREADSHEET_ID);
+  const items  = sheetToObjects(ss.getSheetByName(SH_PROC.ITEMS));
+  if (!items.length) return Logger.log('沒有進貨資料');
+  const ymd    = v => (v instanceof Date) ? Utilities.formatDate(v, 'Asia/Taipei', 'yyyy-MM-dd') : String(v || '').slice(0, 10).replace(/\//g, '-');
+  const since  = PropertiesService.getScriptProperties().getProperty('last_weekly_rotate')
+              || ymd(items[items.length - 1].date);
+  const recent = items.filter(r => ymd(r.date) >= since);
+  const products = sheetToObjects(getSheet(SH.PRODUCTS));
+
+  // 換花報廢執行紀錄（同一天跑兩次 = 第二筆進貨把第一筆的花報廢掉）
+  const logs = sheetToObjects(getSheet(SH.INV_LOG))
+    .filter(r => String(r.note || '').includes('週換花報廢') && ymd(r.time) >= since);
+  const runs = {};
+  logs.forEach(r => { const k = String(r.time).slice(0, 16); runs[k] = (runs[k] || 0) + 1; });
+  Logger.log(`最近換花日：${since}，換花報廢執行 ${Object.keys(runs).length} 次`);
+  Object.entries(runs).forEach(([t, n]) => Logger.log(`   ${t}　報廢 ${n} 筆`));
+
+  const batches = [...new Set(recent.map(r => r.batchId))];
+  Logger.log(`這段期間進貨 ${batches.length} 批、${recent.length} 項`);
+  const seen = new Set();
+  let bad = 0;
+  recent.forEach(it => {
+    const name = String(it.flowerName || '').trim();
+    if (!name || seen.has(name)) return;
+    seen.add(name);
+    const matches = products.filter(p => String(p.name || '').trim() === name);
+    if (!matches.length) { bad++; return Logger.log(`❌ ${name}：商品表找不到同名商品`); }
+    const p       = matches[0];
+    const status  = String(p.status || 'active').toLowerCase();
+    let reason = '';
+    if (status !== 'active')         reason = `status=${status}`;
+    else if (!isVisible_(p.visible)) reason = 'visible=FALSE';
+    if (reason) bad++;
+    const dup = matches.length > 1 ? `（⚠️ ${matches.length} 筆同名，進貨只進到 id ${p.id}）` : '';
+    Logger.log(`${reason ? '❌' : '✅'} ${name}：id ${p.id}　${it.batchId}${reason ? '　原因 ' + reason : ''}${dup}`);
+  });
+  Logger.log(bad ? `共 ${bad} 項不會出現在收銀台` : '全部品項都會出現在收銀台');
 }
