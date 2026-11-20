@@ -1,5 +1,25 @@
 // ══════════════════════════════════════════════════════
 //  拾逅花事 | 進銷存系統 — Google Apps Script 後端
+//  版本：2.11  |  2026-11
+//  [v2.11] Studio 訂單獨立
+//         - Studio 花材另外進貨：Studio 單結帳不扣任何點位庫存，作廢也不還原庫存
+//           （之前點位不認得 Studio 會預設扣高雄）
+//         - 一次性修正舊資料：先執行 previewStudioFix() 看會改幾筆、金額多少，
+//           確認沒問題再執行 fixStudioStore()，把 S 開頭、記在高雄的單改成 Studio
+//           （主檔與封存檔都會處理）
+//  ────────────────────────────────────────────────────
+//  版本：2.10  |  2026-11
+//  [v2.10] 後台報表支援查詢 115/6/1 之前的交易（讀封存試算表）
+//         - 新增 ARCHIVE_ID / ARCHIVE_CUTOFF / ARCHIVE_START 與 getTxRows_ 等共用函式
+//         - 6/1 之前只讀封存檔、6/1 之後只讀主檔，避免封存副本內 6 月後的資料重複計算
+//         - 封存檔裡舊試算表遷移進來的交易（total=0、items 空白）欄位錯位，
+//           讀取時自動校正：金額取 cost 欄、成本取 discount 欄
+//         - 封存檔日期格式 2026/3/28 統一轉成 yyyy-MM-ddTHH:mm:ss
+//         - 套用報表：getSalesReport / getDailyReport / getMonthlyReport /
+//           getPayBreakdown / getPayBreakdownRange / getItemRanking /
+//           getItemStoreSplit / getStoreStats / getTransactionHistory
+//         - 只讀不寫：結帳、作廢、合併商品等寫入動作完全沒動
+//  ────────────────────────────────────────────────────
 //  版本：2.9  |  2026-11
 //  [v2.9] 週換花「下架」改用 visible 欄位，status 只代表停售
 //         - visible=FALSE：本週沒進貨、暫時不在收銀台（進貨後自動打開）
@@ -236,6 +256,10 @@ function parseTaipei_(ts) {
   return new Date(hasOffset ? s : s + '+08:00');
 }
 
+// [v2.11] 不扣庫存的點位：Studio 花材另外進，不屬於任何點位庫存
+const NO_STOCK_STORES = ['Studio'];
+function isNoStockStore_(store) { return NO_STOCK_STORES.includes(String(store || '')); }
+
 function storeToColKey_(store) {
   if (store === '台南FOCUS')    return 'stockTN';
   if (store === '誠品生活台南') return 'stockES';
@@ -251,6 +275,68 @@ function storeFilter_(store) {
 function safeJson(str, fallback) {
   try   { return JSON.parse(str); }
   catch { return fallback; }
+}
+
+
+// ══════════════════════════════════════════════════════
+//  [v2.10] 交易封存檔：115/6/1 之前的交易改從封存試算表讀
+// ══════════════════════════════════════════════════════
+const ARCHIVE_ID     = '13YGGTO8EEpKhtyERGJSGdqE6ZJjt0IxqEScRsk2ZoEw';
+const ARCHIVE_CUTOFF = '2026-06-01';   // 這天之前讀封存檔，這天（含）之後讀主檔
+const ARCHIVE_START  = '2026-03-01';   // 封存檔最早的資料月份，用來判斷要不要開封存檔
+
+function ymdOf_(d) {
+  return Utilities.formatDate(d, 'Asia/Taipei', 'yyyy-MM-dd');
+}
+
+// 單一日期是否落在封存區間
+function inArchive_(ymd) {
+  return !!ymd && ymd >= ARCHIVE_START && ymd < ARCHIVE_CUTOFF;
+}
+
+// 查詢區間是否碰到封存區間（from/to 為 'yyyy-MM-dd'，空值 = 不限）
+function needsArchive_(from, to) {
+  return (!from || from < ARCHIVE_CUTOFF) && (!to || to >= ARCHIVE_START);
+}
+
+// 封存檔日期可能是 Date、'2026/3/28' 或 '2026-05-30 14:00:00'，統一成 sheetToObjects 的格式
+function normTxDate_(v) {
+  if (v instanceof Date) return Utilities.formatDate(v, 'Asia/Taipei', "yyyy-MM-dd'T'HH:mm:ss");
+  const m = String(v || '').trim()
+    .match(/^(\d{4})[-\/](\d{1,2})[-\/](\d{1,2})(?:[ T](\d{1,2}):(\d{2})(?::(\d{2}))?)?/);
+  if (!m) return String(v || '');
+  const p = n => String(n || 0).padStart(2, '0');
+  return `${m[1]}-${p(m[2])}-${p(m[3])}T${p(m[4])}:${p(m[5])}:${p(m[6])}`;
+}
+
+// 讀封存檔：只留 6/1 之前，並校正舊試算表遷移進來的錯位欄位
+function getArchiveTxRows_() {
+  const sh = SpreadsheetApp.openById(ARCHIVE_ID).getSheetByName(SH.TRANSACTIONS);
+  if (!sh) return [];
+  return sheetToObjects(sh).map(r => {
+    r.date = normTxDate_(r.date);
+    // 遷移資料特徵：total=0、cost 有值、items 空白 → 金額在 cost 欄、成本在 discount 欄
+    if ((Number(r.total) || 0) === 0 && (Number(r.cost) || 0) > 0 && !String(r.items || '').trim()) {
+      const amount = Number(r.cost) || 0;
+      r.cost     = Number(r.discount) || 0;
+      r.total    = amount;
+      r.discount = Math.max(0, (Number(r.subtotal) || 0) - amount);
+      r._legacy  = true;
+    }
+    r._archive = true;
+    return r;
+  }).filter(r => {
+    const ymd = String(r.date).slice(0, 10);
+    return /^\d{4}-\d{2}-\d{2}$/.test(ymd) && ymd < ARCHIVE_CUTOFF;
+  });
+}
+
+// 報表共用：主檔（6/1 之後）＋ 需要時合併封存檔（6/1 之前），封存資料排在前面維持時間順序
+function getTxRows_(includeArchive) {
+  const main = sheetToObjects(getSheet(SH.TRANSACTIONS));
+  if (!includeArchive) return main;
+  const mainAfter = main.filter(r => String(r.date).slice(0, 10) >= ARCHIVE_CUTOFF || !/^\d{4}-\d{2}-\d{2}/.test(String(r.date)));
+  return getArchiveTxRows_().concat(mainAfter);
 }
 
 // ══════════════════════════════════════════════════════
@@ -517,7 +603,8 @@ function addTransaction(data) {
     ]);
 
     // 扣減庫存（在 Lock 保護內執行，安全）
-    if (data.items && data.items.length) {
+    // [v2.11] Studio 單不扣庫存
+    if (data.items && data.items.length && !isNoStockStore_(data.store)) {
       data.items.forEach(item => {
         if (item.id && Number(item.id) > 0 && item.qty > 0) {
           _updateStockDeltaInternal(item.id, data.store, -item.qty, `銷售扣庫：${txId}`);
@@ -570,8 +657,7 @@ function updateStockDelta(id, store, delta, note) {
 //  銷售報表
 // ══════════════════════════════════════════════════════
 function getSalesReport(store, from, to) {
-  const sh   = getSheet(SH.TRANSACTIONS);
-  const rows = sheetToObjects(sh);
+  const rows = getTxRows_(needsArchive_(from, to));   // [v2.10]
   const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
   const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
 
@@ -611,9 +697,12 @@ function dateRange_(date) {
 }
 
 function getDailyReport(store, date) {
-  const sh   = getSheet(SH.TRANSACTIONS);
-  const rows = sheetToObjects(sh);
   const { from, to } = dateRange_(date);
+  // [v2.10] 當天、上週同日、上月同日、去年同日任一天落在封存區間才開封存檔
+  const _chk = [0, 7].map(n => { const d = new Date(from); d.setDate(d.getDate() - n); return ymdOf_(d); });
+  { const d = new Date(from); d.setMonth(d.getMonth() - 1); _chk.push(ymdOf_(d)); }
+  { const d = new Date(from); d.setFullYear(d.getFullYear() - 1); _chk.push(ymdOf_(d)); }
+  const rows = getTxRows_(_chk.some(inArchive_));
 
   const filt    = storeFilter_(store);
   const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
@@ -698,8 +787,9 @@ function getMonthlyReport(store, ym) {
   const lyFrom = new Date(year - 1, month - 1, 1, 0, 0, 0);
   const lyTo   = new Date(year - 1, month, 0, 23, 59, 59);
 
-  const sh      = getSheet(SH.TRANSACTIONS);
-  const rows    = sheetToObjects(sh);
+  // [v2.10] 本月或去年同月碰到封存區間才開封存檔
+  const _ymA = `${year}-${String(month).padStart(2,'0')}`, _ymB = `${year-1}-${String(month).padStart(2,'0')}`;
+  const rows    = getTxRows_(needsArchive_(_ymA + '-01', _ymA + '-31') || needsArchive_(_ymB + '-01', _ymB + '-31'));
   const filt    = storeFilter_(store);
   const notVoid = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
 
@@ -718,9 +808,8 @@ function getMonthlyReport(store, ym) {
 }
 
 function getPayBreakdown(store, date) {
-  const sh   = getSheet(SH.TRANSACTIONS);
-  const rows = sheetToObjects(sh);
   const { from, to } = dateRange_(date);
+  const rows = getTxRows_(inArchive_(ymdOf_(from)));   // [v2.10]
   const filt = storeFilter_(store);
   const result = {};
   rows.filter(r => {
@@ -734,8 +823,7 @@ function getPayBreakdown(store, date) {
 }
 
 function getPayBreakdownRange(store, from, to) {
-  const sh       = getSheet(SH.TRANSACTIONS);
-  const rows     = sheetToObjects(sh);
+  const rows     = getTxRows_(needsArchive_(from, to));   // [v2.10]
   const filt     = storeFilter_(store);
   const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
   const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
@@ -777,8 +865,6 @@ function getWeeklyTrend(store) {
 }
 
 function getItemRanking(store, date, fromDate, toDate) {
-  const sh   = getSheet(SH.TRANSACTIONS);
-  const rows = sheetToObjects(sh);
   const filt = storeFilter_(store);
   let from, to;
   if (fromDate && toDate) {
@@ -789,6 +875,7 @@ function getItemRanking(store, date, fromDate, toDate) {
     from = new Date(base.getFullYear(), base.getMonth(), 1);
     to   = new Date(base.getFullYear(), base.getMonth() + 1, 0, 23, 59, 59);
   }
+  const rows = getTxRows_(needsArchive_(ymdOf_(from), ymdOf_(to)));   // [v2.10]
   const prodMap = {};
   sheetToObjects(getSheet(SH.PRODUCTS)).forEach(r => {
     prodMap[Number(r.id)] = { cost: Number(r.cost)||0, price: Number(r.price)||0, name: r.name };
@@ -848,8 +935,7 @@ function getItemRanking(store, date, fromDate, toDate) {
 
 function getItemStoreSplit(name, from, to) {
   if (!name) return [];
-  const sh       = getSheet(SH.TRANSACTIONS);
-  const rows     = sheetToObjects(sh);
+  const rows     = getTxRows_(needsArchive_(from, to));   // [v2.10]
   const fromDate = from ? new Date(from + 'T00:00:00+08:00') : new Date(0);
   const toDate   = to   ? new Date(to   + 'T23:59:59+08:00') : new Date();
   const notVoid  = r => !(r.voided === true || String(r.voided).toLowerCase() === 'true');
@@ -873,8 +959,7 @@ function getItemStoreSplit(name, from, to) {
 }
 
 function getStoreStats(store, fromDate, toDate) {
-  const sh   = getSheet(SH.TRANSACTIONS);
-  const rows = sheetToObjects(sh);
+  const rows = getTxRows_(needsArchive_(fromDate, toDate));   // [v2.10]
   const filt = storeFilter_(store);
   const from = fromDate ? new Date(fromDate + 'T00:00:00+08:00') : new Date(0);
   const to   = toDate   ? new Date(toDate   + 'T23:59:59+08:00') : new Date();
@@ -978,7 +1063,9 @@ function getTransactionHistory(store, date) {
   // [PERF] 有指定日期時只讀最近 600 列（約 2 個月），不讀全表
   // 若查更早的歷史資料才 fallback 讀全表
   let rows;
-  if (date) {
+  if (date && date < ARCHIVE_CUTOFF) {
+    rows = getArchiveTxRows_();   // [v2.10] 6/1 之前的日期改讀封存檔
+  } else if (date) {
     const lastRow  = sh.getLastRow();
     const readRows = Math.min(600, lastRow - 1);
     if (lastRow < 2 || readRows <= 0) {
@@ -1571,9 +1658,12 @@ function voidTransaction(data) {
     const vRes = markVoucherVoided_(txId); // [v2.5] 同步作廢兌換紀錄
     const store = vals[i][headers.indexOf('store')];
     const items = safeJson(String(vals[i][headers.indexOf('items')] || ''), []);
-    items.forEach(item => {
-      if (item.id && Number(item.id) > 0 && Number(item.qty) > 0) updateStockDelta(item.id, store, Number(item.qty), `退款還原：${txId}`);
-    });
+    // [v2.11] Studio 單當初沒扣庫存，作廢也不還原（不然高雄會憑空多出花）
+    if (!isNoStockStore_(store)) {
+      items.forEach(item => {
+        if (item.id && Number(item.id) > 0 && Number(item.qty) > 0) updateStockDelta(item.id, store, Number(item.qty), `退款還原：${txId}`);
+      });
+    }
     const memberId  = String(vals[i][headers.indexOf('memberId')] || '');
     const earnedPts = Number(vals[i][headers.indexOf('earnedPoints')]) || 0;
     const txTotal   = Number(vals[i][headers.indexOf('total')]) || 0;
@@ -2461,4 +2551,65 @@ function getVoucherAnalytics(store, from, to, campaign) {
     redeemItems: Object.values(redeemMap).map(x => ({ name: x.name, qty: x.qty, vouchers: x.vouchers, cost: r0(x.cost), margin: r0(x.income - x.cost) })).sort((a, b) => b.qty - a.qty).slice(0, 15),
     addOnItems: Object.values(addOnMap).map(x => ({ ...x, sales: r0(x.sales) })).sort((a, b) => b.sales - a.sales).slice(0, 15),
   };
+}
+
+// ══════════════════════════════════════════════════════
+//  [v2.11] 一次性：舊 Studio 單從高雄改回 Studio
+//  判斷條件：交易編號 S 開頭（S + 數字，只有 Studio 接單會產生）且點位 = 高雄FOCUS 13
+//  步驟：1) 執行 previewStudioFix() 看結果  2) 確認後執行 fixStudioStore()
+//  只改 store 欄位，不動金額、不動庫存
+// ══════════════════════════════════════════════════════
+const STUDIO_FIX_FROM = '高雄FOCUS 13';
+
+function scanStudioRows_(sh) {
+  if (!sh) return { sh, storeCol: -1, rows: [] };
+  const vals     = sh.getDataRange().getValues();
+  const headers  = vals[0];
+  const idCol    = headers.indexOf('id');
+  const storeCol = headers.indexOf('store');
+  const totalCol = headers.indexOf('total');
+  const noteCol  = headers.indexOf('note');
+  const rows = [];
+  for (let i = 1; i < vals.length; i++) {
+    const id = String(vals[i][idCol] || '').trim();
+    if (!/^S\d+$/.test(id)) continue;
+    if (String(vals[i][storeCol]) !== STUDIO_FIX_FROM) continue;
+    rows.push({
+      row  : i + 1, id,
+      total: Number(vals[i][totalCol]) || 0,
+      hasStudioNote: String(vals[i][noteCol] || '').includes('Studio'),
+    });
+  }
+  return { sh, storeCol, rows };
+}
+
+function studioFixTargets_() {
+  const main = scanStudioRows_(getSheet(SH.TRANSACTIONS));
+  let arch = { rows: [] };
+  try { arch = scanStudioRows_(SpreadsheetApp.openById(ARCHIVE_ID).getSheetByName(SH.TRANSACTIONS)); }
+  catch (e) { Logger.log('⚠️ 封存檔開不起來：' + e.message); }
+  return { main, arch };
+}
+
+function previewStudioFix() {
+  const { main, arch } = studioFixTargets_();
+  [['主檔', main], ['封存檔', arch]].forEach(([label, t]) => {
+    const sum      = t.rows.reduce((s, r) => s + r.total, 0);
+    const noNote   = t.rows.filter(r => !r.hasStudioNote);
+    Logger.log(`${label}：${t.rows.length} 筆，合計 NT$ ${sum.toLocaleString()}`);
+    if (noNote.length) Logger.log(`  ⚠️ 其中 ${noNote.length} 筆備註沒有「Studio」字樣，請抽查：${noNote.slice(0, 20).map(r => r.id).join(', ')}`);
+  });
+  Logger.log('確認無誤後執行 fixStudioStore()');
+}
+
+function fixStudioStore() {
+  const { main, arch } = studioFixTargets_();
+  let n = 0;
+  [main, arch].forEach(t => {
+    if (!t.rows.length || t.storeCol < 0) return;
+    const cells = t.rows.map(r => t.sh.getRange(r.row, t.storeCol + 1).getA1Notation());
+    t.sh.getRangeList(cells).setValue('Studio');
+    n += cells.length;
+  });
+  Logger.log(`✅ 已將 ${n} 筆 Studio 單的點位改為 Studio（主檔 ${main.rows.length}、封存檔 ${arch.rows.length}）`);
 }
