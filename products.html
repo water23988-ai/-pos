@@ -124,6 +124,19 @@
         /* 商品數量 badge */
         .count-badge { background: #F5EFE6; color: #7A6550; border-radius: 20px; padding: 3px 10px; font-size: 11px; font-weight: 600; }
 
+        /* ── [v2.13] 狀態分頁 + 三段狀態按鈕 ── */
+        .state-tabs { display: flex; gap: 6px; margin-bottom: 14px; flex-wrap: wrap; }
+        .state-tab { border: 1.5px solid #DDD0BC; background: #FAF7F2; border-radius: 12px; padding: 8px 14px; font-size: 13px; font-weight: 600; color: #7A6550; cursor: pointer; display: flex; align-items: center; gap: 6px; }
+        .state-tab .n { font-size: 11px; background: #F0E9DF; border-radius: 10px; padding: 1px 7px; color: #A89278; }
+        .state-tab.active { border-color: #8e9775; background: #f0f3ec; color: #4d6145; }
+        .state-tab.active .n { background: #8e9775; color: white; }
+        .state-seg { display: flex; margin-top: 10px; padding-top: 10px; border-top: 1px solid #EDE5D8; gap: 4px; }
+        .state-seg button { flex: 1; border: 1.5px solid #DDD0BC; background: #F5EFE6; color: #A89278; border-radius: 8px; padding: 6px 2px; font-size: 11px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+        .state-seg button.on.s-on  { background: #8e9775; border-color: #8e9775; color: white; }
+        .state-seg button.on.s-off { background: #C4A87A; border-color: #C4A87A; color: white; }
+        .state-seg button.on.s-stop{ background: #C4928A; border-color: #C4928A; color: white; }
+        .state-seg button:disabled { opacity: 0.5; cursor: wait; }
+
         /* ── Toggle Switch ── */
         .toggle-wrap { display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid #EDE5D8; }
         .toggle-label-text { font-size: 11px; font-weight: 600; color: #A89278; letter-spacing: 0.04em; }
@@ -265,12 +278,6 @@
                     <input type="number" id="fieldStockTN" class="f-input" min="0" placeholder="0">
                 </div>
                 <div>
-                    <label class="f-label" style="color:#8A9BA8;">誠品 (ES)</label>
-                    <input type="number" id="fieldStockES" class="f-input" min="0" placeholder="0">
-                </div>
-            </div>
-            <div class="modal-grid-3">
-                <div>
                     <label class="f-label" style="color:#8A9BA8;">市集 (MK)</label>
                     <input type="number" id="fieldStockMarket" class="f-input" min="0" placeholder="0">
                 </div>
@@ -279,7 +286,7 @@
 
         <div class="modal-actions">
             <button onclick="closeProductModal()" class="btn-ghost" style="flex:1;">取消</button>
-            <button id="deleteBtn" onclick="deleteProduct()" class="btn-danger" style="display:none;">刪除</button>
+            <button id="deleteBtn" onclick="deleteProduct()" class="btn-danger" style="display:none;">停售</button>
             <button onclick="saveProduct()" class="btn-primary" style="flex:2;" id="saveBtn">儲存商品</button>
         </div>
     </div>
@@ -367,6 +374,13 @@
             </div>
         </div>
 
+        <!-- [v2.13] 狀態分頁 -->
+        <div class="state-tabs" id="stateTabs">
+            <button class="state-tab active" data-state="on"   onclick="setStateFilter('on')">上架中 <span class="n" id="cnt-on">0</span></button>
+            <button class="state-tab"        data-state="off"  onclick="setStateFilter('off')">本週未進 <span class="n" id="cnt-off">0</span></button>
+            <button class="state-tab"        data-state="stop" onclick="setStateFilter('stop')">停售 <span class="n" id="cnt-stop">0</span></button>
+        </div>
+
         <!-- 篩選列 -->
         <div class="filter-bar" id="productFilterBar">
             <div class="filter-chips" id="catChips">
@@ -426,6 +440,24 @@ const DEFAULT_API_URL = 'https://script.google.com/macros/s/AKfycbwKKpuiZvTc3iGF
 let API_URL = DEFAULT_API_URL;
 let allProducts = [];
 let currentCat  = '全部';
+let currentState = 'on';   // [v2.13] on=上架中 / off=本週未進 / stop=停售
+
+// [v2.13] 三種狀態（後端：status 管停售、visible 管本週有沒有上架）
+//   停售     → status = inactive
+//   本週未進 → status = active、visible = FALSE（舊資料的 status=hidden 也算這裡）
+//   上架中   → status = active、visible 不是 FALSE
+function productState(p) {
+    const st = String(p.status || 'active').toLowerCase();
+    if (st === 'inactive') return 'stop';
+    if (st === 'hidden' || p.visible === false) return 'off';
+    return 'on';
+}
+const STATE_LABEL = { on: '上架中', off: '本週未進', stop: '停售' };
+function setStateFilter(state) {
+    currentState = state;
+    document.querySelectorAll('#stateTabs .state-tab').forEach(b => b.classList.toggle('active', b.dataset.state === state));
+    renderProducts();
+}
 
 // ══ API Modal ══
 function openApiModal() {
@@ -512,6 +544,13 @@ function renderProducts() {
     const q = (document.getElementById('searchInput').value || '').toLowerCase().trim();
     let list = allProducts;
     if (currentCat !== '全部') list = list.filter(p => (p.category || p.分類 || '') === currentCat);
+
+    // [v2.13] 各狀態數量（套用分類篩選後）
+    const counts = { on: 0, off: 0, stop: 0 };
+    list.forEach(p => counts[productState(p)]++);
+    Object.keys(counts).forEach(k => { const el = document.getElementById('cnt-' + k); if (el) el.innerText = counts[k]; });
+    // 有輸入搜尋時跨三種狀態一起找（方便找回停售或本週未進的花），沒搜尋時只看目前分頁
+    if (!q) list = list.filter(p => productState(p) === currentState);
     // [v2.10] 同時搜尋商品名稱和編號
     if (q) list = list.filter(p =>
         (p.name || p.productName || p.商品名稱 || '').toLowerCase().includes(q) ||
@@ -524,7 +563,7 @@ function renderProducts() {
         document.getElementById('productsContainer').innerHTML = `
             <div class="empty-state">
                 <div class="empty-state-icon">🌸</div>
-                <div class="empty-state-text">${q || currentCat !== '全部' ? '查無符合的商品' : '還沒有商品，點右上角新增'}</div>
+                <div class="empty-state-text">${q || currentCat !== '全部' || currentState !== 'on' ? '查無符合的商品' : '還沒有商品，點右上角新增'}</div>
             </div>`;
         return;
     }
@@ -541,22 +580,18 @@ function productCardHtml(p) {
     const sugprice = Number(p.suggestedPrice || p.建議售價 || 0);
     const stockKH  = Number(p.stockKH || p.庫存KH || 0);
     const stockTN  = Number(p.stockTN || p.庫存TN || 0);
-    const stockES  = Number(p.stockES || p.庫存ES || 0);
     const stockMK  = Number(p.stockMarket || 0);
     const code     = String(p.code || '');
-    // status: 'active' = 收銀台顯示, 'hidden' = 管理可見但不在收銀台, 'inactive' = 已刪除
-    const status  = p.status || 'active';
-    const posOn   = status === 'active';    // 是否顯示在收銀台
-    const deleted = status === 'inactive';  // 已軟刪除
+    const state   = productState(p);        // [v2.13]
+    const deleted = state === 'stop';
 
     const khClass  = stockKH <= 3 ? 'stock-low' : '';
     const tnClass  = stockTN <= 3 ? 'stock-low' : '';
-    const esClass  = stockES <= 3 ? 'stock-low' : '';
     const mkClass  = stockMK <= 3 ? 'stock-low' : '';
 
     return `<div class="product-card" style="${deleted ? 'opacity:0.55;' : ''}">
         <button class="product-card-edit" onclick="openEditModal('${escHtml(JSON.stringify(p))}')">✏️</button>
-        <div class="product-card-name">${escHtml(name)}${deleted ? ' <span style="font-size:9px;background:#f3d6d4;color:#C4928A;border-radius:6px;padding:2px 6px;font-weight:700;">已停用</span>' : ''}${code ? ` <span style="font-size:9px;background:#e8f0e0;color:#6d7756;border-radius:6px;padding:2px 7px;font-weight:700;"># ${escHtml(code)}</span>` : ''}</div>
+        <div class="product-card-name">${escHtml(name)}${state !== 'on' ? ` <span style="font-size:9px;background:${deleted ? '#f3d6d4;color:#C4928A' : '#f3e9d6;color:#a8874f'};border-radius:6px;padding:2px 6px;font-weight:700;">${STATE_LABEL[state]}</span>` : ''}${code ? ` <span style="font-size:9px;background:#e8f0e0;color:#6d7756;border-radius:6px;padding:2px 7px;font-weight:700;"># ${escHtml(code)}</span>` : ''}</div>
         <span class="product-card-cat">${escHtml(cat)}</span>
         <div class="product-card-price">NT$ ${price.toLocaleString()}</div>
         <div class="product-card-cost">成本 NT$ ${cost.toLocaleString()} ${sugprice > 0 ? '· 建議 NT$ ' + sugprice.toLocaleString() : ''}</div>
@@ -571,22 +606,13 @@ function productCardHtml(p) {
                 <div class="stock-badge-val">${stockTN}</div>
                 <div class="stock-badge-lbl">台南</div>
             </div>
-            <div class="stock-badge ${esClass}">
-                <div class="stock-badge-val">${stockES}</div>
-                <div class="stock-badge-lbl">誠品</div>
-            </div>
             <div class="stock-badge ${mkClass}">
                 <div class="stock-badge-val">${stockMK}</div>
                 <div class="stock-badge-lbl">市集</div>
             </div>
         </div>
-        <div class="toggle-wrap">
-            <span class="toggle-label-text ${posOn ? 'on' : ''}">${posOn ? '收銀台顯示中' : (deleted ? '已停用' : '收銀台已隱藏')}</span>
-            <label class="toggle" style="${deleted ? 'pointer-events:none;opacity:0.4;' : ''}">
-                <input type="checkbox" ${posOn ? 'checked' : ''} onchange="toggleVisibility('${escHtml(id)}', this)">
-                <div class="toggle-track"></div>
-                <div class="toggle-thumb"></div>
-            </label>
+        <div class="state-seg">
+            ${['on','off','stop'].map(s => `<button class="s-${s} ${state === s ? 'on' : ''}" onclick="setProductState('${escHtml(id)}','${s}',this)">${STATE_LABEL[s]}</button>`).join('')}
         </div>
     </div>`;
 }
@@ -601,7 +627,7 @@ function openAddModal() {
     document.getElementById('modalTitle').innerText = '新增商品';
     document.getElementById('editProductId').value = '';
     document.getElementById('deleteBtn').style.display = 'none';
-    ['fieldName','fieldCode','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockES','fieldStockMarket'].forEach(id => {
+    ['fieldName','fieldCode','fieldPrice','fieldCost','fieldSuggestedPrice','fieldStockKH','fieldStockTN','fieldStockMarket'].forEach(id => {
         document.getElementById(id).value = '';
     });
     document.getElementById('fieldCategory').value = '主花';
@@ -622,10 +648,10 @@ function openEditModal(jsonStr) {
     document.getElementById('fieldSuggestedPrice').value = p.suggestedPrice || p.建議售價 || '';
     document.getElementById('fieldStockKH').value      = p.stockKH || p.庫存KH || '';
     document.getElementById('fieldStockTN').value      = p.stockTN || p.庫存TN || '';
-    document.getElementById('fieldStockES').value      = p.stockES || p.庫存ES || '';
     document.getElementById('fieldStockMarket').value  = p.stockMarket || '';
     document.getElementById('fieldCode').value          = p.code || '';
-    document.getElementById('deleteBtn').style.display = '';
+    // [v2.13] 已停售的商品不顯示「停售」按鈕，改用卡片上的狀態按鈕恢復
+    document.getElementById('deleteBtn').style.display = productState(p) === 'stop' ? 'none' : '';
     document.getElementById('codeDupWarn').style.display = 'none';
     document.getElementById('productModal').classList.add('show');
     // 編輯時也即時檢查（萬一本來就跟別人撞）
@@ -671,10 +697,10 @@ async function saveProduct() {
             suggestedPrice  : Number(document.getElementById('fieldSuggestedPrice').value) || 0,
             stockKH         : Number(document.getElementById('fieldStockKH').value) || 0,
             stockTN         : Number(document.getElementById('fieldStockTN').value) || 0,
-            stockES         : Number(document.getElementById('fieldStockES').value) || 0,
+            // [v2.13] 誠品已收點，不再送 stockES（避免覆寫歷史欄位）
             stockMarket     : Number(document.getElementById('fieldStockMarket').value) || 0,
             code            : document.getElementById('fieldCode').value.trim(),
-            // visible 欄已由 status 統一管理（v2.12），不再傳送
+            // [v2.13] 狀態由卡片上的三段按鈕控制，這裡不送 status / visible
         }
     };
 
@@ -707,7 +733,7 @@ async function saveProduct() {
 async function deleteProduct() {
     const id = document.getElementById('editProductId').value.trim();
     if (!id) return;
-    if (!confirm('確定要刪除此商品？此操作無法復原。')) return;
+    if (!confirm('確定停售這個商品？\n\n停售後不會出現在收銀台，進貨也不會自動恢復。\n之後可以在「停售」分頁按「上架中」恢復。')) return;
     if (!API_URL) { showToast('請先設定 API 網址'); return; }
 
     setGas('loading');
@@ -716,12 +742,12 @@ async function deleteProduct() {
         const result = await res.json();
         if (result.success) {
             setGas('ok');
-            showToast('✅ 商品已刪除');
+            showToast('✅ 已停售');
             closeProductModal();
             await loadProducts();
         } else {
             setGas('error');
-            showToast('刪除失敗：' + (result.error || '未知錯誤'));
+            showToast('停售失敗：' + (result.error || '未知錯誤'));
         }
     } catch(e) {
         setGas('error');
@@ -729,40 +755,33 @@ async function deleteProduct() {
     }
 }
 
-// ══ 切換收銀台顯示（同步更新 Google Sheet status 欄位）══
-async function toggleVisibility(id, checkbox) {
-    const posOn     = checkbox.checked;
-    const newStatus = posOn ? 'active' : 'hidden';
-    const wrap      = checkbox.closest('.toggle-wrap');
-    const label     = wrap ? wrap.querySelector('.toggle-label-text') : null;
+// ══ [v2.13] 切換商品狀態：上架中 / 本週未進 / 停售 ══
+async function setProductState(id, state, btn) {
+    const p = allProducts.find(x => String(x.id || x.productId) === String(id));
+    if (!p || productState(p) === state) return;
+    if (!API_URL) { showToast('請先設定 API 網址'); return; }
+    if (state === 'stop' && !confirm(`停售「${p.name}」？\n\n停售後進貨也不會自動回到收銀台，要回到這裡手動恢復。`)) return;
 
-    if (!API_URL) {
-        showToast('請先設定 API 網址');
-        checkbox.checked = !posOn;
-        return;
-    }
+    const data = state === 'stop' ? { id, status: 'inactive' }
+               : state === 'off'  ? { id, status: 'active', visible: false }
+               :                    { id, status: 'active', visible: true };
 
+    const seg = btn.closest('.state-seg');
+    seg.querySelectorAll('button').forEach(b => b.disabled = true);
+    setGas('loading');
     try {
-        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({
-            action: 'updateProduct',
-            data: { id, status: newStatus }
-        })});
+        const res    = await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateProduct', data }) });
         const result = await res.json();
-        if (result.success) {
-            showToast(posOn ? '✅ 已顯示在收銀台' : '🔕 已從收銀台隱藏');
-            if (label) {
-                label.innerText = posOn ? '收銀台顯示中' : '收銀台已隱藏';
-                label.className = 'toggle-label-text' + (posOn ? ' on' : '');
-            }
-            const p = allProducts.find(p => (p.id || p.productId) == id);
-            if (p) { p.status = newStatus; }
-        } else {
-            showToast('更新失敗');
-            checkbox.checked = !posOn;
-        }
-    } catch(e) {
-        showToast('連線失敗');
-        checkbox.checked = !posOn;
+        if (!result.success) throw new Error(result.error || '更新失敗');
+        p.status = data.status;
+        if (data.visible !== undefined) p.visible = data.visible;
+        setGas('ok');
+        showToast(`✅ ${p.name} → ${STATE_LABEL[state]}`);
+        renderProducts();   // 換到別的分頁的商品會從目前列表移走
+    } catch (e) {
+        setGas('error');
+        showToast('更新失敗：' + (e.message || '連線失敗'));
+        seg.querySelectorAll('button').forEach(b => b.disabled = false);
     }
 }
 
@@ -834,7 +853,6 @@ function previewMerge() {
         成本：NT$ ${avgCost}（加權平均）<br>
         庫存高雄：${(k.stockKH||0)+(m.stockKH||0)} 支 &nbsp;
         台南：${(k.stockTN||0)+(m.stockTN||0)} 支 &nbsp;
-        誠品：${(k.stockES||0)+(m.stockES||0)} 支 &nbsp;
         市集：${(k.stockMarket||0)+(m.stockMarket||0)} 支<br>
         「${escHtml(m.name)}」將被停用，歷史交易名稱同步更新`;
 }
